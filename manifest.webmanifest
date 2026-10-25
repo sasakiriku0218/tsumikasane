@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "つみかさね",
+  "short_name": "つみかさね",
+  "description": "ToDo・予定・日記・食事・運動・体重・家計簿・目標を、毎日ひとつの場所に記録するアプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f5f1",
+  "theme_color": "#f2f5f1",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
