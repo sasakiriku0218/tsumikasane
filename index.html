@@ -103,6 +103,16 @@ input, select, textarea, button { font: inherit; color: inherit; letter-spacing:
 .warn { color: var(--warn); }
 .good { color: var(--accent); }
 
+/* icons: DADS shapes in the text colour (so they carry the text's 4.5:1), always beside a visible label and hidden from
+   screen readers. Rows with no room for a label (delete, tick, steppers) keep a named button with a 44 × 44px target. */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.icon { flex: none; fill: currentColor; }
+/* small labelled controls keep their look; an invisible box makes them 44px tall to tap, as DADS's small buttons do */
+nav.tabs button, .chip-btn, .seg button, .moods button, .link-btn, .tile .open, .btn.sm { position: relative; }
+nav.tabs button::after, .chip-btn::after, .seg button::after, .moods button::after, .link-btn::after, .tile .open::after, .btn.sm::after {
+  content: ""; position: absolute; inset: 0; margin: auto; height: 44px;
+}
+
 /* tabs */
 nav.tabs {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
@@ -128,27 +138,28 @@ h2::before { content: ""; width: 12px; height: 12px; border-radius: 4px; backgro
 .datenav, .monthnav { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 .datenav .rel { font-weight: 700; }
 .monthnav .cur { font-weight: 700; min-width: 7.5em; text-align: center; font-variant-numeric: tabular-nums; }
-.iconbtn {
-  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
-  width: 40px; height: 40px; cursor: pointer; display: grid; place-items: center; font-size: 1.25rem; line-height: 1; padding: 0;
+.navbtn {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; line-height: 1;
 }
-.iconbtn:hover { border-color: var(--accent); }
+.navbtn:hover { border-color: var(--accent); }
 .chip-btn { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; cursor: pointer; color: var(--accent); line-height: 1; font-weight: 700; }
 
 /* forms */
 form.add { display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: var(--space-2); }
 form.add input, form.add select, textarea, .inline input {
-  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; line-height: 1.5; min-width: 0;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; line-height: 1.5; min-width: 0;
 }
-.datenav input[type="date"] { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; line-height: 1.5; min-width: 0; }
+.datenav input[type="date"] { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; line-height: 1.5; min-width: 0; }
 .grow { flex: 1 1 180px; }
 .w-sm { flex: 0 1 130px; }
 .w-xs { flex: 0 1 96px; }
-.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 14px 18px; font-weight: 700; line-height: 1; cursor: pointer; }
+/* DADS medium button: 48px tall, a 24px lead icon 4px from its label */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 48px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 700; line-height: 1; cursor: pointer; }
 .btn:hover { background: var(--accent-hover); }
 .btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); font-weight: 400; }
 .btn.ghost:hover { background: var(--surface-2); }
-.btn.sm { padding: 10px 14px; }
+.btn.sm { min-height: 40px; padding: 4px 12px; }
 .link-btn { background: transparent; border: 0; color: var(--link); cursor: pointer; text-decoration: underline; padding: 8px 0; line-height: 1; }
 .link-btn.armed { color: var(--warn); font-weight: 700; }
 .link-btn:disabled { opacity: .4; cursor: default; text-decoration: none; }
@@ -157,7 +168,7 @@ form.add input, form.add select, textarea, .inline input {
 .seg button { background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; color: var(--muted); line-height: 1; }
 .seg button[aria-pressed="true"] { background: var(--sec-c); color: var(--surface); font-weight: 700; }
 .inline { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
-.inline input { padding: 6px 9px; width: 7em; text-align: right; font-variant-numeric: tabular-nums; }
+.inline input { padding: 7px 9px; width: 7em; text-align: right; font-variant-numeric: tabular-nums; }
 .unit { color: var(--muted); }
 
 /* cards and lists */
@@ -182,16 +193,20 @@ ul.list li.dayhead { background: var(--surface-2); padding: var(--space-1) var(-
 .chip { flex: none; font-size: .875rem; line-height: 1; font-weight: 700; color: var(--chip-c); border: 1px solid var(--chip-c); border-radius: 6px; padding: 5px 8px; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .datecell { flex: none; width: 7.5ch; font-variant-numeric: tabular-nums; color: var(--muted); }
 .empty { padding: var(--space-3) var(--space-2); text-align: center; color: var(--muted); display: block; }
-.del { flex: none; background: transparent; border: 0; color: var(--muted); cursor: pointer; height: 40px; min-width: 40px; border-radius: 6px; font-size: 1.25rem; line-height: 1; padding: 0 6px; }
+.del { flex: none; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; color: var(--muted); cursor: pointer; height: 44px; min-width: 44px; border-radius: 6px; line-height: 1; padding: 0 8px; }
 .del:hover { background: var(--surface-2); color: var(--warn); }
 .del.armed { color: var(--warn); font-weight: 700; font-size: .875rem; }
 .note { font-size: .875rem; line-height: 1.3; letter-spacing: 0; color: var(--muted); padding: var(--space-1) var(--space-2) var(--space-2); }
 
 /* todo */
-.check { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); background: transparent; cursor: pointer; display: grid; place-items: center; padding: 0; }
-.check:hover { border-color: var(--c-todo); }
-li.done .check { background: var(--c-todo); border-color: var(--c-todo); }
-li.done .check::after { content: ""; width: 6px; height: 11px; border: solid var(--surface); border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+/* the tick is DADS's success mark: a 24px ring that fills when done; the ::after widens the target to 44 × 44px */
+.check { flex: none; position: relative; width: 24px; height: 24px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.check::after { content: ""; position: absolute; inset: -10px; }
+.check circle { fill: none; stroke: var(--line); stroke-width: 2; }
+.check path { fill: none; }
+.check:hover circle { stroke: var(--c-todo); }
+li.done .check circle { fill: var(--c-todo); stroke: var(--c-todo); }
+li.done .check path { fill: var(--surface); }
 li.done .text { color: var(--muted); text-decoration: line-through; }
 
 /* journal */
@@ -249,7 +264,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
 .pct { flex: none; font-size: .875rem; letter-spacing: 0; color: var(--muted); font-variant-numeric: tabular-nums; width: 4.5ch; text-align: right; }
 .goal-actions { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 .goal-actions input[type="number"] { width: 5.5rem; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; line-height: 1.5; text-align: right; font-variant-numeric: tabular-nums; }
-.stepper { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; width: 40px; height: 40px; cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 0; }
+.stepper { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; width: 44px; height: 44px; cursor: pointer; display: grid; place-items: center; padding: 0; }
 .spacer { flex: 1; }
 
 /* home */
@@ -269,7 +284,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
 .tile ul { margin: 2px 0 0; padding: 0; list-style: none; }
 .tile ul li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile ul li::before { content: "・"; color: var(--tile-c); }
-.tile .open { align-self: flex-start; margin-top: auto; background: transparent; border: 0; color: var(--tile-c); font-weight: 700; line-height: 1; cursor: pointer; padding: 10px 0 2px; }
+.tile .open { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; margin-top: auto; background: transparent; border: 0; color: var(--tile-c); font-weight: 700; line-height: 1; cursor: pointer; padding: 10px 0 2px; }
 .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-1); }
 .day { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: .875rem; line-height: 1; color: var(--muted); }
 .day .n { font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; font-size: 1rem; }
@@ -301,9 +316,19 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
 .foot { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
 .backup { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1) var(--space-3); }
 .notice { display: flex; flex-direction: column; gap: 4px; padding: var(--space-2); border: 1px solid var(--warn); border-radius: 12px; background: var(--surface); text-wrap: pretty; }
-.notice strong { color: var(--warn); font-family: var(--font-display); font-size: 1.125rem; line-height: 1.6; }
+.notice strong { display: flex; align-items: center; gap: var(--space-1); color: var(--warn); font-family: var(--font-display); font-size: 1.125rem; line-height: 1.6; }
+.notice .cut { fill: var(--surface); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
+
+<!-- icon shapes from the Digital Agency's example components (MIT): chevrons, close and plus; minus is drawn to match the plus -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-prev" viewBox="0 0 16 16"><path d="m5.27 8 5.33-5.33-.93-.94L3.4 8l6.27 6.27.93-.94L5.27 8Z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 16 16"><path d="m6 1.73-.93.94L10.4 8l-5.33 5.33.93.94L12.27 8 6 1.73Z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.4 18.6-1-1 5.5-5.6-5.6-5.6 1.1-1 5.6 5.5 5.6-5.6 1 1.1L13 12l5.6 5.6-1 1L12 13l-5.6 5.6Z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M21 11H13V3H11V11H3V13H11V21H13V13H21V11Z"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M21 11H3V13H21V11Z"/></symbol>
+</svg>
 
 <div class="wrap">
   <header class="top">
@@ -313,7 +338,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
 
   <!-- 保存できない場所で開いたときの注意 -->
   <div class="notice" id="noSave" role="status" hidden>
-    <strong>ここでは保存されません</strong>
+    <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="警告"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg>ここでは保存されません</strong>
     <span>このブラウザは記録を保存できない設定になっています。プライベートブラウズをやめるか、別のブラウザで開いてください。</span>
   </div>
 
@@ -351,7 +376,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
     <form class="add" id="evForm" autocomplete="off">
       <input type="time" id="evTime" class="w-sm" aria-label="時間（任意）">
       <input type="text" id="evTitle" class="grow" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
-      <button class="btn" type="submit">追加</button>
+      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
     </form>
     <ul class="list card" id="calDayList"></ul>
   </section>
@@ -362,7 +387,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
     <form class="add" id="todoForm" autocomplete="off">
       <input type="text" id="todoText" class="grow" placeholder="やること（例：牛乳を買う）" aria-label="やること" maxlength="200" required>
       <input type="date" id="todoDue" class="w-sm" aria-label="期限（任意）">
-      <button class="btn" type="submit">追加</button>
+      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
     </form>
     <div class="bar">
       <div class="seg" role="group" aria-label="表示の切り替え" id="todoFilters">
@@ -402,7 +427,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
       </select>
       <input type="text" id="mealText" class="grow" placeholder="食べたもの（例：鮭定食）" aria-label="食べたもの" maxlength="200" required>
       <input type="number" id="mealKcal" class="w-xs" placeholder="kcal" aria-label="カロリー（任意）" min="0" max="9999" inputmode="numeric">
-      <button class="btn" type="submit">追加</button>
+      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
     </form>
     <ul class="list card" id="mealList"></ul>
     <div class="muted small" id="mealTotal"></div>
@@ -419,7 +444,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
       </datalist>
       <input type="number" id="woMin" class="w-xs" placeholder="分" aria-label="時間（分）" min="1" max="1440" inputmode="numeric" required>
       <input type="text" id="woNote" class="grow" placeholder="メモ（任意）" aria-label="メモ" maxlength="200">
-      <button class="btn" type="submit">追加</button>
+      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
     </form>
     <ul class="list card" id="workoutList"></ul>
     <div class="muted small" id="workoutTotal"></div>
@@ -491,7 +516,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
       </datalist>
       <input type="number" id="exAmount" class="w-xs" placeholder="金額" aria-label="金額（円）" min="1" max="99999999" step="1" inputmode="numeric" required>
       <input type="text" id="exMemo" class="grow" placeholder="メモ（例：スーパーで買い物）" aria-label="メモ" maxlength="200">
-      <button class="btn" type="submit">追加</button>
+      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
     </form>
     <div class="card" id="catCard">
       <div class="card-head">費目ごとの支出</div>
@@ -511,7 +536,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
       <input type="number" id="goalTarget" class="w-xs" placeholder="目標値" aria-label="目標値（任意）" min="1" max="999999" inputmode="numeric">
       <input type="text" id="goalUnit" class="w-xs" placeholder="単位" aria-label="単位（任意）" maxlength="10">
       <input type="date" id="goalDeadline" class="w-sm" aria-label="期限（任意）">
-      <button class="btn" type="submit">追加</button>
+      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
     </form>
     <div class="card" id="goalList"></div>
   </section>
@@ -575,6 +600,18 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
     for (const [k, v] of Object.entries(attrs)) if (v != null) n.setAttribute(k, v);
     if (text != null) n.textContent = text;
     return n;
+  }
+  // a DADS icon from the sprite at the top of <body>; it always sits beside a label, so screen readers skip it
+  function icon(name, size = 16) {
+    const s = svgEl("svg", { class: "icon", width: size, height: size, "aria-hidden": "true", focusable: "false" });
+    s.append(svgEl("use", { href: "#i-" + name }));
+    return s;
+  }
+  // DADS's success mark as a ring + tick, so CSS can show the ring alone until the item is done
+  function checkMark() {
+    const s = svgEl("svg", { width: 24, height: 24, viewBox: "0 0 24 24", "aria-hidden": "true", focusable: "false" });
+    s.append(svgEl("circle", { cx: 12, cy: 12, r: 10 }), svgEl("path", { d: "m17.6 9.6-7 7-4.3-4.3L7.7 11l2.9 2.9 5.7-5.6 1.3 1.4Z" }));
+    return s;
   }
 
   const todayKey = ymd(new Date());
@@ -655,15 +692,18 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
   function showError() { flash("保存できませんでした。端末の空き容量が足りているか確かめてください。"); }
   async function act(fn) { try { await fn(); } catch { showError(); } }
 
-  // two-step delete: first press arms it, second press within 3 s deletes
-  function delButton(onConfirm, label = "×", cls = "del") {
-    const b = el("button", { type: "button", class: cls, "aria-label": "削除" }, label);
+  // two-step delete: first press arms it, second press within 3 s deletes. List rows have no room for a label, so the ×
+  // carries the name 削除 and a 44px target (DADS's exception for icon-only controls); armed, it spells the action out
+  function delButton(onConfirm) {
+    const b = el("button", { type: "button", class: "del" });
+    const idle = () => { b.classList.remove("armed"); b.setAttribute("aria-label", "削除"); b.replaceChildren(icon("close", 24)); };
+    idle();
     let t = null;
     b.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      if (b.classList.contains("armed")) { clearTimeout(t); b.classList.remove("armed"); b.textContent = label; onConfirm(); return; }
-      b.classList.add("armed"); b.textContent = "削除する";
-      t = setTimeout(() => { b.classList.remove("armed"); b.textContent = label; }, 3000);
+      if (b.classList.contains("armed")) { clearTimeout(t); idle(); onConfirm(); return; }
+      b.classList.add("armed"); b.removeAttribute("aria-label"); b.textContent = "削除する";
+      t = setTimeout(idle, 3000);
     });
     return b;
   }
@@ -715,10 +755,11 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
     const rel = relLabel(viewDate);
     document.querySelectorAll(".datenav").forEach((nav) => {
       setChildren(nav,
-        el("button", { type: "button", class: "iconbtn", "aria-label": "前の日", onclick: () => setViewDate(addDays(viewDate, -1)) }, "‹"),
-        rel ? el("span", { class: "rel" }, rel) : null,
+        // the two steps and the date first, so on a phone they share one row and the extras wrap below
+        el("button", { type: "button", class: "navbtn", onclick: () => setViewDate(addDays(viewDate, -1)) }, icon("prev"), "前日"),
         el("input", { type: "date", value: viewDate, "aria-label": "日付を選ぶ", onchange: (e) => setViewDate(e.target.value) }),
-        el("button", { type: "button", class: "iconbtn", "aria-label": "次の日", onclick: () => setViewDate(addDays(viewDate, 1)) }, "›"),
+        el("button", { type: "button", class: "navbtn", onclick: () => setViewDate(addDays(viewDate, 1)) }, "翌日", icon("next")),
+        rel ? el("span", { class: "rel" }, rel) : null,
         viewDate !== todayKey ? el("button", { type: "button", class: "chip-btn", onclick: () => setViewDate(todayKey) }, "きょうへ") : null
       );
     });
@@ -767,7 +808,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
     }
     for (const t of shown) {
       list.append(el("li", { class: t.done ? "done" : "" },
-        el("button", { type: "button", class: "check", "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => act(() => todos.update(t.id, { done: !t.done })) }),
+        el("button", { type: "button", class: "check", "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => act(() => todos.update(t.id, { done: !t.done })) }, checkMark()),
         el("span", { class: "body" }, el("span", { class: "text" }, t.text), dueText(t)),
         delButton(() => act(() => todos.remove(t.id)))
       ));
@@ -1159,9 +1200,9 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
   function renderMoney() {
     const nav = $("monthNav");
     setChildren(nav,
-      el("button", { type: "button", class: "iconbtn", "aria-label": "前の月", onclick: () => { viewMonth = addMonths(viewMonth, -1); renderMoney(); } }, "‹"),
+      el("button", { type: "button", class: "navbtn", onclick: () => { viewMonth = addMonths(viewMonth, -1); renderMoney(); } }, icon("prev"), "前月"),
       el("span", { class: "cur" }, fmtMonth(viewMonth)),
-      el("button", { type: "button", class: "iconbtn", "aria-label": "次の月", onclick: () => { viewMonth = addMonths(viewMonth, 1); renderMoney(); } }, "›"),
+      el("button", { type: "button", class: "navbtn", onclick: () => { viewMonth = addMonths(viewMonth, 1); renderMoney(); } }, "翌月", icon("next")),
       viewMonth !== monthOf(todayKey) ? el("button", { type: "button", class: "chip-btn", onclick: () => { viewMonth = monthOf(todayKey); renderMoney(); } }, "今月へ") : null
     );
     const m = monthSummary(viewMonth);
@@ -1279,9 +1320,9 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
           el("span", { class: "pct" }, `${pct}%`)) : null,
         el("div", { class: "goal-actions" },
           hasTarget ? [
-            el("button", { type: "button", class: "stepper", "aria-label": "1 減らす", onclick: () => setGoalCurrent(g, cur - 1) }, "−"),
+            el("button", { type: "button", class: "stepper", "aria-label": "1 減らす", onclick: () => setGoalCurrent(g, cur - 1) }, icon("minus", 24)),
             el("input", { type: "number", min: 0, value: cur, "aria-label": "現在の値", onchange: (e) => setGoalCurrent(g, e.target.value) }),
-            el("button", { type: "button", class: "stepper", "aria-label": "1 増やす", onclick: () => setGoalCurrent(g, cur + 1) }, "+"),
+            el("button", { type: "button", class: "stepper", "aria-label": "1 増やす", onclick: () => setGoalCurrent(g, cur + 1) }, icon("plus", 24)),
             el("span", { class: "sub" }, `／ ${tgt} ${g.unit || ""}`),
           ] : null,
           el("span", { class: "spacer" }),
@@ -1320,9 +1361,9 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
   function setCalDay(d) { calDay = d; calMonth = monthOf(d); renderCalendar(); }
   function renderCalendar() {
     setChildren($("calNav"),
-      el("button", { type: "button", class: "iconbtn", "aria-label": "前の月", onclick: () => { calMonth = addMonths(calMonth, -1); renderCalendar(); } }, "‹"),
+      el("button", { type: "button", class: "navbtn", onclick: () => { calMonth = addMonths(calMonth, -1); renderCalendar(); } }, icon("prev"), "前月"),
       el("span", { class: "cur" }, fmtMonth(calMonth)),
-      el("button", { type: "button", class: "iconbtn", "aria-label": "次の月", onclick: () => { calMonth = addMonths(calMonth, 1); renderCalendar(); } }, "›"),
+      el("button", { type: "button", class: "navbtn", onclick: () => { calMonth = addMonths(calMonth, 1); renderCalendar(); } }, "翌月", icon("next")),
       calDay !== todayKey || calMonth !== monthOf(todayKey) ? el("button", { type: "button", class: "chip-btn", onclick: () => setCalDay(todayKey) }, "きょうへ") : null
     );
     const evBy = groupBy(events.items, (e) => e.date);
@@ -1374,7 +1415,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
     }
     for (const t of todosDue) {
       list.append(el("li", { class: t.done ? "done" : "" },
-        el("button", { type: "button", class: "check", "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => act(() => todos.update(t.id, { done: !t.done })) }),
+        el("button", { type: "button", class: "check", "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => act(() => todos.update(t.id, { done: !t.done })) }, checkMark()),
         el("span", { class: "body" }, el("span", { class: "text" }, t.text), el("span", { class: "sub" }, "ToDo の期限"))
       ));
     }
@@ -1393,7 +1434,8 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
       el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
       sub ? el("div", { class: "sub" }, sub) : null,
       extra,
-      el("button", { type: "button", class: "open", onclick: () => showTab(tabKey) }, "開く ›"));
+      // eight tiles each say 開く, so the name adds which one (and still contains the visible word)
+      el("button", { type: "button", class: "open", "aria-label": label + "を開く", onclick: () => showTab(tabKey) }, "開く", icon("next")));
   }
   function renderHome() {
     $("homeDate").textContent = fmtLong(todayKey);
