@@ -668,7 +668,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             <span style="--lc: var(--c-goal)">目標の期限</span>
           </div>
         </div>
-        <div class="row-between"><span class="label" id="calDayLabel"></span><span class="muted small" id="calDayCount"></span></div>
         <form class="add" id="evForm" autocomplete="off">
           <input type="text" id="evTitle" class="full" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
           <label class="flabel" for="evTime">時間 <span class="opt">任意</span></label>
@@ -1886,8 +1885,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const todosDue = [...(todoBy.get(calDay) || [])].sort((a, b) => num(a.createdAt) - num(b.createdAt));
     const goalsDue = goalBy.get(calDay) || [];
     const dueCount = todosDue.length + goalsDue.length;
-    $("calDayLabel").textContent = (rel ? rel + "・" : "") + fmtMDW(calDay);
-    $("calDayCount").textContent = [evs.length ? `予定 ${evs.length} 件` : "", dueCount ? `期限 ${dueCount} 件` : ""].filter(Boolean).join("・");
+    // no date line above the form (the user found it unnecessary): the field's hint names the day it adds to
+    const day = parseYmd(calDay);
+    $("evTitle").placeholder = (rel || `${day.getMonth() + 1}月${day.getDate()}日`) + "の予定（例：歯医者）";
     const list = $("calDayList");
     list.replaceChildren();
     if (!evs.length && !dueCount) { list.append(el("li", { class: "empty" }, "この日の予定はありません。上の欄から追加できます。")); return; }
