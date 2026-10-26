@@ -473,7 +473,8 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .cal-week span { padding-bottom: 6px; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
 .cal-week span:first-child, .cal-day.sun .n { color: var(--warn); }
 .cal-week span:last-child, .cal-day.sat .n { color: var(--sat); }
-.cal-day { min-height: 56px; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: transparent; border: 0; border-bottom: .5px solid var(--separator); border-radius: 0; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
+/* tall squares (the user wanted a portrait calendar with more plans showing): room for the date and four lines */
+.cal-day { min-height: 108px; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: transparent; border: 0; border-bottom: .5px solid var(--separator); border-radius: 0; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
 .cal-day:not(:nth-child(7n)) { border-inline-end: .5px solid var(--separator); }
 .cal-day:focus-visible { outline-offset: -3px !important; }  /* inside the square, so the next one can't cover it */
 @media (hover: hover) { .cal-day:hover { background: var(--fill); } }
@@ -484,7 +485,8 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* 10% tint: every date colour on it still reads 4.5:1 */
 .cal-day[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .cal-day[aria-pressed="true"] .n { font-weight: 700; }
-/* each plan as a bar in its label's colour (the title clipped to the square), at most two, then +N. ToDo and goal deadlines
+/* each plan as a bar in its label's colour (the title clipped to the square): four lines at most, the last one +N when
+   there are more. ToDo and goal deadlines
    are outlined bars, as iPhone shows reminders lighter than events. The text is black or white on a light tint, so it
    reads 4.5:1 whatever the hue. */
 .cal-day .bars { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0 2px; }
@@ -1827,6 +1829,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         ...todosDue.map((t) => ({ text: t.text, hue: "var(--c-todo)", due: true })),
         ...goalsDue.map((g) => ({ text: g.title, hue: "var(--c-goal)", due: true })),
       ];
+      // four lines fit a square: four bars, or three and "+N"
+      const shownPlans = plans.length > 4 ? plans.slice(0, 3) : plans;
       const evNames = [...new Set(evs.map((e) => (labelOf(e) || {}).name).filter(Boolean))];
       const notes = [evs.length ? `予定 ${evs.length} 件` + (evNames.length ? `（${evNames.join("、")}）` : "") : "", todosDue.length ? `ToDo の期限 ${todosDue.length} 件` : "", goalsDue.length ? `目標の期限 ${goalsDue.length} 件` : ""];
       cells.push(el("button", {
@@ -1838,8 +1842,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       },
         el("span", { class: "n" }, dt.getDate()),
         plans.length ? el("span", { class: "bars", "aria-hidden": "true" },
-          plans.slice(0, 2).map((x) => el("span", { class: "bar" + (x.due ? " due" : ""), style: `--bc:${x.hue}` }, x.text)),
-          plans.length > 2 ? el("span", { class: "more" }, `+${plans.length - 2}`) : null) : null
+          shownPlans.map((x) => el("span", { class: "bar" + (x.due ? " due" : ""), style: `--bc:${x.hue}` }, x.text)),
+          plans.length > shownPlans.length ? el("span", { class: "more" }, `+${plans.length - shownPlans.length}`) : null) : null
       ));
     }
     setChildren($("calGrid"), cells);
