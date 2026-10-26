@@ -269,12 +269,11 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
 .monthnav .cur { min-width: 6.5em; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
 .navbtn { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px; background: transparent; border: 0; color: var(--accent); cursor: pointer; line-height: 1.2; }
 .navbtn .icon { width: 18px; height: 18px; }
-/* the calendar's top: just the month's name (the user's call), with きょうへ on the right in other months; the month turns
-   with a sideways swipe on the calendar. The ‹ › buttons stay for a mouse (no swipe there), for keyboards (they show when
+/* the calendar's top: just the month's name (the user's call: no きょうへ either); the month turns with a sideways swipe on
+   the calendar, and tapping the カレンダー tab again comes back to this month. The ‹ › buttons stay for a mouse (no swipe there), for keyboards (they show when
    focused) and for VoiceOver, which can't swipe the grid; on touch screens they are otherwise out of sight. */
 .monthbar { align-self: stretch; display: flex; align-items: center; gap: var(--space-1); min-height: 32px; }
 .monthbar .cur { font-weight: 600; font-variant-numeric: tabular-nums; }
-.monthbar .chip-btn { margin-inline-start: auto; }
 .monthbar .navbtn { min-width: 44px; justify-content: center; padding: 0; }
 .monthbar .navbtn:first-child { margin-inline-start: -13px; }  /* its chevron lines up with the cards */
 @media (hover: none), (pointer: coarse) {
@@ -722,7 +721,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             <button type="button" class="navbtn" id="calPrev" aria-label="前の月"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
             <span class="cur" id="calMonthName" aria-live="polite"></span>
             <button type="button" class="navbtn" id="calNext" aria-label="次の月"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></button>
-            <button type="button" class="chip-btn" id="calToday" hidden>きょうへ</button>
           </div>
         </div>
         <div class="card cal">
@@ -1159,6 +1157,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function openTab(key) {
     // on iPhone the 記録 tab reopens the record page left open there; pressed again from inside, it goes back to its list
     if (key === "records" && !wideScreen.matches && lastRecord && tab !== "records" && !isRecord(tab)) key = lastRecord;
+    // the calendar has no きょうへ button (the user's call): its tab pressed again comes back to today, as iOS tabs reset
+    if (key === "calendar" && tab === "calendar") setCalDay(todayKey);
     showTab(key);
   }
   // opening a record page from 記録 slides it in from the right and the back button slides it away, as iOS navigation
@@ -1937,10 +1937,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   $("calPrev").addEventListener("click", () => showMonth(-1));
   $("calNext").addEventListener("click", () => showMonth(1));
-  $("calToday").addEventListener("click", (ev) => {
-    setCalDay(todayKey);
-    if (ev.detail === 0) $("calGrid").querySelector(".cal-day.today")?.focus(); // the button is gone now; keyboards land on today
-  });
   // the grid follows a finger moving sideways; up-and-down moves are left to scrolling (touch-action: pan-y), and a mouse
   // uses the buttons instead
   calCard.addEventListener("pointerdown", (ev) => {
@@ -2117,7 +2113,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function renderCalendar() {
     const monthName = fmtMonth(calMonth);
     if ($("calMonthName").textContent !== monthName) $("calMonthName").textContent = monthName; // a live region: only a change is read out
-    $("calToday").hidden = calMonth === monthOf(todayKey);
     const evBy = groupBy(events.items, (e) => e.date);
     const todoBy = groupBy(todos.items, (t) => t.due);
     const goalBy = groupBy(goals.items, (g) => g.deadline);
