@@ -57,6 +57,7 @@
   --c-weight: #564ade;      /* indigo */
   --c-money: #a16a00;       /* yellow */
   --c-goal: #008575;        /* mint */
+  --sat: #1662de;           /* Saturdays in the calendar: blue, 4.5:1 even on the chosen day's tint */
   /* behind white glyphs and text (icon squares, selected chips): the same in both modes, each 4.5:1 with white */
   --f-home: #007d2e; --f-records: #6c6c70;
   --f-todo: #1e6ef4; --f-cal: #b02fc2; --f-journal: #956d51; --f-meal: #c55300;
@@ -97,7 +98,7 @@
     --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
     --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
     --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3;
+    --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --sat: #5cb8ff;
     --lc-red: #ff4245; --lc-orange: #ff9230; --lc-yellow: #ffd600; --lc-green: #30d158; --lc-cyan: #3cd3fe; --lc-blue: #0091ff; --lc-purple: #db34f2; --lc-pink: #ff375f; --lc-brown: #b78a66; --lc-gray: #8e8e93;
     color-scheme: dark;
   }
@@ -109,7 +110,7 @@
   --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
   --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
   --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3;
+  --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --sat: #5cb8ff;
   --lc-red: #ff4245; --lc-orange: #ff9230; --lc-yellow: #ffd600; --lc-green: #30d158; --lc-cyan: #3cd3fe; --lc-blue: #0091ff; --lc-purple: #db34f2; --lc-pink: #ff375f; --lc-brown: #b78a66; --lc-gray: #8e8e93;
   color-scheme: dark;
 }
@@ -463,25 +464,33 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px var(--space-2); padding: 0 var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.35; color: var(--muted); }
 .legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; background: var(--lc); vertical-align: 1px; }
 
-/* calendar: Sunday-first month grid as in the Calendar app: today's date in the tint, the chosen day in a filled circle */
-.cal { padding: 12px var(--space-1) 0; }
-.cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+/* calendar: a Sunday-first month grid with thin gray lines between the weeks and each day's plans written in coloured
+   bars, after the iPhone Calendar's month view the user showed. Today's date is in the tint; the chosen day's square is
+   lightly tinted and its date bold (no circle, at the user's wish). */
+.cal { padding: 12px 0 0; }
+.cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal-grid { border-top: .5px solid var(--separator); }
 .cal-week span { padding-bottom: 6px; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
 .cal-week span:first-child, .cal-day.sun .n { color: var(--warn); }
-.cal-week span:last-child, .cal-day.sat .n { color: var(--c-todo); }
-.cal-day { min-height: 54px; padding: 4px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; background: transparent; border: 0; border-radius: 12px; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
+.cal-week span:last-child, .cal-day.sat .n { color: var(--sat); }
+.cal-day { min-height: 56px; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: transparent; border: 0; border-bottom: .5px solid var(--separator); border-radius: 0; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
+.cal-day:focus-visible { outline-offset: -3px !important; }  /* inside the square, so the next one can't cover it */
 @media (hover: hover) { .cal-day:hover { background: var(--fill); } }
-.cal-day .n { display: grid; place-items: center; width: 2.1em; height: 2.1em; border-radius: 50%; font-size: var(--t-callout); line-height: 1; }
+.cal-day .n { font-size: var(--t-callout); line-height: 1.2; }
 /* neighbouring months: muted text rather than transparency, so the dates still read at 4.5:1 */
 .cal-day.out .n { color: var(--muted); }
 .cal-day.today .n { color: var(--accent); font-weight: 700; }
-.cal-day[aria-pressed="true"] .n { background: var(--fg); color: var(--surface); font-weight: 700; }
-.cal-day.today[aria-pressed="true"] .n { background: var(--accent-fill); color: var(--accent-ink); }
-.cal-day .marks { display: flex; gap: 3px; height: 6px; }
-.cal-day .marks i { width: 6px; height: 6px; border-radius: 50%; background: var(--mc); }
-.cal .legend { padding: var(--space-1) var(--space-1) var(--space-2); }
-/* the narrowest phones: give the seven columns all the width there is */
-@media (max-width: 359px) { .cal { padding-inline: 2px; } .cal-week, .cal-grid { gap: 0; } }
+/* 10% tint: every date colour on it still reads 4.5:1 */
+.cal-day[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.cal-day[aria-pressed="true"] .n { font-weight: 700; }
+/* each plan as a bar in its label's colour (the title clipped to the square), at most two, then +N. ToDo and goal deadlines
+   are outlined bars, as iPhone shows reminders lighter than events. The text is black or white on a light tint, so it
+   reads 4.5:1 whatever the hue. */
+.cal-day .bars { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0 2px; }
+.cal-day .bar { display: block; overflow: hidden; white-space: nowrap; padding: 1px 3px; border-radius: 4px; border-inline-start: 3px solid var(--bc); background: color-mix(in srgb, var(--bc) 20%, var(--surface)); color: var(--fg); font-size: calc(1rem - 6px); line-height: 1.3; font-weight: 600; text-align: start; }
+.cal-day .bar.due { background: var(--surface); box-shadow: inset 0 0 0 1px var(--bc); }
+.cal-day .more { font-size: calc(1rem - 6px); line-height: 1.2; color: var(--muted); }
+.cal .legend { padding: var(--space-1) var(--space-2) var(--space-2); }
 
 /* event labels: the user's own categories. The name always sits next to the colour, so colour is never the only cue (HIG).
    In the add form they are one-tap chips; a chosen chip fills with its colour and white text. */
@@ -1811,8 +1820,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const evs = evBy.get(d) || [];
       const todosDue = (todoBy.get(d) || []).filter((t) => !t.done);
       const goalsDue = (goalBy.get(d) || []).filter((g) => !g.done);
-      // each event's dot takes its label's colour; the day's name lists the labels too
-      const marks = [...evs.slice(0, 3).map((e) => labelHue(labelOf(e))), todosDue.length ? "var(--c-todo)" : null, goalsDue.length ? "var(--c-goal)" : null];
+      // the day's plans as bars: events by time in their label's colour, then ToDo and goal deadlines; the day's name lists the labels too
+      const plans = [
+        ...[...evs].sort(byTime).map((e) => ({ text: e.title, hue: labelHue(labelOf(e)) })),
+        ...todosDue.map((t) => ({ text: t.text, hue: "var(--c-todo)", due: true })),
+        ...goalsDue.map((g) => ({ text: g.title, hue: "var(--c-goal)", due: true })),
+      ];
       const evNames = [...new Set(evs.map((e) => (labelOf(e) || {}).name).filter(Boolean))];
       const notes = [evs.length ? `予定 ${evs.length} 件` + (evNames.length ? `（${evNames.join("、")}）` : "") : "", todosDue.length ? `ToDo の期限 ${todosDue.length} 件` : "", goalsDue.length ? `目標の期限 ${goalsDue.length} 件` : ""];
       cells.push(el("button", {
@@ -1823,7 +1836,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         onclick: () => setCalDay(d),
       },
         el("span", { class: "n" }, dt.getDate()),
-        el("span", { class: "marks" }, marks.filter(Boolean).map((c) => el("i", { style: `--mc:${c}` })))
+        plans.length ? el("span", { class: "bars", "aria-hidden": "true" },
+          plans.slice(0, 2).map((x) => el("span", { class: "bar" + (x.due ? " due" : ""), style: `--bc:${x.hue}` }, x.text)),
+          plans.length > 2 ? el("span", { class: "more" }, `+${plans.length - 2}`) : null) : null
       ));
     }
     setChildren($("calGrid"), cells);
