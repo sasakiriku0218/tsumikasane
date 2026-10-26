@@ -46,6 +46,7 @@
   --glass-edge: rgba(0, 0, 0, .1);
   --pill: #ffffff;          /* the bubble behind the selected tab */
   --shadow: 0 6px 24px rgba(0, 0, 0, .12), 0 1px 3px rgba(0, 0, 0, .06);
+  --toast-bg: rgba(28, 28, 30, .92);  /* a dark HUD with white text */
   --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%236c6c70' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   /* record hues for text and marks: Increase Contrast values, 4.5:1 on white */
   --c-todo: #1e6ef4;        /* blue */
@@ -88,7 +89,7 @@
     --fg: #ffffff; --muted: #98989f; --line: #8e8e93; --separator: #38383a;
     --accent: #30d158; --accent-fill: #1e7d34; --accent-ink: #ffffff; --warn: #ff6165; --warn-fill: #d70015;
     --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
-    --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+    --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
     --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3;
     color-scheme: dark;
@@ -99,7 +100,7 @@
   --fg: #ffffff; --muted: #98989f; --line: #8e8e93; --separator: #38383a;
   --accent: #30d158; --accent-fill: #1e7d34; --accent-ink: #ffffff; --warn: #ff6165; --warn-fill: #d70015;
   --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
-  --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
   --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3;
   color-scheme: dark;
@@ -132,6 +133,7 @@ body {
 input, select, textarea, button { font: inherit; color: inherit; letter-spacing: inherit; }
 button { touch-action: manipulation; transition: opacity .2s; }
 :focus-visible { outline: 3px solid var(--focus) !important; outline-offset: 2px !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .muted { color: var(--muted); }
 .small { font-size: var(--t-foot); line-height: 1.35; }
 .warn { color: var(--warn); }
@@ -200,14 +202,17 @@ button:active:not(:disabled) { opacity: .5; transition: none; }
 }
 .navtitle { grid-column: 2; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 600; opacity: 0; transition: opacity .2s; }
 .navbar.scrolled .navtitle { opacity: 1; }
+/* back: a chevron in a round glass button, label-coloured like other bar items (iOS 26) */
 .back {
   grid-column: 1; grid-row: 1; justify-self: start;
-  display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px 0 2px;
-  background: transparent; border: 0; color: var(--accent); font-size: 17px; cursor: pointer;
+  display: grid; place-items: center; width: 44px; height: 44px; margin-inline-start: 4px; padding: 0;
+  border: 0; border-radius: 50%; color: var(--fg); cursor: pointer;
+  background: var(--glass); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .1), inset 0 0 0 .5px var(--glass-edge);
 }
-.back .icon { width: 22px; height: 22px; }
+.back .icon { width: 20px; height: 20px; margin-inline-end: 2px; }
 @media (prefers-reduced-transparency: reduce) {
-  .menu, .navbar.scrolled { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .menu, .navbar.scrolled, .back { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 /* from 768px: a sidebar on the leading side, as iPad apps turn their tab bar into one */
@@ -254,8 +259,26 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
 .navbtn .icon { width: 18px; height: 18px; }
 .chip-btn { min-height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface); color: var(--accent); font-size: var(--t-sub); font-weight: 600; line-height: 1.2; cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 
-/* forms: rounded fields with an edge that reads 3:1 (UIKit's rounded-rect style) */
-form.add { display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: center; background: var(--surface); border-radius: var(--radius); padding: 12px; }
+/* forms (HIG text fields): the main text across the card first, then one row per detail with its label beside it, fields
+   stacked with matching widths, the add button on the trailing side. With large text the labels move above their fields
+   (HIG layout: stack side-by-side items when the text grows). Fields keep UIKit's rounded edge, which reads 3:1. */
+section { container-type: inline-size; }
+form.add { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 12px; padding: 14px var(--space-2); background: var(--surface); border-radius: var(--radius); }
+form.add > .full, form.add > .actions { grid-column: 1 / -1; }
+.flabel { min-width: 0; }
+.flabel .opt { margin-inline-start: 2px; font-size: var(--t-foot); color: var(--muted); }
+.ffield { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.ffield input[type="text"], .ffield > .seg { flex: 1 1 auto; }
+.ffield > .seg { max-width: 22em; }
+.ffield input[type="number"] { flex: 0 1 7em; text-align: right; font-variant-numeric: tabular-nums; }
+.ffield input[type="date"], .ffield input[type="time"] { flex: 0 1 10em; }
+.ffield .unit-field { flex: 1 1 6em; }
+form.add .actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
+form.add .actions .link-btn { margin-inline-end: auto; }
+@container (max-width: 19.5em) {
+  form.add { grid-template-columns: minmax(0, 1fr); row-gap: 6px; }
+  form.add > .flabel { margin-top: 6px; }
+}
 form.add input, form.add select, textarea, .inline input, .goal-actions input[type="number"], .datenav input[type="date"] {
   min-height: 44px; min-width: 0; padding: 0 12px;
   background-color: var(--surface); border: 1px solid var(--line); border-radius: 12px; line-height: 1.3;
@@ -263,10 +286,6 @@ form.add input, form.add select, textarea, .inline input, .goal-actions input[ty
 select { -webkit-appearance: none; appearance: none; padding-right: 30px !important; background-image: var(--chev); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px 12px; }
 textarea { width: 100%; padding: 10px 12px; line-height: 1.6; resize: vertical; }
 ::placeholder { color: var(--muted); opacity: 1; }
-/* field widths in em, so they grow with the text size the user picked */
-.grow { flex: 1 1 10.6em; }
-.w-sm { flex: 0 1 9.2em; }  /* room for a whole date */
-.w-xs { flex: 0 1 5.7em; }
 .inline { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 .inline input { width: 7em; padding: 0 10px; text-align: right; font-variant-numeric: tabular-nums; }
 .unit { color: var(--muted); }
@@ -276,16 +295,21 @@ textarea { width: 100%; padding: 10px 12px; line-height: 1.6; resize: vertical; 
 .btn .icon { width: 20px; height: 20px; }
 .btn.ghost { background: var(--fill); color: var(--fg); font-weight: 400; }
 .btn.sm { min-height: 34px; padding: 0 14px; font-size: var(--t-sub); }
-.bar .btn.ghost { background: var(--surface); }
 .link-btn { min-height: 44px; padding: 0 4px; background: transparent; border: 0; color: var(--accent); line-height: 1.2; text-align: left; cursor: pointer; }
 .link-btn.danger, .link-btn.armed { color: var(--warn); }
 .link-btn.armed { font-weight: 600; }
 .link-btn:disabled { opacity: .35; cursor: default; }
-.bar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1) var(--space-2); flex-wrap: wrap; }
-/* segmented control: a gray track with the chosen segment raised on a white thumb */
-.seg { display: inline-flex; padding: 2px; border-radius: 999px; background: var(--fill); }
-.seg button { min-height: 32px; padding: 0 16px; background: transparent; border: 0; border-radius: 999px; color: var(--fg); font-size: var(--t-sub); line-height: 1.2; cursor: pointer; }
-.seg button[aria-pressed="true"] { background: var(--thumb); font-weight: 600; box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04), 0 0 0 .5px rgba(0, 0, 0, .04); }
+.list-foot { display: flex; justify-content: flex-end; margin-top: -8px; }
+/* segmented control: a gray track with the chosen segment raised on a white thumb; segments share the width equally (HIG) */
+.seg { display: flex; max-width: 30em; padding: 2px; border-radius: 999px; background: var(--fill); }  /* stays a control, not a bar, on wide screens */
+.seg button { flex: 1 1 0; min-width: 0; min-height: 32px; padding: 0 12px; background: transparent; border: 0; border-radius: 999px; color: var(--fg); font-size: var(--t-sub); line-height: 1.2; cursor: pointer; }
+.seg button[aria-pressed="true"], .seg-radio input:checked + span { background: var(--thumb); font-weight: 600; box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04), 0 0 0 .5px rgba(0, 0, 0, .04); }
+/* the same control built on radio buttons, for choices inside forms: native arrow keys, read out as a group */
+.seg-radio label { flex: 1 1 0; min-width: 0; position: relative; display: grid; cursor: pointer; }
+.seg-radio input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.seg-radio span { display: grid; place-items: center; min-height: 32px; padding: 0 8px; border-radius: 999px; font-size: var(--t-sub); line-height: 1.2; white-space: nowrap; }
+.seg-radio input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.seg-radio label::after { content: ""; position: absolute; inset: 0; margin: auto; height: 44px; }
 
 /* cards and inset grouped lists */
 .card { background: var(--surface); border-radius: var(--radius); }
@@ -316,6 +340,13 @@ ul.list li.dayhead::before, ul.list li.dayhead + li::before { display: none; }
 /* a tag: the record's hue as a light tint, with label-coloured text so it reads at any hue */
 .chip { flex: none; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--chip-c) 16%, var(--surface)); color: var(--fg); font-size: var(--t-foot); line-height: 1.3; font-weight: 600; }
 .datecell { flex: none; width: 6em; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }  /* fits 10/25（日） */
+/* large text or a narrow phone (HIG typography): rows with a tag, date or number put the text on a line of its own first,
+   and the extras follow beneath, so the words never break one character at a time */
+@container (max-width: 17em) {
+  ul.list > li:has(> .chip, > .datecell, > .num, > .amount) { flex-wrap: wrap; row-gap: 4px; }
+  ul.list > li:has(> .chip, > .datecell, > .num, > .amount) > .body { order: -1; flex: 1 1 100%; }
+  ul.list > li:has(> .chip, > .datecell, > .num, > .amount) > .del { margin-inline-start: auto; }
+}
 .empty { display: block; padding: var(--space-3) var(--space-2); text-align: center; color: var(--muted); }
 .note { padding: var(--space-1) var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 /* delete: × first, then a red 削除する capsule to confirm (destructive role) */
@@ -347,6 +378,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .stat .d { font-size: var(--t-foot); line-height: 1.35; color: var(--muted); }
 
 /* weight chart */
+.chart-head { padding: 12px 12px 0; }
 .chart-wrap { position: relative; padding: 8px 8px 4px; }
 .chart { display: block; width: 100%; height: auto; outline-offset: -2px; }
 .chart .gridline { stroke: var(--separator); stroke-width: 1; }
@@ -452,11 +484,31 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
 .group-head { margin: var(--space-1) 0 -8px; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); }
 .group-foot { margin: -8px 0 0; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 
-.status { font-size: var(--t-foot); line-height: 1.4; color: var(--muted); text-align: center; }
-.foot { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
+/* a short message above the tab bar, like an iOS HUD; white on near-black in both modes */
+.toast {
+  position: fixed; z-index: 30; left: 50%; bottom: calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + 12px);
+  width: max-content; max-width: min(420px, calc(100vw - 32px)); padding: 10px 18px; border-radius: 18px;
+  background: var(--toast-bg); color: #ffffff; box-shadow: var(--shadow);
+  font-size: var(--t-sub); line-height: 1.35; text-align: center;
+  opacity: 0; transform: translate(-50%, 8px); pointer-events: none; transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (min-width: 768px) { .toast { bottom: var(--space-3); } }
 .notice { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); border-radius: var(--radius); background: var(--surface); text-wrap: pretty; }
 .notice strong { display: flex; align-items: center; gap: var(--space-1); color: var(--warn); font-weight: 600; line-height: 1.3; }
 .notice .cut { fill: var(--surface); }
+/* iOS-style push and pop between 記録 and a record page; the script only starts it on phones without Reduce Motion */
+.menu { view-transition-name: tabbar; }
+.navbar { view-transition-name: topbar; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .32s; animation-timing-function: cubic-bezier(.25, .9, .3, 1); }
+html[data-nav="push"]::view-transition-new(root) { animation-name: nav-in-from-right; }
+html[data-nav="push"]::view-transition-old(root) { animation-name: nav-out-to-left; }
+html[data-nav="pop"]::view-transition-new(root) { animation-name: nav-in-from-left; }
+html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-right; z-index: 1; }
+@keyframes nav-in-from-right { from { transform: translateX(100%); } }
+@keyframes nav-out-to-left { to { transform: translateX(-30%); opacity: .7; } }
+@keyframes nav-in-from-left { from { transform: translateX(-30%); opacity: .7; } }
+@keyframes nav-out-to-right { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 </style>
 </head>
@@ -497,7 +549,8 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
   <main class="main">
     <!-- iOS-style top bar: a back button on the record pages, and the page title once the large title scrolls under it -->
     <header class="navbar" id="navbar">
-      <button type="button" class="back" id="backBtn" aria-label="記録に戻る" hidden><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg>記録</button>
+      <!-- HIG toolbars: the standard back button is a symbol, not a text label; its name still says where it goes -->
+      <button type="button" class="back" id="backBtn" aria-label="記録に戻る" hidden><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
       <span class="navtitle" id="navTitle" aria-hidden="true"></span>
     </header>
 
@@ -538,9 +591,10 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
         </div>
         <div class="row-between"><span class="label" id="calDayLabel"></span><span class="muted small" id="calDayCount"></span></div>
         <form class="add" id="evForm" autocomplete="off">
-          <input type="time" id="evTime" class="w-sm" aria-label="時間（任意）">
-          <input type="text" id="evTitle" class="grow" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
-          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+          <input type="text" id="evTitle" class="full" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
+          <label class="flabel" for="evTime">時間 <span class="opt">任意</span></label>
+          <div class="ffield"><input type="time" id="evTime"></div>
+          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <ul class="list card" id="calDayList"></ul>
       </section>
@@ -549,19 +603,19 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
       <section id="sec-todo" style="--sec-c: var(--c-todo)" hidden>
         <div class="sec-head"><h2>ToDo</h2><span class="muted small" id="todoCount"></span></div>
         <form class="add" id="todoForm" autocomplete="off">
-          <input type="text" id="todoText" class="grow" placeholder="やること（例：牛乳を買う）" aria-label="やること" maxlength="200" required>
-          <input type="date" id="todoDue" class="w-sm" aria-label="期限（任意）">
-          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+          <input type="text" id="todoText" class="full" placeholder="やること（例：牛乳を買う）" aria-label="やること" maxlength="200" required>
+          <label class="flabel" for="todoDue">期限 <span class="opt">任意</span></label>
+          <div class="ffield"><input type="date" id="todoDue"></div>
+          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
-        <div class="bar">
-          <div class="seg" role="group" aria-label="表示の切り替え" id="todoFilters">
-            <button type="button" data-filter="all" aria-pressed="true">すべて</button>
-            <button type="button" data-filter="active" aria-pressed="false">未完了</button>
-            <button type="button" data-filter="done" aria-pressed="false">完了</button>
-          </div>
-          <button type="button" class="link-btn danger" id="clearDone">完了したものを削除</button>
+        <div class="seg" role="group" aria-label="表示の切り替え" id="todoFilters">
+          <button type="button" data-filter="all" aria-pressed="true">すべて</button>
+          <button type="button" data-filter="active" aria-pressed="false">未完了</button>
+          <button type="button" data-filter="done" aria-pressed="false">完了</button>
         </div>
         <ul class="list card" id="todoList"></ul>
+        <!-- it acts on the list, so it sits right under it -->
+        <div class="list-foot"><button type="button" class="link-btn danger" id="clearDone">完了したものを削除</button></div>
       </section>
 
       <!-- 記録: the record pages (the iPhone tab bar has room for five tabs) and backup -->
@@ -573,7 +627,7 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
           <li class="btn-row"><button type="button" class="row-btn" id="exportBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>記録を書き出す</button></li>
           <li class="btn-row"><button type="button" class="row-btn" id="importBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-import"/></svg>記録を読み込む</button></li>
         </ul>
-        <p class="group-foot">書き出したファイルを別の端末で読み込むと、記録をそちらへ移せます。</p>
+        <p class="group-foot" id="storeNote"></p>
         <input type="file" id="importFile" accept=".json,application/json" hidden>
       </section>
 
@@ -599,12 +653,19 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
       <section id="sec-meal" style="--sec-c: var(--c-meal)" hidden>
         <div class="sec-head"><h2>食事</h2><div class="datenav"></div></div>
         <form class="add" id="mealForm" autocomplete="off">
-          <select id="mealSlot" class="w-xs" aria-label="区分">
-            <option>朝食</option><option>昼食</option><option>夕食</option><option>間食</option>
-          </select>
-          <input type="text" id="mealText" class="grow" placeholder="食べたもの（例：鮭定食）" aria-label="食べたもの" maxlength="200" required>
-          <input type="number" id="mealKcal" class="w-xs" placeholder="kcal" aria-label="カロリー（任意）" min="0" max="9999" inputmode="numeric">
-          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+          <input type="text" id="mealText" class="full" placeholder="食べたもの（例：鮭定食）" aria-label="食べたもの" maxlength="200" required>
+          <span class="flabel" id="mealSlotLabel">区分</span>
+          <div class="ffield">
+            <div class="seg seg-radio" role="radiogroup" aria-labelledby="mealSlotLabel">
+              <label><input type="radio" name="mealSlot" value="朝食" checked><span>朝食</span></label>
+              <label><input type="radio" name="mealSlot" value="昼食"><span>昼食</span></label>
+              <label><input type="radio" name="mealSlot" value="夕食"><span>夕食</span></label>
+              <label><input type="radio" name="mealSlot" value="間食"><span>間食</span></label>
+            </div>
+          </div>
+          <label class="flabel" for="mealKcal">カロリー<span class="sr-only">（kcal）</span></label>
+          <div class="ffield"><input type="number" id="mealKcal" placeholder="任意" min="0" max="9999" inputmode="numeric"><span class="unit">kcal</span></div>
+          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <ul class="list card" id="mealList"></ul>
         <div class="muted small" id="mealTotal"></div>
@@ -614,14 +675,16 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
       <section id="sec-workout" style="--sec-c: var(--c-workout)" hidden>
         <div class="sec-head"><h2>運動</h2><div class="datenav"></div></div>
         <form class="add" id="workoutForm" autocomplete="off">
-          <input type="text" id="woType" class="grow" list="woTypes" placeholder="種目（例：ウォーキング）" aria-label="種目" maxlength="100" required>
+          <input type="text" id="woType" class="full" list="woTypes" placeholder="種目（例：ウォーキング）" aria-label="種目" maxlength="100" required>
           <datalist id="woTypes">
             <option value="ウォーキング"><option value="ランニング"><option value="筋トレ"><option value="ストレッチ">
             <option value="自転車"><option value="水泳"><option value="ヨガ"><option value="階段"><option value="散歩">
           </datalist>
-          <input type="number" id="woMin" class="w-xs" placeholder="分" aria-label="時間（分）" min="1" max="1440" inputmode="numeric" required>
-          <input type="text" id="woNote" class="grow" placeholder="メモ（任意）" aria-label="メモ" maxlength="200">
-          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+          <label class="flabel" for="woMin">時間<span class="sr-only">（分）</span></label>
+          <div class="ffield"><input type="number" id="woMin" placeholder="30" min="1" max="1440" inputmode="numeric" required><span class="unit">分</span></div>
+          <label class="flabel" for="woNote">メモ <span class="opt">任意</span></label>
+          <div class="ffield"><input type="text" id="woNote" maxlength="200"></div>
+          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <ul class="list card" id="workoutList"></ul>
         <div class="muted small" id="workoutTotal"></div>
@@ -631,34 +694,33 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
       <section id="sec-weight" style="--sec-c: var(--c-weight)" hidden>
         <div class="sec-head"><h2>体重</h2><div class="datenav"></div></div>
         <form class="add" id="wtForm" autocomplete="off">
-          <span class="label" id="wtFormLabel">きょうの体重</span>
-          <input type="number" id="wtInput" class="w-xs" step="0.1" min="20" max="300" placeholder="65.0" aria-label="体重（kg）" inputmode="decimal" required>
-          <span class="unit">kg</span>
-          <button class="btn" type="submit" id="wtSubmit">記録する</button>
-          <span class="muted small" id="wtState"></span>
-          <span class="spacer"></span>
-          <button type="button" class="link-btn danger" id="wtDelete" hidden>この日の記録を削除</button>
-        </form>
-        <div class="bar">
-          <div class="seg" role="group" aria-label="グラフの期間" id="wtRanges">
-            <button type="button" data-range="30" aria-pressed="true">1か月</button>
-            <button type="button" data-range="90" aria-pressed="false">3か月</button>
-            <button type="button" data-range="365" aria-pressed="false">1年</button>
+          <label class="flabel" for="wtInput" id="wtFormLabel">きょうの体重</label>
+          <div class="ffield"><input type="number" id="wtInput" step="0.1" min="20" max="300" placeholder="65.0" inputmode="decimal" required><span class="unit">kg</span></div>
+          <div class="actions">
+            <button type="button" class="link-btn danger" id="wtDelete" hidden>この日の記録を削除</button>
+            <span class="muted small" id="wtState"></span>
+            <button class="btn" type="submit" id="wtSubmit">記録する</button>
           </div>
-          <form class="inline" id="wtTargetForm" autocomplete="off">
-            <label for="wtTarget">目標体重</label>
-            <input type="number" id="wtTarget" step="0.1" min="20" max="300" placeholder="未設定" inputmode="decimal">
-            <span class="unit">kg</span>
-            <button class="btn ghost sm" type="submit">保存</button>
-          </form>
-        </div>
+        </form>
+        <!-- Health-style chart card: the period control on top, then the plot (HIG charts) -->
         <div class="card">
+          <div class="chart-head">
+            <div class="seg" role="group" aria-label="グラフの期間" id="wtRanges">
+              <button type="button" data-range="30" aria-pressed="true">1か月</button>
+              <button type="button" data-range="90" aria-pressed="false">3か月</button>
+              <button type="button" data-range="365" aria-pressed="false">1年</button>
+            </div>
+          </div>
           <div class="chart-wrap" id="wtChartWrap">
             <svg class="chart" id="wtChart" role="img" tabindex="0" aria-label="体重の推移グラフ。矢印キーで点を移動できます。数値は下の一覧にもあります。"></svg>
             <div class="tip" id="wtTip" hidden></div>
           </div>
         </div>
         <div class="stats" id="wtStats"></div>
+        <form class="add" id="wtTargetForm" autocomplete="off">
+          <label class="flabel" for="wtTarget">目標体重<span class="sr-only">（kg）</span></label>
+          <div class="ffield"><input type="number" id="wtTarget" step="0.1" min="20" max="300" placeholder="未設定" inputmode="decimal"><span class="unit">kg</span><button class="btn ghost sm" type="submit">保存</button></div>
+        </form>
         <div class="card">
           <div class="card-head">記録の一覧</div>
           <ul class="list" id="wtList"></ul>
@@ -679,11 +741,17 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
           </form>
         </div>
         <form class="add" id="exForm" autocomplete="off">
-          <input type="date" id="exDate" class="w-sm" aria-label="日付" required>
-          <select id="exKind" class="w-xs" aria-label="種類">
-            <option value="out">支出</option><option value="in">収入</option>
-          </select>
-          <input type="text" id="exCat" class="w-xs" list="catOut" placeholder="費目" aria-label="費目" maxlength="20">
+          <span class="flabel" id="exKindLabel">種類</span>
+          <div class="ffield">
+            <div class="seg seg-radio" role="radiogroup" aria-labelledby="exKindLabel">
+              <label><input type="radio" name="exKind" value="out" checked><span>支出</span></label>
+              <label><input type="radio" name="exKind" value="in"><span>収入</span></label>
+            </div>
+          </div>
+          <label class="flabel" for="exAmount">金額<span class="sr-only">（円）</span></label>
+          <div class="ffield"><input type="number" id="exAmount" placeholder="0" min="1" max="99999999" step="1" inputmode="numeric" required><span class="unit">円</span></div>
+          <label class="flabel" for="exCat">費目</label>
+          <div class="ffield"><input type="text" id="exCat" list="catOut" placeholder="食費・交通など" maxlength="20"></div>
           <datalist id="catOut">
             <option value="食費"><option value="外食"><option value="日用品"><option value="交通"><option value="住居"><option value="光熱費">
             <option value="通信"><option value="交際"><option value="趣味"><option value="医療"><option value="衣服"><option value="教育"><option value="その他">
@@ -691,9 +759,10 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
           <datalist id="catIn">
             <option value="給与"><option value="副収入"><option value="おこづかい"><option value="その他">
           </datalist>
-          <input type="number" id="exAmount" class="w-xs" placeholder="金額" aria-label="金額（円）" min="1" max="99999999" step="1" inputmode="numeric" required>
-          <input type="text" id="exMemo" class="grow" placeholder="メモ（例：スーパーで買い物）" aria-label="メモ" maxlength="200">
-          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+          <label class="flabel" for="exDate">日付</label>
+          <div class="ffield"><input type="date" id="exDate" required></div>
+          <input type="text" id="exMemo" class="full" placeholder="メモ（例：スーパーで買い物）" aria-label="メモ" maxlength="200">
+          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <div class="card" id="catCard">
           <div class="card-head">費目ごとの支出</div>
@@ -709,21 +778,21 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
       <section id="sec-goal" style="--sec-c: var(--c-goal)" hidden>
         <div class="sec-head"><h2>目標</h2><span class="muted small" id="goalCount"></span></div>
         <form class="add" id="goalForm" autocomplete="off">
-          <input type="text" id="goalTitle" class="grow" placeholder="目標（例：本を読む）" aria-label="目標" maxlength="200" required>
-          <input type="number" id="goalTarget" class="w-xs" placeholder="目標値" aria-label="目標値（任意）" min="1" max="999999" inputmode="numeric">
-          <input type="text" id="goalUnit" class="w-xs" placeholder="単位" aria-label="単位（任意）" maxlength="10">
-          <input type="date" id="goalDeadline" class="w-sm" aria-label="期限（任意）">
-          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+          <input type="text" id="goalTitle" class="full" placeholder="目標（例：本を読む）" aria-label="目標" maxlength="200" required>
+          <label class="flabel" for="goalTarget">目標値 <span class="opt">任意</span></label>
+          <div class="ffield"><input type="number" id="goalTarget" placeholder="10" min="1" max="999999" inputmode="numeric"><input type="text" id="goalUnit" class="unit-field" placeholder="単位（冊など）" aria-label="単位（任意）" maxlength="10"></div>
+          <label class="flabel" for="goalDeadline">期限 <span class="opt">任意</span></label>
+          <div class="ffield"><input type="date" id="goalDeadline"></div>
+          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <div class="card" id="goalList"></div>
       </section>
-
-      <footer class="foot">
-        <div class="status" id="status"></div>
-      </footer>
     </div>
   </main>
 </div>
+
+<!-- short messages (saved, exported, errors) float above the tab bar, so they show wherever you are on the page -->
+<div class="toast" id="status" role="status"></div>
 
 <script>
 (() => {
@@ -768,6 +837,8 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
   }
   // replaceChildren() would print "null" for a skipped child, so drop those first
   function setChildren(parent, ...kids) { parent.replaceChildren(...kids.flat().filter((k) => k != null && k !== false)); }
+  // the chosen option of a radio group (the segmented controls inside the forms)
+  const checkedValue = (name) => (document.querySelector(`input[name="${name}"]:checked`) || {}).value || "";
   const SVG_NS = "http://www.w3.org/2000/svg";
   function svgEl(tag, attrs = {}, text) {
     const n = document.createElementNS(SVG_NS, tag);
@@ -857,17 +928,19 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
 
   const statusEl = $("status");
   let statusTimer = null;
+  // where records live is said once, under バックアップ on the 記録 page, instead of at the foot of every page
   function showMode() {
     $("noSave").hidden = canStoreLocal;
-    statusEl.textContent = canStoreLocal
-      ? "この端末のブラウザに保存しています。ほかの端末とは共有されません。"
-      : "この画面では保存されません。";
+    $("storeNote").textContent = canStoreLocal
+      ? "記録はこの端末のブラウザにだけ保存され、ほかの端末とは共有されません。書き出したファイルを別の端末で読み込むと、記録をそちらへ移せます。"
+      : "この画面では記録が保存されません。";
   }
-  // a message in the status line for a few seconds, then back to the usual one
+  // a short message above the tab bar for a few seconds; role=status reads it out as well
   function flash(msg) {
     clearTimeout(statusTimer);
     statusEl.textContent = msg;
-    statusTimer = setTimeout(showMode, 6000);
+    statusEl.classList.add("show");
+    statusTimer = setTimeout(() => statusEl.classList.remove("show"), 6000);
   }
   function showError() { flash("保存できませんでした。端末の空き容量が足りているか確かめてください。"); }
   async function act(fn) { try { await fn(); } catch { showError(); } }
@@ -913,7 +986,19 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
     if (key === "records" && !wideScreen.matches && lastRecord && tab !== "records" && !isRecord(tab)) key = lastRecord;
     showTab(key);
   }
+  // opening a record page from 記録 slides it in from the right and the back button slides it away, as iOS navigation
+  // does; switching tabs stays instant (HIG: no extra motion for frequent actions). Phones only, never with Reduce Motion.
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  let navSeq = 0; // a transition whose update arrives after a newer tap must not undo that tap
   function showTab(key) {
+    const seq = ++navSeq;
+    const nav = isRecord(key) && tab === "records" ? "push" : key === "records" && isRecord(tab) ? "pop" : "";
+    if (!nav || !document.startViewTransition || reduceMotion.matches || wideScreen.matches) { delete document.documentElement.dataset.nav; setTab(key); return; }
+    document.documentElement.dataset.nav = nav;
+    document.startViewTransition(() => { if (seq === navSeq) setTab(key); })
+      .finished.finally(() => { if (seq === navSeq) delete document.documentElement.dataset.nav; });
+  }
+  function setTab(key) {
     if (tab === "journal" && key !== "journal") flushJournal();
     tab = key;
     if (isRecord(key)) lastRecord = key;
@@ -1113,7 +1198,7 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
     ev.preventDefault();
     const text = $("mealText").value.trim();
     if (!text) return;
-    const item = { date: viewDate, slot: $("mealSlot").value, text, createdAt: Date.now() };
+    const item = { date: viewDate, slot: checkedValue("mealSlot") || SLOTS[0], text, createdAt: Date.now() };
     const kcalRaw = $("mealKcal").value;
     if (kcalRaw !== "") item.kcal = Math.max(0, Math.round(Number(kcalRaw)));
     act(() => meals.add(item));
@@ -1273,7 +1358,8 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
   function renderWeightChart() {
     const wrap = $("wtChartWrap"), svg = $("wtChart"), tip = $("wtTip");
     const W = Math.max(300, Math.round(wrap.clientWidth - 16) || 600), H = 240;
-    const padL = 44, padR = 28, padT = 22, padB = 28;
+    // HIG charts: the value labels sit on the trailing side, as in Health, so the plot starts where the card's text starts
+    const padL = 12, padR = 44, padT = 22, padB = 28;
     const pw = W - padL - padR, ph = H - padT - padB;
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.setAttribute("width", W); svg.setAttribute("height", H);
@@ -1283,10 +1369,17 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
     const recs = sortedWeights().filter((r) => r.id >= start && r.id <= todayKey);
     const target = wtTarget();
     wtPts = [];
+    const howTo = "矢印キーで点を移動できます。数値は下の一覧にもあります。";
     if (!recs.length) {
+      svg.setAttribute("aria-label", `体重の推移グラフ。${rangeLabel()}の記録はまだありません。`);
       svg.append(svgEl("text", { x: W / 2, y: H / 2, "text-anchor": "middle", class: "axis-text" }, `${rangeLabel()}の記録はまだありません`));
       return;
     }
+    // HIG charts: say the main message up front, for VoiceOver too
+    const r0 = recs[0], r1 = recs[recs.length - 1];
+    svg.setAttribute("aria-label", recs.length > 1
+      ? `体重の推移グラフ。${rangeLabel()}で${recs.length}回の記録、${fmtMD(r0.id)}の${fmtKg(r0.kg)} kgから${fmtMD(r1.id)}の${fmtKg(r1.kg)} kg。${howTo}`
+      : `体重の推移グラフ。${rangeLabel()}の記録は${fmtMD(r1.id)}の${fmtKg(r1.kg)} kgの1回。${howTo}`);
     const vals = recs.map((r) => num(r.kg));
     if (target > 0) vals.push(target);
     let lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo;
@@ -1303,7 +1396,7 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
     for (let i = 0; i <= nTicks; i++) {
       const v = yLo + i * step, yy = y(v);
       svg.append(svgEl("line", { class: "gridline", x1: padL, x2: W - padR, y1: yy, y2: yy }));
-      svg.append(svgEl("text", { class: "axis-text", x: padL - 8, y: yy + 4, "text-anchor": "end" }, v.toFixed(dec)));
+      svg.append(svgEl("text", { class: "axis-text", x: W - padR + 8, y: yy + 4, "text-anchor": "start" }, v.toFixed(dec)));
     }
     // x ticks
     let labelDates = [];
@@ -1313,7 +1406,8 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
     const maxLabels = Math.max(2, Math.floor(pw / 44));
     if (labelDates.length > maxLabels) { const k = Math.ceil(labelDates.length / maxLabels); labelDates = labelDates.filter((_, i) => (labelDates.length - 1 - i) % k === 0); }
     for (const d of labelDates) {
-      svg.append(svgEl("text", { class: "axis-text", x: x(d), y: H - 8, "text-anchor": "middle" }, wtRange > 90 ? `${parseYmd(d).getMonth() + 1}月` : fmtMD(d)));
+      const xx = x(d);
+      svg.append(svgEl("text", { class: "axis-text", x: xx, y: H - 8, "text-anchor": xx < padL + 20 ? "start" : "middle" }, wtRange > 90 ? `${parseYmd(d).getMonth() + 1}月` : fmtMD(d)));
     }
     // marks
     const pts = recs.map((r) => ({ date: r.id, kg: num(r.kg), x: x(r.id), y: y(num(r.kg)) }));
@@ -1327,12 +1421,13 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
     if (target > 0) {
       const ty = y(target);
       svg.append(svgEl("line", { class: "target", x1: padL, x2: W - padR, y1: ty, y2: ty }));
-      svg.append(svgEl("text", { class: "axis-text", x: W - padR, y: ty - 5, "text-anchor": "end" }, `目標 ${fmtKg(target)}`));
+      svg.append(svgEl("text", { class: "axis-text", x: padL + 2, y: ty - 5, "text-anchor": "start" }, `目標 ${fmtKg(target)}`));
     }
     for (const p of pts) svg.append(svgEl("circle", { class: "dot", cx: p.x, cy: p.y, r: 4 }));
     const last = pts[pts.length - 1];
-    const labelLeft = last.x > W - padR - 48;
-    svg.append(svgEl("text", { class: "endlabel", x: labelLeft ? last.x - 10 : last.x + 10, y: last.y + 4, "text-anchor": labelLeft ? "end" : "start" }, fmtKg(last.kg)));
+    // the latest value just above its point, so it never sits on the line
+    const nearEnd = last.x > W - padR - 24, above = last.y - 12 > padT;
+    svg.append(svgEl("text", { class: "endlabel", x: nearEnd ? last.x + 4 : last.x, y: above ? last.y - 12 : last.y + 20, "text-anchor": nearEnd ? "end" : "middle" }, fmtKg(last.kg)));
     // hover overlay
     const cross = svgEl("line", { class: "cross", x1: 0, x2: 0, y1: padT, y2: padT + ph, visibility: "hidden" });
     const focusDot = svgEl("circle", { class: "dot", r: 6, visibility: "hidden" });
@@ -1385,21 +1480,22 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
   }
 
   // ---------- 家計簿 ----------
-  const exDate = $("exDate"), exKind = $("exKind"), exCat = $("exCat"), budgetInput = $("budgetInput");
+  const exDate = $("exDate"), exCat = $("exCat"), budgetInput = $("budgetInput");
+  const exKind = () => (checkedValue("exKind") === "in" ? "in" : "out");
   exDate.value = todayKey;
-  exKind.addEventListener("change", () => exCat.setAttribute("list", exKind.value === "in" ? "catIn" : "catOut"));
+  document.querySelectorAll('input[name="exKind"]').forEach((r) => r.addEventListener("change", () => exCat.setAttribute("list", exKind() === "in" ? "catIn" : "catOut")));
   $("exForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const date = exDate.value;
     const amount = Math.round(Number($("exAmount").value));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !(amount > 0)) return;
-    const item = { date, kind: exKind.value === "in" ? "in" : "out", category: exCat.value.trim() || "未分類", amount, createdAt: Date.now() };
+    const item = { date, kind: exKind(), category: exCat.value.trim() || "未分類", amount, createdAt: Date.now() };
     const memo = $("exMemo").value.trim();
     if (memo) item.memo = memo;
     act(() => expenses.add(item));
     exCat.value = ""; $("exAmount").value = ""; $("exMemo").value = "";
     if (monthOf(date) !== viewMonth) { viewMonth = monthOf(date); renderMoney(); }
-    exCat.focus();
+    $("exAmount").focus();
   });
   $("budgetForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
