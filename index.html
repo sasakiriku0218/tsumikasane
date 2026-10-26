@@ -61,6 +61,12 @@
   --f-home: #007d2e; --f-records: #6c6c70;
   --f-todo: #1e6ef4; --f-cal: #b02fc2; --f-journal: #956d51; --f-meal: #c55300;
   --f-workout: #007eae; --f-weight: #564ade; --f-money: #a16a00; --f-goal: #008575;
+  /* event label hues, the user's pick among iOS system colours: --lc-* for dots and light tints (follows dark mode),
+     --lf-* behind white text (the same in both modes, 4.5:1 with white) */
+  --lc-red: #e9152d; --lc-orange: #c55300; --lc-yellow: #a16a00; --lc-green: #008932; --lc-cyan: #007eae;
+  --lc-blue: #1e6ef4; --lc-purple: #b02fc2; --lc-pink: #e7124d; --lc-brown: #956d51; --lc-gray: #6c6c70;
+  --lf-red: #e9152d; --lf-orange: #c55300; --lf-yellow: #a16a00; --lf-green: #008932; --lf-cyan: #007eae;
+  --lf-blue: #1e6ef4; --lf-purple: #b02fc2; --lf-pink: #e7124d; --lf-brown: #956d51; --lf-gray: #6c6c70;
   --font-body: -apple-system, BlinkMacSystemFont, system-ui, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
   /* SF Pro Rounded for the big numbers, as Health and Fitness use; other systems fall back to their own font */
   --font-round: ui-rounded, -apple-system, BlinkMacSystemFont, system-ui, "Hiragino Sans", "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
@@ -92,6 +98,7 @@
     --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
     --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3;
+    --lc-red: #ff4245; --lc-orange: #ff9230; --lc-yellow: #ffd600; --lc-green: #30d158; --lc-cyan: #3cd3fe; --lc-blue: #0091ff; --lc-purple: #db34f2; --lc-pink: #ff375f; --lc-brown: #b78a66; --lc-gray: #8e8e93;
     color-scheme: dark;
   }
 }
@@ -103,6 +110,7 @@
   --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
   --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3;
+  --lc-red: #ff4245; --lc-orange: #ff9230; --lc-yellow: #ffd600; --lc-green: #30d158; --lc-cyan: #3cd3fe; --lc-blue: #0091ff; --lc-purple: #db34f2; --lc-pink: #ff375f; --lc-brown: #b78a66; --lc-gray: #8e8e93;
   color-scheme: dark;
 }
 /* Increase Contrast: stronger text, edges and separators, outlined cards, solid bars (HIG asks for these variants) */
@@ -279,7 +287,7 @@ form.add .actions .link-btn { margin-inline-end: auto; }
   form.add { grid-template-columns: minmax(0, 1fr); row-gap: 6px; }
   form.add > .flabel { margin-top: 6px; }
 }
-form.add input, form.add select, textarea, .inline input, .goal-actions input[type="number"], .datenav input[type="date"] {
+form.add input, form.add select, textarea, .inline input, .goal-actions input[type="number"], .datenav input[type="date"], .label-row input, .label-row select {
   min-height: 44px; min-width: 0; padding: 0 12px;
   background-color: var(--surface); border: 1px solid var(--line); border-radius: 12px; line-height: 1.3;
 }
@@ -443,6 +451,8 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .tile ul { margin: 4px 0 0; padding: 0; list-style: none; }
 .tile ul li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.5; }
 .tile ul li::before { content: "・"; color: var(--tile-c); }
+/* today's events: a dot in each event's label colour */
+.tile ul.ev li::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline: 4px 8px; border-radius: 50%; background: var(--dot); vertical-align: 1px; }
 .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); padding: 12px var(--space-2) var(--space-1); }
 .day { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--t-foot); line-height: 1.2; color: var(--muted); }
 .day .n { font-size: var(--t-body); font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
@@ -472,6 +482,36 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .cal .legend { padding: var(--space-1) var(--space-1) var(--space-2); }
 /* the narrowest phones: give the seven columns all the width there is */
 @media (max-width: 359px) { .cal { padding-inline: 2px; } .cal-week, .cal-grid { gap: 0; } }
+
+/* event labels: the user's own categories. The name always sits next to the colour, so colour is never the only cue (HIG).
+   In the add form they are one-tap chips; a chosen chip fills with its colour and white text. */
+#evLabelLabel { align-self: start; margin-top: 4px; }  /* the chips can wrap, so the label stays with their first row */
+.label-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.label-chips label { position: relative; display: grid; cursor: pointer; }
+.label-chips input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.label-chips span { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 999px; background: var(--fill); font-size: var(--t-sub); line-height: 1.2; white-space: nowrap; }
+.label-chips span::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--lc); }
+.label-chips .none span::before { display: none; }
+.label-chips input:checked + span { background: var(--lf); color: #ffffff; font-weight: 600; }
+.label-chips input:checked + span::before { background: #ffffff; }
+.label-chips input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.label-chips label::after { content: ""; position: absolute; inset: 0; margin: auto; height: 44px; }
+/* on an event row: a small pop-up button showing the label, to change it in place (its tap area is 44px tall) */
+.label-pop { position: relative; display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; height: 28px; margin-top: 4px; padding-inline-start: 10px; border-radius: 999px; background: color-mix(in srgb, var(--lc) 14%, var(--surface)); }
+.label-pop .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--lc); }
+.label-pop select { height: 44px; margin-block: -8px; padding: 0 26px 0 0 !important; border: 0; background-color: transparent; color: var(--fg); font-size: var(--t-foot); font-weight: 600; cursor: pointer; background-position: right 8px center; }
+/* the label editor: a disclosure row at the foot of the calendar, opened only when needed (HIG: progressive disclosure) */
+.label-editor > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); min-height: 52px; padding: 0 var(--space-2); border-radius: var(--radius); font-weight: 600; cursor: pointer; list-style: none; }
+.label-editor > summary::-webkit-details-marker { display: none; }
+.label-editor > summary::after { content: ""; flex: none; width: 8px; height: 8px; margin-inline-end: 4px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .2s; }
+.label-editor[open] > summary::after { transform: rotate(45deg); }
+.label-editor[open] > summary { border-radius: var(--radius) var(--radius) 0 0; }
+.label-editor > ul.list { border-top: .5px solid var(--separator); }
+.label-row .dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--lc); }
+.label-row input { flex: 1 1 auto; }
+.label-row select { flex: none; }
+.label-tools { padding: 0 var(--space-2) 6px; }
+.label-tools .link-btn { display: inline-flex; align-items: center; gap: 4px; }
 
 /* 記録: the record pages as an iOS Settings list, then backup */
 ul.list > li.btn-row { padding: 0; }
@@ -583,7 +623,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="card cal">
           <div class="cal-week" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
           <div class="cal-grid" id="calGrid"></div>
-          <div class="legend">
+          <div class="legend" id="calLegend">
             <span style="--lc: var(--c-cal)">予定</span>
             <span style="--lc: var(--c-todo)">ToDo の期限</span>
             <span style="--lc: var(--c-goal)">目標の期限</span>
@@ -594,9 +634,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <input type="text" id="evTitle" class="full" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
           <label class="flabel" for="evTime">時間 <span class="opt">任意</span></label>
           <div class="ffield"><input type="time" id="evTime"></div>
+          <span class="flabel" id="evLabelLabel">ラベル</span>
+          <div class="ffield" id="evLabels"></div>
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <ul class="list card" id="calDayList"></ul>
+        <details class="card label-editor" id="labelEditor">
+          <summary>ラベルの編集</summary>
+          <ul class="list" id="labelList"></ul>
+          <div class="label-tools"><button type="button" class="link-btn" id="labelAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>ラベルを追加</button></div>
+        </details>
       </section>
 
       <!-- ToDo -->
@@ -901,7 +948,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       try { localStorage.setItem(LS_PREFIX + this.name, JSON.stringify(this.items)); }
       catch { if (canStoreLocal) showError(); }
     }
-    async add(data) { this.items.push({ id: uid(), ...data }); this.saveLocal(); renderAll(); }
+    async add(data) { const id = uid(); this.items.push({ id, ...data }); this.saveLocal(); renderAll(); return id; }
     async set(id, data) {
       const i = this.items.findIndex((x) => x.id === id);
       if (i >= 0) this.items[i] = { id, ...data }; else this.items.push({ id, ...data });
@@ -924,7 +971,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const goals = new Store("goals");
   const settings = new Store("settings");
   const events = new Store("events");
-  const ALL_STORES = [todos, journal, meals, workouts, weights, expenses, goals, settings, events];
+  const labels = new Store("labels"); // the user's categories for events
+  const ALL_STORES = [todos, journal, meals, workouts, weights, expenses, goals, settings, events, labels];
 
   const statusEl = $("status");
   let statusTimer = null;
@@ -1650,7 +1698,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // ---------- カレンダー ----------
   // untimed (all-day) events sort first
   const byTime = (a, b) => (a.time || "").localeCompare(b.time || "") || num(a.createdAt) - num(b.createdAt);
-  const evLabel = (e) => (e.time ? e.time + " " : "") + e.title;
+  const evText = (e) => (e.time ? e.time + " " : "") + e.title;
   function groupBy(items, key) {
     const m = new Map();
     for (const x of items) {
@@ -1661,6 +1709,75 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     return m;
   }
+  // ---------- ラベル（予定の分類） ----------
+  // each label has a name and an iOS system hue; the hue marks the month grid, the day list and the home card
+  const LABEL_COLORS = [["red", "赤"], ["orange", "オレンジ"], ["yellow", "黄"], ["green", "緑"], ["cyan", "水色"], ["blue", "青"], ["purple", "紫"], ["pink", "ピンク"], ["brown", "茶"], ["gray", "グレー"]];
+  const colorKey = (c) => (LABEL_COLORS.some(([k]) => k === c) ? c : "gray");
+  const sortedLabels = () => [...labels.items].sort((a, b) => num(a.createdAt) - num(b.createdAt));
+  const labelOf = (e) => (e && e.labelId && labels.get(e.labelId)) || null;
+  // events without a label keep the calendar's own colour
+  const labelHue = (l) => (l ? `var(--lc-${colorKey(l.color)})` : "var(--c-cal)");
+  const labelStyle = (l) => (l ? `--lc:var(--lc-${colorKey(l.color)});--lf:var(--lf-${colorKey(l.color)})` : "--lc:var(--c-cal);--lf:var(--f-cal)");
+  let evLabelChoice = ""; // the label picked in the add form; it stays picked for the next event
+  let labelEditorStale = false;
+  function renderLabels() {
+    const items = sortedLabels();
+    if (evLabelChoice && !labels.get(evLabelChoice)) evLabelChoice = "";
+    // the add form: one tap picks a label, or a way to make the first one
+    if (!items.length) {
+      setChildren($("evLabels"), el("button", { type: "button", class: "link-btn", onclick: () => { $("labelEditor").open = true; addLabel(); } }, "ラベルを作る"));
+    } else {
+      const chip = (value, name, l) => el("label", { class: value ? "" : "none", style: labelStyle(l) },
+        el("input", { type: "radio", name: "evLabel", value, checked: value === evLabelChoice, onchange: () => { evLabelChoice = value; } }),
+        el("span", {}, name));
+      setChildren($("evLabels"), el("div", { class: "label-chips", role: "radiogroup", "aria-labelledby": "evLabelLabel" },
+        chip("", "なし", null), items.map((l) => chip(l.id, l.name, l))));
+    }
+    renderLabelEditor();
+  }
+  function renderLabelEditor() {
+    const list = $("labelList");
+    // don't swap out a name or colour field while it is in use; catch up once focus leaves the list
+    const a = document.activeElement;
+    if (list.contains(a) && a.matches("input, select")) { labelEditorStale = true; return; }
+    labelEditorStale = false;
+    const items = sortedLabels();
+    if (!items.length) { setChildren(list, el("li", { class: "empty" }, "ラベルはまだありません。下の「ラベルを追加」から作れます。")); return; }
+    setChildren(list, items.map((l) => el("li", { class: "label-row", "data-id": l.id, style: labelStyle(l) },
+      el("span", { class: "dot", "aria-hidden": "true" }),
+      el("input", { type: "text", value: l.name, maxlength: 20, "aria-label": `「${l.name}」の名前`, onchange: (ev) => {
+        const v = ev.target.value.trim();
+        if (!v) { ev.target.value = l.name; return; }
+        if (v !== l.name) act(() => labels.update(l.id, { name: v }));
+      } }),
+      el("select", { "aria-label": `「${l.name}」の色`, onchange: (ev) => {
+        ev.target.closest("li").style.cssText = labelStyle({ color: ev.target.value });
+        act(() => labels.update(l.id, { color: ev.target.value }));
+      } }, LABEL_COLORS.map(([k, name]) => el("option", { value: k, selected: k === colorKey(l.color) }, name))),
+      delButton(() => act(() => labels.remove(l.id))))));
+  }
+  $("labelList").addEventListener("focusout", (ev) => {
+    if (labelEditorStale && !$("labelList").contains(ev.relatedTarget)) renderLabelEditor();
+  });
+  // a new label gets the first colour not in use yet, and its name is ready to type over
+  async function addLabel() {
+    const used = new Set(labels.items.map((l) => l.color));
+    const color = (LABEL_COLORS.find(([k]) => !used.has(k)) || LABEL_COLORS[0])[0];
+    let id = null;
+    await act(async () => { id = await labels.add({ name: "新しいラベル", color, createdAt: Date.now() }); });
+    const input = id && $("labelList").querySelector(`li[data-id="${id}"] input`);
+    if (input) { input.focus(); input.select(); }
+  }
+  $("labelAdd").addEventListener("click", () => addLabel());
+  // on an event row: the label as a pop-up button, to change it in place
+  function labelPop(e, l) {
+    return el("label", { class: "label-pop", style: labelStyle(l) },
+      el("span", { class: "dot", "aria-hidden": "true" }),
+      el("select", { "aria-label": `「${e.title}」のラベル`, onchange: (ev) => act(() => events.update(e.id, { labelId: ev.target.value })) },
+        el("option", { value: "", selected: !l }, "ラベルなし"),
+        sortedLabels().map((x) => el("option", { value: x.id, selected: !!l && x.id === l.id }, x.name))));
+  }
+
   $("evForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const title = $("evTitle").value.trim();
@@ -1668,6 +1785,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const item = { date: calDay, title, createdAt: Date.now() };
     const time = $("evTime").value;
     if (time) item.time = time;
+    if (evLabelChoice && labels.get(evLabelChoice)) item.labelId = evLabelChoice;
     act(() => events.add(item));
     $("evTitle").value = ""; $("evTime").value = ""; $("evTitle").focus();
   });
@@ -1693,8 +1811,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const evs = evBy.get(d) || [];
       const todosDue = (todoBy.get(d) || []).filter((t) => !t.done);
       const goalsDue = (goalBy.get(d) || []).filter((g) => !g.done);
-      const marks = [...evs.slice(0, 3).map(() => "var(--c-cal)"), todosDue.length ? "var(--c-todo)" : null, goalsDue.length ? "var(--c-goal)" : null];
-      const notes = [evs.length ? `予定 ${evs.length} 件` : "", todosDue.length ? `ToDo の期限 ${todosDue.length} 件` : "", goalsDue.length ? `目標の期限 ${goalsDue.length} 件` : ""];
+      // each event's dot takes its label's colour; the day's name lists the labels too
+      const marks = [...evs.slice(0, 3).map((e) => labelHue(labelOf(e))), todosDue.length ? "var(--c-todo)" : null, goalsDue.length ? "var(--c-goal)" : null];
+      const evNames = [...new Set(evs.map((e) => (labelOf(e) || {}).name).filter(Boolean))];
+      const notes = [evs.length ? `予定 ${evs.length} 件` + (evNames.length ? `（${evNames.join("、")}）` : "") : "", todosDue.length ? `ToDo の期限 ${todosDue.length} 件` : "", goalsDue.length ? `目標の期限 ${goalsDue.length} 件` : ""];
       cells.push(el("button", {
         type: "button",
         class: "cal-day" + (monthOf(d) !== calMonth ? " out" : "") + (wd === 0 ? " sun" : wd === 6 ? " sat" : "") + (d === todayKey ? " today" : ""),
@@ -1707,6 +1827,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       ));
     }
     setChildren($("calGrid"), cells);
+    const ls = sortedLabels();
+    setChildren($("calLegend"),
+      ls.map((l) => el("span", { style: `--lc:${labelHue(l)}` }, l.name)),
+      el("span", { style: "--lc: var(--c-cal)" }, ls.length ? "ラベルなし" : "予定"),
+      el("span", { style: "--lc: var(--c-todo)" }, "ToDo の期限"),
+      el("span", { style: "--lc: var(--c-goal)" }, "目標の期限"));
 
     // the chosen day: its events, then whatever falls due on it
     const rel = relLabel(calDay);
@@ -1720,9 +1846,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     list.replaceChildren();
     if (!evs.length && !dueCount) { list.append(el("li", { class: "empty" }, "この日の予定はありません。上の欄から追加できます。")); return; }
     for (const e of evs) {
-      list.append(el("li", {},
-        el("span", { class: "chip", style: "--chip-c: var(--c-cal)" }, e.time || "終日"),
-        el("span", { class: "body" }, el("span", { class: "text" }, e.title)),
+      const l = labelOf(e);
+      list.append(el("li", { style: labelStyle(l) },
+        el("span", { class: "chip", style: "--chip-c: var(--lc)" }, e.time || "終日"),
+        el("span", { class: "body" }, el("span", { class: "text" }, e.title), labels.items.length ? labelPop(e, l) : null),
         delButton(() => act(() => events.remove(e.id)))
       ));
     }
@@ -1781,8 +1908,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         undone.length ? `きょう期限 ${dueToday}・期限切れ ${overdue}` : (todos.items.length ? "すべて完了しています" : "まだ登録がありません"),
         top.length ? el("ul", {}, top.map((t) => el("li", { title: t.text }, t.text))) : null, "todo", true),
       tile("var(--c-cal)", "きょうの予定", String(evToday.length), "件",
-        evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evLabel(nextEv)}` : "まだ予定はありません",
-        evToday.length ? el("ul", {}, evToday.slice(0, 3).map((e) => el("li", { title: e.title }, evLabel(e)))) : null, "calendar", true),
+        evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evText(nextEv)}` : "まだ予定はありません",
+        evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null, "calendar", true),
       tile("var(--c-journal)", "日記", j ? (j.mood ? MOODS[j.mood] : "書きました") : "まだ", null,
         j ? (j.text ? j.text.slice(0, 60) + (j.text.length > 60 ? "…" : "") : "気分だけ記録しています") : "ひとことでも残しておくと、あとで効いてきます。", null, "journal"),
       tile("var(--c-meal)", "食事", String(ms.length), "回",
@@ -1882,7 +2009,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderWeight(); renderMoney(); renderGoals(); renderCalendar();
+    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels();
   }
   const initial = (location.hash || "").slice(1);
   showTab(PAGES.some((p) => p.key === initial) ? initial : "home");
