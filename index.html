@@ -469,7 +469,8 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 
 /* calendar: a Sunday-first month grid of thin gray lines (between weeks and between days, as the user asked) with each
    day's plans written in coloured bars, after the iPhone Calendar's month view the user showed. Today's date is in the
-   tint; the chosen day's square is lightly tinted and its date bold (no circle, at the user's wish). */
+   tint. Tapping a day opens its sheet (the day sheet, further down); the day last opened stays lightly tinted with its
+   date bold (no circle, at the user's wish). */
 .cal { padding: 12px 0 0; }
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .cal-grid { border-top: .5px solid var(--separator); }
@@ -486,8 +487,8 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .cal-day.out .n { color: var(--muted); }
 .cal-day.today .n { color: var(--accent); font-weight: 700; }
 /* 10% tint: every date colour on it still reads 4.5:1 */
-.cal-day[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
-.cal-day[aria-pressed="true"] .n { font-weight: 700; }
+.cal-day.sel { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.cal-day.sel .n { font-weight: 700; }
 /* each plan as a bar in its label's colour (the title clipped to the square): four lines at most, the last one +N when
    there are more. ToDo and goal deadlines
    are outlined bars, as iPhone shows reminders lighter than events. The text is black or white on a light tint, so it
@@ -500,7 +501,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 
 /* event labels: the user's own categories. The name always sits next to the colour, so colour is never the only cue (HIG).
    In the add form they are one-tap chips; a chosen chip fills with its colour and white text. */
-#evLabelLabel { align-self: start; margin-top: 4px; }  /* the chips can wrap, so the label stays with their first row */
+#evLabelLabel, #edLabelLabel { align-self: start; margin-top: 4px; }  /* the chips can wrap, so the label stays with their first row */
 .label-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .label-chips label { position: relative; display: grid; cursor: pointer; }
 .label-chips input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
@@ -511,10 +512,6 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .label-chips input:checked + span::before { background: #ffffff; }
 .label-chips input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
 .label-chips label::after { content: ""; position: absolute; inset: 0; margin: auto; height: 44px; }
-/* on an event row: a small pop-up button showing the label, to change it in place (its tap area is 44px tall) */
-.label-pop { position: relative; display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; height: 28px; margin-top: 4px; padding-inline-start: 10px; border-radius: 999px; background: color-mix(in srgb, var(--lc) 14%, var(--surface)); }
-.label-pop .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--lc); }
-.label-pop select { height: 44px; margin-block: -8px; padding: 0 26px 0 0 !important; border: 0; background-color: transparent; color: var(--fg); font-size: var(--t-foot); font-weight: 600; cursor: pointer; background-position: right 8px center; }
 /* the label editor: a disclosure row at the foot of the calendar, opened only when needed (HIG: progressive disclosure) */
 .label-editor > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); min-height: 52px; padding: 0 var(--space-2); border-radius: var(--radius); font-weight: 600; cursor: pointer; list-style: none; }
 .label-editor > summary::-webkit-details-marker { display: none; }
@@ -527,6 +524,53 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .label-row select { flex: none; }
 .label-tools { padding: 0 var(--space-2) 6px; }
 .label-tools .link-btn { display: inline-flex; align-items: center; gap: 4px; }
+
+/* the day sheet (HIG sheets): a tap on a day in the month slides that day's plans up in a sheet, where they are added,
+   changed and deleted. On iPhone it rises from the bottom with a grabber and goes away with a pull down, 完了 or a tap
+   above it; from 768px it is a form sheet in the middle. Its height is fixed, as iOS sheets snap to set heights, so it
+   doesn't jump between the day's list and an edit form. In dark mode it sits a step lighter than the page and its cards
+   one more step, as iOS raises sheets. */
+html:has(dialog.sheet[open]) { overflow: hidden; }  /* the page under it stays put */
+dialog.sheet {
+  position: fixed; inset: auto 0 0; width: 100%; max-width: 640px; height: calc(100dvh - max(48px, env(safe-area-inset-top, 0px) + 16px)); max-height: none;
+  margin: 0 auto; padding: 0; border: 0; border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg); color: var(--fg); box-shadow: 0 -4px 24px rgba(0, 0, 0, .16);
+  overflow: hidden auto; overscroll-behavior: contain;
+}
+dialog.sheet::backdrop { background: rgba(0, 0, 0, .32); animation: sheet-fade .32s; }
+@keyframes sheet-fade { from { opacity: 0; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sheet { --bg: #1c1c1e; --surface: #2c2c2e; } }
+:root[data-theme="dark"] .sheet { --bg: #1c1c1e; --surface: #2c2c2e; }
+/* the bar on top: the title between キャンセル and 完了 or 保存; it stays put while the sheet scrolls, and it is the part to pull */
+.sheet-head {
+  position: sticky; top: 0; z-index: 1;
+  display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, max-content) minmax(max-content, 1fr); align-items: center; gap: var(--space-1);
+  min-height: 60px; padding: 14px var(--space-1) 4px; background: var(--bg); touch-action: none;
+}
+.sheet-head::before { content: ""; position: absolute; top: 6px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: color-mix(in srgb, var(--muted) 55%, transparent); }
+.sheet-title { grid-column: 2; margin: 0; font-size: var(--t-body); line-height: 1.3; font-weight: 600; text-align: center; overflow-wrap: anywhere; }
+.sheet-title:focus-visible { outline: none !important; }  /* focused as the sheet opens, so screen readers start here; not a control */
+.sheet-btn { grid-row: 1; min-height: 44px; padding: 0 8px; background: transparent; border: 0; color: var(--accent); line-height: 1.2; white-space: nowrap; cursor: pointer; }  /* kept whole: the title gives way */
+.sheet-btn.start { grid-column: 1; justify-self: start; }
+.sheet-btn.end { grid-column: 3; justify-self: end; font-weight: 600; }
+.sheet-body { padding: 4px var(--space-2) max(var(--space-3), env(safe-area-inset-bottom, 0px)); container-type: inline-size; }
+.sheet-view { display: flex; flex-direction: column; gap: var(--space-2); }
+.sheet-del { display: block; width: 100%; min-height: 50px; padding: 0 var(--space-2); text-align: center; }
+.row-btn > .chip { min-width: 4.6em; text-align: center; }  /* the times line up in a column */
+/* 終日にする stays whole beside the time; the time field gives up the room */
+.ffield > .link-btn { flex: none; white-space: nowrap; }
+/* an event row opens its edit form; its label shows as a dot in its colour beside the name */
+.ev-label::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; background: var(--lc); vertical-align: 1px; }
+@container (max-width: 17em) {
+  .row-btn:has(> .chip) { flex-wrap: wrap; row-gap: 4px; }
+  .row-btn:has(> .chip) > .body { order: -1; flex: 1 1 100%; }
+  .row-btn:has(> .chip) > .chev { margin-inline-start: auto; }
+}
+@media (min-width: 768px) {
+  dialog.sheet { inset: 0; width: min(520px, calc(100vw - 64px)); height: min(700px, calc(100dvh - 64px)); margin: auto; border-radius: var(--radius); box-shadow: var(--shadow); }
+  .sheet-head { min-height: 52px; padding-top: 6px; }
+  .sheet-head::before { display: none; }
+}
 
 /* 記録: the record pages as an iOS Settings list, then backup */
 ul.list > li.btn-row { padding: 0; }
@@ -668,15 +712,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             <span style="--lc: var(--c-goal)">目標の期限</span>
           </div>
         </div>
-        <form class="add" id="evForm" autocomplete="off">
-          <input type="text" id="evTitle" class="full" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
-          <label class="flabel" for="evTime">時間 <span class="opt">任意</span></label>
-          <div class="ffield"><input type="time" id="evTime"></div>
-          <span class="flabel" id="evLabelLabel">ラベル</span>
-          <div class="ffield" id="evLabels"></div>
-          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
-        </form>
-        <ul class="list card" id="calDayList"></ul>
         <details class="card label-editor" id="labelEditor">
           <summary>ラベルの編集</summary>
           <ul class="list" id="labelList"></ul>
@@ -876,6 +911,42 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   </main>
 </div>
 
+<!-- a day's plans in an iOS-style sheet: a tap on a day in the month opens it, and they are added, changed and deleted here -->
+<dialog class="sheet" id="daySheet" aria-labelledby="sheetTitle">
+  <div class="sheet-head" id="sheetHead">
+    <button type="button" class="sheet-btn start" id="sheetCancel" hidden>キャンセル</button>
+    <h2 class="sheet-title" id="sheetTitle" tabindex="-1" autofocus></h2>
+    <button type="button" class="sheet-btn end" id="sheetDone">完了</button>
+    <button type="submit" class="sheet-btn end" id="sheetSave" form="evEdit" hidden>保存</button>
+  </div>
+  <div class="sheet-body">
+    <div class="sheet-view" id="dayView">
+      <form class="add" id="evForm" autocomplete="off">
+        <input type="text" id="evTitle" class="full" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
+        <label class="flabel" for="evTime">時間 <span class="opt">任意</span></label>
+        <div class="ffield"><input type="time" id="evTime"></div>
+        <span class="flabel" id="evLabelLabel">ラベル</span>
+        <div class="ffield" id="evLabels"></div>
+        <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
+      </form>
+      <ul class="list card" id="calDayList"></ul>
+    </div>
+    <div class="sheet-view" id="editView" hidden>
+      <form class="add" id="evEdit" autocomplete="off">
+        <input type="text" id="edTitle" class="full" aria-label="予定の内容" maxlength="100" required>
+        <label class="flabel" for="edDate">日付</label>
+        <div class="ffield"><input type="date" id="edDate" required></div>
+        <label class="flabel" for="edTime">時間 <span class="opt">任意</span></label>
+        <div class="ffield"><input type="time" id="edTime"><button type="button" class="link-btn" id="edTimeClear">終日にする</button></div>
+        <span class="flabel" id="edLabelLabel">ラベル</span>
+        <div class="ffield" id="edLabels"></div>
+      </form>
+      <div class="card"><button type="button" class="link-btn danger sheet-del" id="edDelete">この予定を削除</button></div>
+    </div>
+  </div>
+  <div class="toast" id="sheetStatus" role="status"></div>
+</dialog>
+
 <!-- short messages (saved, exported, errors) float above the tab bar, so they show wherever you are on the page -->
 <div class="toast" id="status" role="status"></div>
 
@@ -1018,12 +1089,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function showMode() {
     $("noSave").hidden = canStoreLocal;
   }
-  // a short message above the tab bar for a few seconds; role=status reads it out as well
+  // a short message above the tab bar for a few seconds; role=status reads it out as well. The day sheet covers the
+  // page, so while it is open the message shows in the sheet's own copy
+  const sheetEl = $("daySheet"), sheetStatus = $("sheetStatus");
   function flash(msg) {
     clearTimeout(statusTimer);
-    statusEl.textContent = msg;
-    statusEl.classList.add("show");
-    statusTimer = setTimeout(() => statusEl.classList.remove("show"), 6000);
+    const t = sheetEl.open ? sheetStatus : statusEl;
+    (t === statusEl ? sheetStatus : statusEl).classList.remove("show");
+    t.textContent = msg;
+    t.classList.add("show");
+    statusTimer = setTimeout(() => t.classList.remove("show"), 6000);
   }
   function showError() { flash("保存できませんでした。端末の空き容量が足りているか確かめてください。"); }
   async function act(fn) { try { await fn(); } catch { showError(); } }
@@ -1757,19 +1832,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const labelStyle = (l) => (l ? `--lc:var(--lc-${colorKey(l.color)});--lf:var(--lf-${colorKey(l.color)})` : "--lc:var(--c-cal);--lf:var(--f-cal)");
   let evLabelChoice = ""; // the label picked in the add form; it stays picked for the next event
   let labelEditorStale = false;
-  function renderLabels() {
+  // one tap picks a label (chips, a radio group of their own in each form), or a way to make the first one
+  function labelPicker(name, current, onPick, labelledBy) {
     const items = sortedLabels();
+    if (!items.length) return el("button", { type: "button", class: "link-btn", onclick: makeFirstLabel }, "ラベルを作る");
+    const chip = (value, text, l) => el("label", { class: value ? "" : "none", style: labelStyle(l) },
+      el("input", { type: "radio", name, value, checked: value === current, onchange: () => onPick(value) }),
+      el("span", {}, text));
+    return el("div", { class: "label-chips", role: "radiogroup", "aria-labelledby": labelledBy },
+      chip("", "なし", null), items.map((l) => chip(l.id, l.name, l)));
+  }
+  // the label editor is on the page under the sheet, so the sheet gets out of the way first
+  function makeFirstLabel() { closeSheet(true); $("labelEditor").open = true; addLabel(); }
+  function renderLabels() {
     if (evLabelChoice && !labels.get(evLabelChoice)) evLabelChoice = "";
-    // the add form: one tap picks a label, or a way to make the first one
-    if (!items.length) {
-      setChildren($("evLabels"), el("button", { type: "button", class: "link-btn", onclick: () => { $("labelEditor").open = true; addLabel(); } }, "ラベルを作る"));
-    } else {
-      const chip = (value, name, l) => el("label", { class: value ? "" : "none", style: labelStyle(l) },
-        el("input", { type: "radio", name: "evLabel", value, checked: value === evLabelChoice, onchange: () => { evLabelChoice = value; } }),
-        el("span", {}, name));
-      setChildren($("evLabels"), el("div", { class: "label-chips", role: "radiogroup", "aria-labelledby": "evLabelLabel" },
-        chip("", "なし", null), items.map((l) => chip(l.id, l.name, l))));
-    }
+    setChildren($("evLabels"), labelPicker("evLabel", evLabelChoice, (v) => { evLabelChoice = v; }, "evLabelLabel"));
     renderLabelEditor();
   }
   function renderLabelEditor() {
@@ -1806,15 +1883,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (input) { input.focus(); input.select(); }
   }
   $("labelAdd").addEventListener("click", () => addLabel());
-  // on an event row: the label as a pop-up button, to change it in place
-  function labelPop(e, l) {
-    return el("label", { class: "label-pop", style: labelStyle(l) },
-      el("span", { class: "dot", "aria-hidden": "true" }),
-      el("select", { "aria-label": `「${e.title}」のラベル`, onchange: (ev) => act(() => events.update(e.id, { labelId: ev.target.value })) },
-        el("option", { value: "", selected: !l }, "ラベルなし"),
-        sortedLabels().map((x) => el("option", { value: x.id, selected: !!l && x.id === l.id }, x.name))));
-  }
-
   $("evForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const title = $("evTitle").value.trim();
@@ -1827,12 +1895,147 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("evTitle").value = ""; $("evTime").value = ""; $("evTitle").focus();
   });
   function setCalDay(d) { calDay = d; calMonth = monthOf(d); renderCalendar(); }
+
+  // ---------- the day sheet: a tap on a day opens its plans, to add, change and delete them there ----------
+  const sheetHead = $("sheetHead"), edDelete = $("edDelete");
+  let editingId = null, edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
+  // the bar on top: 完了 over the day's list; キャンセル and 保存 over an event's edit form, as iOS edit sheets have
+  function syncSheetHead() {
+    const editing = !!editingId, rel = relLabel(calDay);
+    $("dayView").hidden = editing; $("editView").hidden = !editing;
+    $("sheetDone").hidden = editing; $("sheetCancel").hidden = !editing; $("sheetSave").hidden = !editing;
+    $("sheetTitle").textContent = editing ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
+  }
+  // a closed sheet's starting state: no animation or drag left over, the day's list showing
+  function resetSheet() {
+    for (const a of sheetAnims) a.cancel();
+    clearTimeout(closeTimer);
+    sheetAnims = []; sheetClosing = false; drag = null;
+    sheetEl.style.transform = "";
+    editingId = null; disarmDelete(); syncSheetHead();
+  }
+  function openDay(d, byKey) {
+    if (sheetEl.open) return;
+    resetSheet(); // also here: a browser may hold the close event back until it next draws
+    setCalDay(d); // draws the grid and the sheet's list for that day
+    sheetByKey = byKey;
+    sheetEl.showModal();
+    sheetEl.scrollTop = 0;
+    if (!reduceMotion.matches) sheetEl.animate(wideScreen.matches
+      ? [{ opacity: 0, transform: "scale(.96)" }, { opacity: 1, transform: "none" }]
+      : [{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 320, easing: "cubic-bezier(.25, .9, .3, 1)" });
+  }
+  // it slides back down (fades on wide screens) before it closes; instant when the page under it needs focus at once
+  function closeSheet(instant) {
+    if (!sheetEl.open || sheetClosing) return;
+    if (instant === true || reduceMotion.matches) { sheetEl.close(); return; }
+    sheetClosing = true;
+    const opts = { duration: 220, easing: "cubic-bezier(.4, 0, 1, 1)", fill: "forwards" };
+    try { sheetAnims.push(sheetEl.animate([{ opacity: 1 }, { opacity: 0 }], { ...opts, pseudoElement: "::backdrop" })); } catch {}
+    const away = sheetEl.animate([{ transform: sheetEl.style.transform || "none" },
+      wideScreen.matches ? { opacity: 0, transform: "scale(.96)" } : { transform: "translateY(100%)" }], opts);
+    sheetAnims.push(away);
+    away.finished.then(() => sheetEl.close(), () => sheetEl.close());
+    closeTimer = setTimeout(() => sheetEl.close(), 600); // in case the page stops drawing midway (animations wait while it is hidden)
+  }
+  sheetEl.addEventListener("close", () => {
+    if (sheetEl.open) return; // opened again before this arrived
+    resetSheet();
+    // keyboard users land back on the day they opened (the grid has been redrawn since)
+    if (sheetByKey) $("calGrid").querySelector(".cal-day.sel")?.focus();
+  });
+  // Esc: from an edit form back to the day's list, from the list out of the sheet
+  sheetEl.addEventListener("cancel", (ev) => { ev.preventDefault(); if (editingId) showDayView(); else closeSheet(); });
+  // a tap on the dimmed page above the sheet puts it away
+  sheetEl.addEventListener("click", (ev) => {
+    if (ev.target !== sheetEl) return;
+    const r = sheetEl.getBoundingClientRect();
+    if (ev.clientY < r.top || ev.clientY > r.bottom || ev.clientX < r.left || ev.clientX > r.right) closeSheet();
+  });
+  $("sheetDone").addEventListener("click", () => closeSheet());
+  $("sheetCancel").addEventListener("click", () => showDayView());
+  // iPhone: the bar on top can be pulled down to put the sheet away, as iOS sheets can
+  sheetHead.addEventListener("pointerdown", (ev) => {
+    if (wideScreen.matches || sheetClosing || ev.button !== 0 || ev.target.closest("button")) return;
+    drag = { y: ev.clientY, t: ev.timeStamp, dy: 0 };
+    sheetHead.setPointerCapture(ev.pointerId);
+  });
+  sheetHead.addEventListener("pointermove", (ev) => {
+    if (!drag) return;
+    drag.dy = Math.max(0, ev.clientY - drag.y);
+    sheetEl.style.transform = drag.dy ? `translateY(${drag.dy}px)` : "";
+  });
+  function endDrag(ev) {
+    if (!drag) return;
+    const { dy, t } = drag;
+    drag = null;
+    // pulled a quarter of the way down, or flicked
+    if (dy > sheetEl.offsetHeight / 4 || (dy > 24 && dy / Math.max(1, ev.timeStamp - t) > .6)) { closeSheet(); return; }
+    sheetEl.style.transform = "";
+    if (dy && !reduceMotion.matches) sheetEl.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 200, easing: "ease-out" });
+  }
+  sheetHead.addEventListener("pointerup", endDrag);
+  sheetHead.addEventListener("pointercancel", endDrag);
+
+  // an event's edit form: its text, day, time and label, and a delete that asks for a second press
+  function editEvent(id) {
+    const e = events.get(id);
+    if (!e) return;
+    editingId = id;
+    $("edTitle").value = e.title;
+    $("edDate").value = e.date;
+    $("edTime").value = e.time || "";
+    $("edTimeClear").hidden = !e.time;
+    edLabelChoice = labelOf(e) ? e.labelId : "";
+    setChildren($("edLabels"), labelPicker("edLabel", edLabelChoice, (v) => { edLabelChoice = v; }, "edLabelLabel"));
+    disarmDelete();
+    syncSheetHead();
+    sheetEl.scrollTop = 0;
+    $("sheetTitle").focus();
+  }
+  function showDayView() {
+    editingId = null;
+    disarmDelete();
+    syncSheetHead();
+    $("sheetTitle").focus();
+  }
+  $("evEdit").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const e = events.get(editingId);
+    if (!e) { showDayView(); return; }
+    const title = $("edTitle").value.trim(), date = $("edDate").value, time = $("edTime").value;
+    if (!title) { $("edTitle").value = ""; $("edTitle").focus(); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { $("edDate").focus(); return; }
+    const moved = date !== e.date; // read before the update, which changes e in place
+    const labelId = edLabelChoice && labels.get(edLabelChoice) ? edLabelChoice : undefined;
+    showDayView();
+    act(() => events.update(e.id, { title, date, time: time || undefined, labelId }));
+    if (moved) flash(`${fmtMDW(date)}に移しました`);
+  });
+  for (const type of ["input", "change"]) $("edTime").addEventListener(type, () => { $("edTimeClear").hidden = !$("edTime").value; });
+  $("edTimeClear").addEventListener("click", (ev) => {
+    $("edTime").value = "";
+    $("edTimeClear").hidden = true;
+    if (ev.detail === 0) $("edTime").focus(); // pressed from the keyboard: keep focus in the form
+  });
+  // opening another event starts the delete over, so one press can never delete the wrong event
+  function disarmDelete() { clearTimeout(delTimer); edDelete.classList.remove("armed"); edDelete.textContent = "この予定を削除"; }
+  edDelete.addEventListener("click", () => {
+    if (!edDelete.classList.contains("armed")) {
+      edDelete.classList.add("armed"); edDelete.textContent = "もう一度押すと削除します";
+      delTimer = setTimeout(disarmDelete, 4000);
+      return;
+    }
+    const id = editingId;
+    showDayView();
+    act(() => events.remove(id));
+  });
   function renderCalendar() {
     setChildren($("calNav"),
       el("button", { type: "button", class: "navbtn", onclick: () => { calMonth = addMonths(calMonth, -1); renderCalendar(); } }, icon("prev"), "前月"),
       el("span", { class: "cur" }, fmtMonth(calMonth)),
       el("button", { type: "button", class: "navbtn", onclick: () => { calMonth = addMonths(calMonth, 1); renderCalendar(); } }, "翌月", icon("next")),
-      calDay !== todayKey || calMonth !== monthOf(todayKey) ? el("button", { type: "button", class: "chip-btn", onclick: () => setCalDay(todayKey) }, "きょうへ") : null
+      calMonth !== monthOf(todayKey) ? el("button", { type: "button", class: "chip-btn", onclick: () => setCalDay(todayKey) }, "きょうへ") : null
     );
     const evBy = groupBy(events.items, (e) => e.date);
     const todoBy = groupBy(todos.items, (t) => t.due);
@@ -1860,10 +2063,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const notes = [evs.length ? `予定 ${evs.length} 件` + (evNames.length ? `（${evNames.join("、")}）` : "") : "", todosDue.length ? `ToDo の期限 ${todosDue.length} 件` : "", goalsDue.length ? `目標の期限 ${goalsDue.length} 件` : ""];
       cells.push(el("button", {
         type: "button",
-        class: "cal-day" + (monthOf(d) !== calMonth ? " out" : "") + (wd === 0 ? " sun" : wd === 6 ? " sat" : "") + (d === todayKey ? " today" : ""),
-        "aria-pressed": String(d === calDay),
+        class: "cal-day" + (monthOf(d) !== calMonth ? " out" : "") + (wd === 0 ? " sun" : wd === 6 ? " sat" : "") + (d === todayKey ? " today" : "") + (d === calDay ? " sel" : ""),
+        "aria-haspopup": "dialog",
+        "aria-current": d === todayKey ? "date" : null,
         "aria-label": [fmtMDW(d), ...notes].filter(Boolean).join("、"),
-        onclick: () => setCalDay(d),
+        onclick: (ev) => openDay(d, ev.detail === 0),
       },
         el("span", { class: "n" }, dt.getDate()),
         plans.length ? el("span", { class: "bars", "aria-hidden": "true" },
@@ -1879,25 +2083,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       el("span", { style: "--lc: var(--c-todo)" }, "ToDo の期限"),
       el("span", { style: "--lc: var(--c-goal)" }, "目標の期限"));
 
-    // the chosen day: its events, then whatever falls due on it
-    const rel = relLabel(calDay);
+    // the chosen day, in its sheet: its events (a tap opens one to change or delete it), then whatever falls due on it
     const evs = [...(evBy.get(calDay) || [])].sort(byTime);
     const todosDue = [...(todoBy.get(calDay) || [])].sort((a, b) => num(a.createdAt) - num(b.createdAt));
     const goalsDue = goalBy.get(calDay) || [];
     const dueCount = todosDue.length + goalsDue.length;
-    // no date line above the form (the user found it unnecessary): the field's hint names the day it adds to
-    const day = parseYmd(calDay);
-    $("evTitle").placeholder = (rel || `${day.getMonth() + 1}月${day.getDate()}日`) + "の予定（例：歯医者）";
+    syncSheetHead();
     const list = $("calDayList");
     list.replaceChildren();
     if (!evs.length && !dueCount) { list.append(el("li", { class: "empty" }, "この日の予定はありません。上の欄から追加できます。")); return; }
     for (const e of evs) {
       const l = labelOf(e);
-      list.append(el("li", { style: labelStyle(l) },
-        el("span", { class: "chip", style: "--chip-c: var(--lc)" }, e.time || "終日"),
-        el("span", { class: "body" }, el("span", { class: "text" }, e.title), labels.items.length ? labelPop(e, l) : null),
-        delButton(() => act(() => events.remove(e.id)))
-      ));
+      list.append(el("li", { class: "btn-row", style: labelStyle(l) },
+        el("button", { type: "button", class: "row-btn nav", "aria-label": `「${e.title}」を編集（${e.time || "終日"}${l ? "・" + l.name : ""}）`, onclick: () => editEvent(e.id) },
+          el("span", { class: "chip", style: "--chip-c: var(--lc)" }, e.time || "終日"),
+          el("span", { class: "body" }, el("span", { class: "text" }, e.title), l ? el("span", { class: "sub ev-label" }, l.name) : null),
+          el("span", { class: "chev" }, icon("next", 16)))));
     }
     for (const t of todosDue) {
       list.append(el("li", { class: t.done ? "done" : "" },
@@ -1906,7 +2107,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       ));
     }
     for (const g of goalsDue) {
-      list.append(el("li", { class: "clickable" + (g.done ? " done" : ""), onclick: () => showTab("goal") },
+      list.append(el("li", { class: "clickable" + (g.done ? " done" : ""), onclick: () => { closeSheet(true); showTab("goal"); } },
         el("span", { class: "chip", style: "--chip-c: var(--c-goal)" }, g.done ? "達成" : "目標"),
         el("span", { class: "body" }, el("span", { class: "text" }, g.title), el("span", { class: "sub" }, "目標の期限"))
       ));
