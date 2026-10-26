@@ -211,6 +211,9 @@ button:active:not(:disabled) { opacity: .5; transition: none; }
 }
 .navtitle { grid-column: 2; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 600; opacity: 0; transition: opacity .2s; }
 .navbar.scrolled .navtitle { opacity: 1; }
+/* the calendar has no large title, so it has no top bar either: the month line sits right at the top */
+html[data-tab="calendar"] .navbar { display: none; }
+html[data-tab="calendar"] .wrap { padding-top: max(var(--space-1), env(safe-area-inset-top, 0px)); }
 /* back: a chevron in a round glass button, label-coloured like other bar items (iOS 26) */
 .back {
   grid-column: 1; grid-row: 1; justify-self: start;
@@ -654,7 +657,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
       <!-- カレンダー -->
       <section id="sec-calendar" style="--sec-c: var(--c-cal)" hidden>
-        <div class="sec-head"><h2>カレンダー</h2><div class="monthnav" id="calNav"></div></div>
+        <!-- no large title here (the user wanted the calendar itself higher up); the heading stays for screen readers -->
+        <div class="sec-head"><h2 class="sr-only">カレンダー</h2><div class="monthnav" id="calNav"></div></div>
         <div class="card cal">
           <div class="cal-week" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
           <div class="cal-grid" id="calGrid"></div>
@@ -1081,6 +1085,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function setTab(key) {
     if (tab === "journal" && key !== "journal") flushJournal();
     tab = key;
+    document.documentElement.dataset.tab = key; // lets a page drop the top bar (the calendar does)
     if (isRecord(key)) lastRecord = key;
     else if (key === "records") lastRecord = null;
     for (const p of PAGES) $("sec-" + p.key).hidden = p.key !== key;
