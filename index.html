@@ -269,6 +269,17 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
 .monthnav .cur { min-width: 6.5em; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
 .navbtn { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px; background: transparent; border: 0; color: var(--accent); cursor: pointer; line-height: 1.2; }
 .navbtn .icon { width: 18px; height: 18px; }
+/* the calendar's top: just the month's name (the user's call), with きょうへ on the right in other months; the month turns
+   with a sideways swipe on the calendar. The ‹ › buttons stay for a mouse (no swipe there), for keyboards (they show when
+   focused) and for VoiceOver, which can't swipe the grid; on touch screens they are otherwise out of sight. */
+.monthbar { align-self: stretch; display: flex; align-items: center; gap: var(--space-1); min-height: 32px; }
+.monthbar .cur { font-weight: 600; font-variant-numeric: tabular-nums; }
+.monthbar .chip-btn { margin-inline-start: auto; }
+.monthbar .navbtn { min-width: 44px; justify-content: center; padding: 0; }
+.monthbar .navbtn:first-child { margin-inline-start: -13px; }  /* its chevron lines up with the cards */
+@media (hover: none), (pointer: coarse) {
+  .monthbar .navbtn:not(:focus-visible) { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
+}
 .chip-btn { min-height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface); color: var(--accent); font-size: var(--t-sub); font-weight: 600; line-height: 1.2; cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 
 /* forms (HIG text fields): the main text across the card first, then one row per detail with its label beside it, fields
@@ -472,6 +483,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
    tint. Tapping a day opens its sheet (the day sheet, further down); the day last opened stays lightly tinted with its
    date bold (no circle, at the user's wish). */
 .cal { padding: 12px 0 0; overflow: hidden; }  /* no legend under the grid (the user's call): the last week ends the card */
+.cal { touch-action: pan-y pinch-zoom; }  /* a sideways drag turns the month (the script); up and down still scrolls */
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .cal-grid { border-top: .5px solid var(--separator); }
 .cal-week span { padding-bottom: 6px; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
@@ -703,7 +715,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <!-- カレンダー -->
       <section id="sec-calendar" style="--sec-c: var(--c-cal)" hidden>
         <!-- no large title here (the user wanted the calendar itself higher up); the heading stays for screen readers -->
-        <div class="sec-head"><h2 class="sr-only">カレンダー</h2><div class="monthnav" id="calNav"></div></div>
+        <div class="sec-head"><h2 class="sr-only">カレンダー</h2>
+          <!-- the month's name only; a sideways swipe on the calendar turns it, and the ‹ › buttons are for a mouse,
+               a keyboard or VoiceOver (see .monthbar) -->
+          <div class="monthbar">
+            <button type="button" class="navbtn" id="calPrev" aria-label="前の月"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
+            <span class="cur" id="calMonthName" aria-live="polite"></span>
+            <button type="button" class="navbtn" id="calNext" aria-label="次の月"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></button>
+            <button type="button" class="chip-btn" id="calToday" hidden>きょうへ</button>
+          </div>
+        </div>
         <div class="card cal">
           <div class="cal-week" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
           <div class="cal-grid" id="calGrid"></div>
@@ -1892,6 +1913,73 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   });
   function setCalDay(d) { calDay = d; calMonth = monthOf(d); renderCalendar(); }
 
+  // ---------- turning the month: a sideways swipe on the calendar (the user's call), or the ‹ › buttons ----------
+  const calCard = document.querySelector("#sec-calendar .cal"), calGrid = $("calGrid");
+  let monthBusy = false, swipe = null, swiped = false;
+  const swipeFade = (dx) => 1 - Math.min(Math.abs(dx) / calGrid.offsetWidth, 1) * .6;
+  // the month slides out the way the finger went and the next one slides in behind it
+  function showMonth(step, fromX = 0) {
+    if (monthBusy) return;
+    const turn = () => { calMonth = addMonths(calMonth, step); renderCalendar(); };
+    calGrid.style.transform = ""; calGrid.style.opacity = "";
+    if (reduceMotion.matches) { turn(); return; }
+    monthBusy = true;
+    const w = calGrid.offsetWidth;
+    const away = calGrid.animate([{ transform: `translateX(${fromX}px)`, opacity: swipeFade(fromX) }, { transform: `translateX(${-step * w}px)`, opacity: 0 }],
+      { duration: 150, easing: "ease-in", fill: "forwards" });
+    // a timer rather than the animation's promise, which waits while the page isn't being drawn
+    setTimeout(() => {
+      turn();
+      calGrid.animate([{ transform: `translateX(${step * w * .6}px)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 240, easing: "cubic-bezier(.25, .9, .3, 1)" });
+      away.cancel();
+      monthBusy = false;
+    }, 150);
+  }
+  $("calPrev").addEventListener("click", () => showMonth(-1));
+  $("calNext").addEventListener("click", () => showMonth(1));
+  $("calToday").addEventListener("click", (ev) => {
+    setCalDay(todayKey);
+    if (ev.detail === 0) $("calGrid").querySelector(".cal-day.today")?.focus(); // the button is gone now; keyboards land on today
+  });
+  // the grid follows a finger moving sideways; up-and-down moves are left to scrolling (touch-action: pan-y), and a mouse
+  // uses the buttons instead
+  calCard.addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType === "mouse" || !ev.isPrimary || monthBusy) return;
+    swipe = { x: ev.clientX, y: ev.clientY, t: ev.timeStamp, id: ev.pointerId, dx: 0, on: false };
+  });
+  calCard.addEventListener("pointermove", (ev) => {
+    if (!swipe || ev.pointerId !== swipe.id) return;
+    const dx = ev.clientX - swipe.x, dy = ev.clientY - swipe.y;
+    if (!swipe.on) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (Math.abs(dy) >= Math.abs(dx)) { swipe = null; return; } // a scroll, not a swipe
+      swipe.on = true;
+      try { calCard.setPointerCapture(ev.pointerId); } catch {}
+    }
+    swipe.dx = dx;
+    calGrid.style.transform = `translateX(${dx}px)`;
+    calGrid.style.opacity = String(swipeFade(dx));
+  });
+  function endSwipe(ev) {
+    if (!swipe || ev.pointerId !== swipe.id) return;
+    const { dx, t, on } = swipe;
+    swipe = null;
+    if (!on) return;
+    // the lift that ends a swipe must not open the day under the finger
+    swiped = true;
+    setTimeout(() => { swiped = false; }, 400);
+    // a quarter of the way across, or a flick
+    if (ev.type === "pointerup" && (Math.abs(dx) > calGrid.offsetWidth / 4 || (Math.abs(dx) > 30 && Math.abs(dx) / Math.max(1, ev.timeStamp - t) > .5))) {
+      showMonth(dx < 0 ? 1 : -1, dx);
+      return;
+    }
+    calGrid.style.transform = ""; calGrid.style.opacity = "";
+    if (!reduceMotion.matches) calGrid.animate([{ transform: `translateX(${dx}px)`, opacity: swipeFade(dx) }, { transform: "none", opacity: 1 }], { duration: 200, easing: "ease-out" });
+  }
+  calCard.addEventListener("pointerup", endSwipe);
+  calCard.addEventListener("pointercancel", endSwipe);
+  calCard.addEventListener("click", (ev) => { if (swiped) { ev.stopPropagation(); ev.preventDefault(); swiped = false; } }, true);
+
   // ---------- the day sheet: a tap on a day opens its plans, to add, change and delete them there ----------
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
   let editingId = null, edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
@@ -2027,12 +2115,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(() => events.remove(id));
   });
   function renderCalendar() {
-    setChildren($("calNav"),
-      el("button", { type: "button", class: "navbtn", onclick: () => { calMonth = addMonths(calMonth, -1); renderCalendar(); } }, icon("prev"), "前月"),
-      el("span", { class: "cur" }, fmtMonth(calMonth)),
-      el("button", { type: "button", class: "navbtn", onclick: () => { calMonth = addMonths(calMonth, 1); renderCalendar(); } }, "翌月", icon("next")),
-      calMonth !== monthOf(todayKey) ? el("button", { type: "button", class: "chip-btn", onclick: () => setCalDay(todayKey) }, "きょうへ") : null
-    );
+    const monthName = fmtMonth(calMonth);
+    if ($("calMonthName").textContent !== monthName) $("calMonthName").textContent = monthName; // a live region: only a change is read out
+    $("calToday").hidden = calMonth === monthOf(todayKey);
     const evBy = groupBy(events.items, (e) => e.date);
     const todoBy = groupBy(todos.items, (t) => t.due);
     const goalBy = groupBy(goals.items, (g) => g.deadline);
