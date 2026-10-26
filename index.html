@@ -549,6 +549,10 @@ ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
 .notice { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); border-radius: var(--radius); background: var(--surface); text-wrap: pretty; }
 .notice strong { display: flex; align-items: center; gap: var(--space-1); color: var(--warn); font-weight: 600; line-height: 1.3; }
 .notice .cut { fill: var(--surface); }
+.notice-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin-top: 6px; }
+.backup-nudge { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); }
+.backup-nudge strong { font-weight: 600; }
+.backup-nudge .nudge-text { font-size: var(--t-sub); line-height: 1.45; color: var(--muted); }
 /* iOS-style push and pop between 記録 and a record page; the script only starts it on phones without Reduce Motion */
 .menu { view-transition-name: tabbar; }
 .navbar { view-transition-name: topbar; }
@@ -613,9 +617,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <span>このブラウザは記録を保存できない設定になっています。プライベートブラウズをやめるか、別のブラウザで開いてください。</span>
       </div>
 
+      <!-- 記録が急に空や少なくなったとき：この端末の中のコピーから戻す案内 -->
+      <div class="notice" id="restoreNote" role="status" hidden>
+        <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="警告"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg><span id="restoreTitle">記録が見つかりません</span></strong>
+        <span id="restoreText"></span>
+        <div class="notice-actions">
+          <button type="button" class="btn" id="restoreBtn">この記録を戻す</button>
+          <button type="button" class="link-btn" id="restoreSkip">このままでいい</button>
+        </div>
+      </div>
+
       <!-- ホーム -->
       <section id="sec-home" style="--sec-c: var(--accent)">
         <div class="sec-head"><p class="kicker" id="homeDate"></p><h2>きょう</h2></div>
+        <!-- a quiet reminder when it has been a while since the last backup -->
+        <div class="card backup-nudge" id="backupNudge" hidden>
+          <strong>記録のバックアップ</strong>
+          <span class="nudge-text" id="backupNudgeText"></span>
+          <div class="notice-actions">
+            <button type="button" class="btn sm" id="nudgeExport">記録を書き出す</button>
+            <button type="button" class="link-btn" id="nudgeLater">あとで</button>
+          </div>
+        </div>
         <div class="grid" id="homeTiles"></div>
         <div class="card">
           <div class="card-head">この7日間のつみかさね</div>
@@ -988,12 +1011,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   const statusEl = $("status");
   let statusTimer = null;
-  // where records live is said once, under バックアップ on the 記録 page, instead of at the foot of every page
+  // where records live is said once, under バックアップ on the 記録 page (renderBackup), instead of at the foot of every page
   function showMode() {
     $("noSave").hidden = canStoreLocal;
-    $("storeNote").textContent = canStoreLocal
-      ? "記録はこの端末のブラウザにだけ保存され、ほかの端末とは共有されません。書き出したファイルを別の端末で読み込むと、記録をそちらへ移せます。"
-      : "この画面では記録が保存されません。";
   }
   // a short message above the tab bar for a few seconds; role=status reads it out as well
   function flash(msg) {
@@ -1193,7 +1213,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   journalText.addEventListener("blur", () => flushJournal());
   window.addEventListener("beforeunload", () => flushJournal());
   // phones often skip beforeunload; switching away from the app hides the page first
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushJournal(); });
+  // (and once the journal is saved, today's protective copy catches up)
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushJournal().then(() => saveCopy()); });
   function markJournalDirty() {
     journalDirty = true;
     journalState.textContent = "未保存";
@@ -1989,7 +2010,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const file = new File([blob], name, { type: "application/json" });
     // on phones the share sheet is the dependable way to keep a file (a home-screen app on iPhone cannot download)
     if (matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: name }); flash("記録を書き出しました。"); }
+      try { await navigator.share({ files: [file], title: name }); flash("記録を書き出しました。"); noteExport(); }
       catch (e) { if (e.name !== "AbortError") flash("書き出せませんでした。もう一度お試しください。"); }
       return;
     }
@@ -1997,7 +2018,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     flash(`「${name}」を書き出しました。`);
+    noteExport();
   }
+  function noteExport() { act(() => settings.set("backup", { ...(settings.get("backup") || {}), lastExport: Date.now() })); }
   async function importRecords(file) {
     let payload = null;
     try { payload = JSON.parse(await file.text()); } catch {}
@@ -2005,9 +2028,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       flash("このファイルは読み込めません。「記録を書き出す」で作ったファイルを選んでください。");
       return;
     }
+    const count = mergeRecords(payload.data);
+    flash(count ? `${count} 件の記録を読み込みました。` : "読み込める記録がありませんでした。");
+  }
+  // adds a set of records to what is here, matching by id: nothing already on this device is lost
+  function mergeRecords(data) {
     let count = 0;
     for (const s of ALL_STORES) {
-      const incoming = Array.isArray(payload.data[s.name]) ? payload.data[s.name].filter((x) => x && typeof x.id === "string") : [];
+      const incoming = Array.isArray(data[s.name]) ? data[s.name].filter((x) => x && typeof x.id === "string") : [];
       if (!incoming.length) continue;
       const byId = new Map(s.items.map((x) => [x.id, x]));
       for (const x of incoming) byId.set(x.id, x);
@@ -2017,8 +2045,106 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     loadJournalForm();
     renderAll();
-    flash(count ? `${count} 件の記録を読み込みました。` : "読み込める記録がありませんでした。");
+    return count;
   }
+
+  // ---------- 記録を守る仕組み ----------
+  // Records live only in this browser's storage, which a phone may clear (for example when space runs low), and an app that
+  // starts up seeing nothing would then save over the real records. So: (1) every day a full copy goes into IndexedDB, a
+  // second storage separate from localStorage, keeping a week of copies; (2) if the records come up empty or far fewer than
+  // the latest copy, a notice offers to bring the copy back; (3) the home page reminds you to export now and then, since
+  // only a file kept elsewhere survives the phone clearing everything.
+  const SNAP_DB = "tsumikasane-copies", SNAP_KEEP = 7;
+  const recordCount = (data) => Object.values(data || {}).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0);
+  const allData = () => Object.fromEntries(ALL_STORES.map((st) => [st.name, st.items]));
+  function openCopies() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(SNAP_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("copies", { keyPath: "day" });
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function readCopies() {
+    return openCopies().then((db) => new Promise((resolve, reject) => {
+      const r = db.transaction("copies").objectStore("copies").getAll();
+      r.onsuccess = () => { db.close(); resolve(r.result || []); };
+      r.onerror = () => { db.close(); reject(r.error); };
+    }));
+  }
+  async function saveCopy() {
+    if (!canStoreLocal || !window.indexedDB) return;
+    const data = allData(), count = recordCount(data);
+    if (!count) return; // an empty set never replaces a real copy
+    try {
+      const copies = await readCopies();
+      const same = copies.find((c) => c.day === todayKey);
+      // a sudden drop (as when storage came up empty) must not overwrite today's fuller copy
+      if (same && same.count >= 5 && count < same.count * 0.8) return;
+      const db = await openCopies();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("copies", "readwrite"), st = tx.objectStore("copies");
+        st.put({ day: todayKey, savedAt: Date.now(), count, data });
+        for (const c of copies.map((c) => c.day).filter((d) => d !== todayKey).sort().reverse().slice(SNAP_KEEP - 1)) st.delete(c);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    } catch {}
+  }
+  let restoreCandidate = null;
+  async function checkRestore() {
+    if (!canStoreLocal || !window.indexedDB) return;
+    try {
+      const now = recordCount(allData());
+      const skipped = num((settings.get("backup") || {}).restoreSkipped);
+      // the newest copy holding clearly more than is here now: all of it gone, or at least ten records and half missing
+      const pick = (await readCopies())
+        .filter((c) => c.savedAt !== skipped && c.count > 0 && (now === 0 || (c.count - now >= 10 && now < c.count / 2)))
+        .sort((a, b) => b.savedAt - a.savedAt)[0];
+      restoreCandidate = pick || null;
+      $("restoreNote").hidden = !pick;
+      if (!pick) return;
+      const at = new Date(pick.savedAt);
+      const when = `${fmtMDW(ymd(at))} ${at.getHours()}:${pad(at.getMinutes())}`;
+      $("restoreTitle").textContent = now === 0 ? "記録が見つかりません" : "記録が減っているようです";
+      $("restoreText").textContent = (now === 0
+        ? `この端末の中に、${when} 時点の記録のコピー（${pick.count} 件）が残っています。`
+        : `${when} 時点のコピーには ${pick.count} 件ありますが、いまは ${now} 件です。`)
+        + "戻すと、いまある記録はそのままで、コピーにある記録が足されます。";
+    } catch {}
+  }
+  $("restoreBtn").addEventListener("click", () => {
+    if (!restoreCandidate) return;
+    const count = mergeRecords(restoreCandidate.data);
+    restoreCandidate = null;
+    $("restoreNote").hidden = true;
+    flash(`${count} 件の記録を戻しました。`);
+    saveCopy();
+  });
+  $("restoreSkip").addEventListener("click", () => {
+    if (restoreCandidate) act(() => settings.set("backup", { ...(settings.get("backup") || {}), restoreSkipped: restoreCandidate.savedAt }));
+    restoreCandidate = null;
+    $("restoreNote").hidden = true;
+  });
+  // the backup line on 記録 and the reminder on the home page
+  function renderBackup() {
+    const b = settings.get("backup") || {};
+    const last = num(b.lastExport);
+    const days = last ? daysBetween(ymd(new Date(last)), todayKey) : null;
+    const lastText = last
+      ? `最後に書き出した日：${fmtMDW(ymd(new Date(last)))}` + (days ? `（${days} 日前）` : "（きょう）")
+      : "まだ一度も書き出していません。";
+    $("storeNote").textContent = (canStoreLocal
+      ? "記録はこの端末のブラウザにだけ保存されます。端末の空き容量が少ないときなどに消えることがあるので、ときどき書き出して、ファイルを iCloud Drive などに保存しておくと安心です。書き出したファイルを読み込むと、記録を戻したり別の端末へ移したりできます。"
+      : "この画面では記録が保存されません。") + " " + lastText;
+    const due = !last || days >= 7;
+    const snoozed = b.snoozeUntil && b.snoozeUntil > todayKey;
+    $("backupNudge").hidden = !(canStoreLocal && due && !snoozed && recordCount(allData()) >= 10);
+    $("backupNudgeText").textContent = (last ? `最後に書き出してから ${days} 日たちました。` : "まだ一度も記録を書き出していません。")
+      + "端末の空き容量が少ないときなどに記録が消えることがあるので、ときどき書き出しておくと安心です。";
+  }
+  $("nudgeExport").addEventListener("click", () => exportRecords());
+  $("nudgeLater").addEventListener("click", () => act(() => settings.set("backup", { ...(settings.get("backup") || {}), snoozeUntil: addDays(todayKey, 3) })));
   $("exportBtn").addEventListener("click", () => exportRecords());
   $("importBtn").addEventListener("click", () => $("importFile").click());
   $("importFile").addEventListener("change", (ev) => {
@@ -2029,13 +2155,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels();
+    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup();
   }
   const initial = (location.hash || "").slice(1);
   showTab(PAGES.some((p) => p.key === initial) ? initial : "home");
   loadJournalForm();
   renderAll();
   showMode();
+  checkRestore().then(() => saveCopy());
   // iOS only shows :active (the pressed look HIG asks for) once the page listens for touches
   document.addEventListener("touchstart", () => {}, { passive: true });
 
