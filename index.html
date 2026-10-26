@@ -471,7 +471,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
    day's plans written in coloured bars, after the iPhone Calendar's month view the user showed. Today's date is in the
    tint. Tapping a day opens its sheet (the day sheet, further down); the day last opened stays lightly tinted with its
    date bold (no circle, at the user's wish). */
-.cal { padding: 12px 0 0; }
+.cal { padding: 12px 0 0; overflow: hidden; }  /* no legend under the grid (the user's call): the last week ends the card */
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .cal-grid { border-top: .5px solid var(--separator); }
 .cal-week span { padding-bottom: 6px; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
@@ -480,6 +480,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* tall squares (the user wanted a portrait calendar with more plans showing): room for the date and four lines */
 .cal-day { min-height: 108px; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: transparent; border: 0; border-bottom: .5px solid var(--separator); border-radius: 0; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
 .cal-day:not(:nth-child(7n)) { border-inline-end: .5px solid var(--separator); }
+.cal-day:nth-last-child(-n + 7) { border-bottom: 0; }  /* the card's edge closes the last week */
 .cal-day:focus-visible { outline-offset: -3px !important; }  /* inside the square, so the next one can't cover it */
 @media (hover: hover) { .cal-day:hover { background: var(--fill); } }
 .cal-day .n { font-size: var(--t-callout); line-height: 1.2; }
@@ -497,10 +498,10 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .cal-day .bar { display: block; overflow: hidden; white-space: nowrap; padding: 1px 3px; border-radius: 4px; border-inline-start: 3px solid var(--bc); background: color-mix(in srgb, var(--bc) 20%, var(--surface)); color: var(--fg); font-size: calc(1rem - 6px); line-height: 1.3; font-weight: 600; text-align: start; }
 .cal-day .bar.due { background: var(--surface); box-shadow: inset 0 0 0 1px var(--bc); }
 .cal-day .more { font-size: calc(1rem - 6px); line-height: 1.2; color: var(--muted); }
-.cal .legend { padding: var(--space-1) var(--space-2) var(--space-2); }
 
-/* event labels: the user's own categories. The name always sits next to the colour, so colour is never the only cue (HIG).
-   In the add form they are one-tap chips; a chosen chip fills with its colour and white text. */
+/* event labels: the user's own categories. Wherever a label is picked or listed its name sits next to the colour, so colour
+   is never the only cue (HIG); the month grid writes each plan's title in it and has no legend (the user's call). In the
+   forms they are one-tap chips; a chosen chip fills with its colour and white text. */
 #evLabelLabel, #edLabelLabel { align-self: start; margin-top: 4px; }  /* the chips can wrap, so the label stays with their first row */
 .label-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .label-chips label { position: relative; display: grid; cursor: pointer; }
@@ -706,11 +707,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="card cal">
           <div class="cal-week" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
           <div class="cal-grid" id="calGrid"></div>
-          <div class="legend" id="calLegend">
-            <span style="--lc: var(--c-cal)">予定</span>
-            <span style="--lc: var(--c-todo)">ToDo の期限</span>
-            <span style="--lc: var(--c-goal)">目標の期限</span>
-          </div>
         </div>
         <details class="card label-editor" id="labelEditor">
           <summary>ラベルの編集</summary>
@@ -2076,12 +2072,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       ));
     }
     setChildren($("calGrid"), cells);
-    const ls = sortedLabels();
-    setChildren($("calLegend"),
-      ls.map((l) => el("span", { style: `--lc:${labelHue(l)}` }, l.name)),
-      el("span", { style: "--lc: var(--c-cal)" }, ls.length ? "ラベルなし" : "予定"),
-      el("span", { style: "--lc: var(--c-todo)" }, "ToDo の期限"),
-      el("span", { style: "--lc: var(--c-goal)" }, "目標の期限"));
 
     // the chosen day, in its sheet: its events (a tap opens one to change or delete it), then whatever falls due on it
     const evs = [...(evBy.get(calDay) || [])].sort(byTime);
