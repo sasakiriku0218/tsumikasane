@@ -464,9 +464,9 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px var(--space-2); padding: 0 var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.35; color: var(--muted); }
 .legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; background: var(--lc); vertical-align: 1px; }
 
-/* calendar: a Sunday-first month grid with thin gray lines between the weeks and each day's plans written in coloured
-   bars, after the iPhone Calendar's month view the user showed. Today's date is in the tint; the chosen day's square is
-   lightly tinted and its date bold (no circle, at the user's wish). */
+/* calendar: a Sunday-first month grid of thin gray lines (between weeks and between days, as the user asked) with each
+   day's plans written in coloured bars, after the iPhone Calendar's month view the user showed. Today's date is in the
+   tint; the chosen day's square is lightly tinted and its date bold (no circle, at the user's wish). */
 .cal { padding: 12px 0 0; }
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .cal-grid { border-top: .5px solid var(--separator); }
@@ -474,6 +474,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .cal-week span:first-child, .cal-day.sun .n { color: var(--warn); }
 .cal-week span:last-child, .cal-day.sat .n { color: var(--sat); }
 .cal-day { min-height: 56px; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: transparent; border: 0; border-bottom: .5px solid var(--separator); border-radius: 0; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
+.cal-day:not(:nth-child(7n)) { border-inline-end: .5px solid var(--separator); }
 .cal-day:focus-visible { outline-offset: -3px !important; }  /* inside the square, so the next one can't cover it */
 @media (hover: hover) { .cal-day:hover { background: var(--fill); } }
 .cal-day .n { font-size: var(--t-callout); line-height: 1.2; }
