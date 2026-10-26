@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>つみかさね</title>
 <meta name="description" content="ToDo・予定・日記・食事・運動・体重・家計簿・目標を、毎日ひとつの場所に記録するアプリ">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
@@ -13,542 +13,716 @@
 <meta name="apple-mobile-web-app-title" content="つみかさね">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" crossorigin>
 <style>
-/* Layout follows DADS: one breakpoint at 768px. Below it a single column (up to 640px) with 16px side margins; from 768px a
-   12-column grid with 32px gutters (twice the body size) and 48px columns at the 928px maximum. Spacing moves in 8px steps
-   (8 / 16 / 24 / 32 / 64). Each record type keeps its own hue so the home view scans at a glance. */
-/* Type follows the Digital Agency Design System (DADS) tokens: Noto Sans JP in 400 and 700 only; body and controls at 16px
-   (Std-16N-170, one-line controls Oln-16 with line-height 1); 14px (Dns-14 / Oln-14) only for footnote-level text, nothing smaller. */
-/* Color comes from the DADS palette (@digital-go-jp/design-tokens 2.1.0, MIT): key color Green, Solid Gray neutrals,
-   Error 2 for warnings. Every text pair is at least 4.5:1 and every line or mark 3:1 against what sits next to it. */
+/* Design follows Apple's Human Interface Guidelines, iPhone first. Where they disagree with the Digital Agency (DADS) rules
+   this app followed before, HIG wins (the user's call); what both ask for stays: text at 4.5:1, marks and field edges at
+   3:1, 44 × 44px targets. */
+/* Type: the system font (SF Pro and Hiragino Sans on Apple devices) in HIG's iOS text styles, regular / semibold / bold.
+   Each style is 1rem plus or minus a fixed step, which tracks HIG's Dynamic Type tables at every setting; on iPhone the
+   root size follows the text size picked in Settings. */
+/* Color: iOS system colors. Light mode takes their Increase Contrast values, because the defaults read under 4.5:1 on
+   white; dark mode takes the defaults, which pass. The tint is the system green, deepened a little so it also reads 4.5:1
+   on the gray grouped background. Fills that carry white text or glyphs use the light values in both modes. */
+/* Layout: on iPhone a floating tab bar at the bottom (five tabs; the five record pages sit under 記録), large titles that
+   fold into the top bar on scroll, and inset grouped cards on the gray background. From 768px the tabs become a sidebar. */
 :root {
-  --bg: #ffffff;           /* White */
-  --surface: #ffffff;      /* White; cards are told apart by their outline */
-  --surface-2: #e6e6e6;    /* Solid Gray 100 */
-  --fg: #1a1a1a;           /* Solid Gray 900 */
-  --muted: #666666;        /* Solid Gray 600 */
-  --line: #949494;         /* Solid Gray 420, 3:1 against white */
-  --accent: #197a4b;       /* key color: Green 800 */
-  --accent-hover: #115a36; /* Green 900 */
+  --bg: #f2f2f7;            /* systemGroupedBackground */
+  --surface: #ffffff;       /* secondarySystemGroupedBackground: cards */
+  --fill: rgba(118, 118, 128, .12);       /* tertiarySystemFill: tracks, gray buttons */
+  --fill-press: rgba(118, 118, 128, .2);  /* a row while it is pressed */
+  --fg: #000000;            /* label */
+  --muted: #6c6c70;         /* secondary text: systemGray (Increase Contrast), 4.5:1 on cards and on the background */
+  --line: #86868b;          /* edges of fields and rings, 3:1 on cards and on the background */
+  --separator: #c6c6c8;     /* opaqueSeparator between rows */
+  --accent: #007d2e;        /* tint: systemGreen, deepened */
+  --accent-fill: #007d2e;
   --accent-ink: #ffffff;
-  --warn: #ce0000;         /* Error 2 (Red 900) */
-  --link: #00118f;         /* Blue 1000 */
-  --focus: #ffd43d;        /* Yellow 300 with a black edge: the DADS focus ring, never restyled */
-  --focus-edge: #000000;
-  --c-todo: #0031d8;       /* Blue 800 */
-  --c-journal: #806300;    /* Yellow 1000 */
-  --c-meal: #ac3e00;       /* Orange 900 */
-  --c-workout: #0066be;    /* Light Blue 800 */
-  --c-weight: #6f23d0;     /* Purple 700 */
-  --c-money: #006f83;      /* Cyan 900 */
-  --c-goal: #197a4b;       /* Green 800 */
-  --c-cal: #aa00aa;        /* Magenta 800 */
-  --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
-  --font-display: var(--font-body);
-  --space-1: 8px;          /* closely related things: a label and its value, controls in one row */
-  --space-2: 16px;         /* inside cards, between the parts of one section */
-  --space-3: 24px;         /* between the page's blocks */
-  --space-4: 32px;         /* page top; rows of the desktop grid */
-  --space-8: 64px;         /* page bottom */
-  --gutter: 32px;          /* DADS: gutters are twice the 16px body size */
+  --warn: #d70015;          /* systemRed (accessible) */
+  --warn-fill: #d70015;
+  --focus: var(--accent);   /* keyboard focus is drawn in the tint, as on iPad */
+  --thumb: #ffffff;         /* the selected segment of a segmented control */
+  --glass: rgba(242, 242, 247, .8);     /* bars float over the content; the blur is added where they are drawn */
+  --glass-solid: #f7f7f9;   /* the same bars when Reduce Transparency is on */
+  --glass-edge: rgba(0, 0, 0, .1);
+  --pill: #ffffff;          /* the bubble behind the selected tab */
+  --shadow: 0 6px 24px rgba(0, 0, 0, .12), 0 1px 3px rgba(0, 0, 0, .06);
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%236c6c70' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  /* record hues for text and marks: Increase Contrast values, 4.5:1 on white */
+  --c-todo: #1e6ef4;        /* blue */
+  --c-cal: #b02fc2;         /* purple */
+  --c-journal: #956d51;     /* brown */
+  --c-meal: #c55300;        /* orange */
+  --c-workout: #007eae;     /* cyan */
+  --c-weight: #564ade;      /* indigo */
+  --c-money: #a16a00;       /* yellow */
+  --c-goal: #008575;        /* mint */
+  /* behind white glyphs and text (icon squares, selected chips): the same in both modes, each 4.5:1 with white */
+  --f-home: #007d2e; --f-records: #6c6c70;
+  --f-todo: #1e6ef4; --f-cal: #b02fc2; --f-journal: #956d51; --f-meal: #c55300;
+  --f-workout: #007eae; --f-weight: #564ade; --f-money: #a16a00; --f-goal: #008575;
+  --font-body: -apple-system, BlinkMacSystemFont, system-ui, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
+  /* SF Pro Rounded for the big numbers, as Health and Fitness use; other systems fall back to their own font */
+  --font-round: ui-rounded, -apple-system, BlinkMacSystemFont, system-ui, "Hiragino Sans", "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
+  /* HIG iOS text styles at the default size: Large Title 34, Title 1 28, Title 2 22, Title 3 20, Body 17, Callout 16,
+     Subheadline 15, Footnote 13, Caption 12 */
+  --t-large: calc(1rem + 17px);
+  --t-title1: calc(1rem + 11px);
+  --t-title2: calc(1rem + 5px);
+  --t-title3: calc(1rem + 3px);
+  --t-body: 1rem;
+  --t-callout: calc(1rem - 1px);
+  --t-sub: calc(1rem - 2px);
+  --t-foot: calc(1rem - 4px);
+  --t-cap: calc(1rem - 5px);
+  --space-1: 8px;           /* closely related things: a label and its value, controls in one row */
+  --space-2: 16px;          /* inside cards; iPhone side margins */
+  --space-3: 24px;          /* between the page's blocks */
+  --space-4: 32px;
+  --space-8: 64px;
+  --radius: 22px;           /* inset grouped cards */
+  --tabbar: 62px;           /* the floating tab bar's height */
 }
-/* DADS has no dark palette: dark mode puts the same hues' 400 steps on Black and Solid Gray 900, held to the same ratios */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #000000; --surface: #1a1a1a; --surface-2: #333333; --fg: #f2f2f2; --muted: #b3b3b3; --line: #666666;
-    --accent: #51b883; --accent-hover: #71c598; --accent-ink: #1a1a1a; --warn: #ff7171; --link: #9db7f9;
-    --c-todo: #7096f8; --c-journal: #ffc700; --c-meal: #ff8d44; --c-workout: #57b8ff; --c-weight: #bb87ff; --c-money: #2bc8e4; --c-goal: #51b883; --c-cal: #f661f6;
+    --bg: #000000; --surface: #1c1c1e; --fill: rgba(118, 118, 128, .18); --fill-press: rgba(118, 118, 128, .32);
+    --fg: #ffffff; --muted: #98989f; --line: #8e8e93; --separator: #38383a;
+    --accent: #30d158; --accent-fill: #1e7d34; --accent-ink: #ffffff; --warn: #ff6165; --warn-fill: #d70015;
+    --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
+    --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+    --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #000000; --surface: #1a1a1a; --surface-2: #333333; --fg: #f2f2f2; --muted: #b3b3b3; --line: #666666;
-  --accent: #51b883; --accent-hover: #71c598; --accent-ink: #1a1a1a; --warn: #ff7171; --link: #9db7f9;
-  --c-todo: #7096f8; --c-journal: #ffc700; --c-meal: #ff8d44; --c-workout: #57b8ff; --c-weight: #bb87ff; --c-money: #2bc8e4; --c-goal: #51b883; --c-cal: #f661f6;
+  --bg: #000000; --surface: #1c1c1e; --fill: rgba(118, 118, 128, .18); --fill-press: rgba(118, 118, 128, .32);
+  --fg: #ffffff; --muted: #98989f; --line: #8e8e93; --separator: #38383a;
+  --accent: #30d158; --accent-fill: #1e7d34; --accent-ink: #ffffff; --warn: #ff6165; --warn-fill: #d70015;
+  --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
+  --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3;
   color-scheme: dark;
+}
+/* Increase Contrast: stronger text, edges and separators, outlined cards, solid bars (HIG asks for these variants) */
+@media (prefers-contrast: more) {
+  :root { --muted: #3c3c43; --line: #6c6c70; --separator: #8e8e93; --glass: var(--glass-solid); }
+  .card, form.add, .notice, .side-in { outline: 1px solid var(--line); outline-offset: -1px; }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --muted: #c7c7cc; --line: #aeaeb2; --accent: #4ad968;
+    --c-todo: #5cb8ff; --c-cal: #ea8dff; --c-journal: #dba679; --c-meal: #ffa056; --c-workout: #6dd9ff; --c-weight: #a7aaff; --c-money: #fedf43; --c-goal: #54dfcb;
+  }
 }
 
 * { box-sizing: border-box; }
 /* rules like `section { display: flex }` would otherwise beat the hidden attribute */
 [hidden] { display: none !important; }
-/* keep content clear of the phone's status bar and home indicator */
-html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); scroll-padding-top: env(safe-area-inset-top, 0px); }
+html { font-size: 106.25%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* iPhone and iPad: the root size follows the text size picked in Settings (Dynamic Type); 17px at the default */
+@supports (font: -apple-system-body) and (-webkit-touch-callout: none) { html { font: -apple-system-body; } }
 body {
   margin: 0;
   background: var(--bg); color: var(--fg);
-  font-family: var(--font-body); font-size: 1rem; line-height: 1.7; letter-spacing: .02em;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: var(--space-4) var(--space-8);
+  font-family: var(--font-body); font-size: var(--t-body); line-height: 1.41; letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
-.wrap { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-3); }
-@media (min-width: 768px) {
-  .wrap { max-width: 928px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); row-gap: var(--space-3); }
-  .wrap > * { grid-column: 1 / -1; min-width: 0; }
-  /* a record page reads as an 8-column block offset by 2, like DADS's article layout; the home view uses all 12 */
-  .wrap > section:not(#sec-home) { grid-column: 3 / span 8; }
-}
-header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 0 var(--space-2); flex-wrap: wrap; }
-h1 { font-family: var(--font-display); font-weight: 700; font-size: 2rem; line-height: 1.5; margin: 0; letter-spacing: .01em; }
-.today { color: var(--muted); font-variant-numeric: tabular-nums; }
-
 input, select, textarea, button { font: inherit; color: inherit; letter-spacing: inherit; }
-/* yellow band against the control, black outline around it; !important so component shadows can't hide it */
-:focus-visible { outline: 4px solid var(--focus-edge) !important; outline-offset: 2px !important; box-shadow: 0 0 0 2px var(--focus) !important; }
+button { touch-action: manipulation; transition: opacity .2s; }
+:focus-visible { outline: 3px solid var(--focus) !important; outline-offset: 2px !important; }
 .muted { color: var(--muted); }
-.small { font-size: .875rem; line-height: 1.3; letter-spacing: 0; }
+.small { font-size: var(--t-foot); line-height: 1.35; }
 .warn { color: var(--warn); }
 .good { color: var(--accent); }
 
-/* icons: DADS shapes in the text colour (so they carry the text's 4.5:1), always beside a visible label and hidden from
-   screen readers. Rows with no room for a label (delete, tick, steppers) keep a named button with a 44 × 44px target. */
+/* icons fill with the text colour beside them and are hidden from screen readers */
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .icon { flex: none; fill: currentColor; }
-/* small labelled controls keep their look; an invisible box makes them 44px tall to tap, as DADS's small buttons do */
-nav.tabs button, .chip-btn, .seg button, .moods button, .link-btn, .tile .open, .btn.sm { position: relative; }
-nav.tabs button::after, .chip-btn::after, .seg button::after, .moods button::after, .link-btn::after, .tile .open::after, .btn.sm::after {
+/* small controls keep their look; an invisible box makes them 44px tall to tap (HIG: 44 × 44pt) */
+.chip-btn, .seg button, .moods button, .btn.sm, .del { position: relative; }
+.chip-btn::after, .seg button::after, .moods button::after, .btn.sm::after, .del::after {
   content: ""; position: absolute; inset: 0; margin: auto; height: 44px;
 }
+/* pressed states (HIG: every custom button shows one): plain buttons dim, rows and cards darken. iOS only shows :active
+   once the page listens for touches, which the script does. */
+button:active:not(:disabled) { opacity: .5; transition: none; }
+.btn:active:not(:disabled), .menu button:active, .tile-head:active, .row-btn:active, .cal-day:active { opacity: .75; }
 
-/* tabs */
-nav.tabs {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
-  display: flex; gap: var(--space-1); overflow-x: auto; padding-block: var(--space-1); margin-inline: calc(-1 * var(--space-1)); padding-inline: var(--space-1);
-  /* the strip scrolls sideways on phones; DADS asks to leave that scrollbar visible */
-  scrollbar-width: thin;
+/* ---------- frame: tab bar (iPhone) or sidebar (wide), top bar, content column ---------- */
+.side, .side-in { display: contents; }
+.app-title { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.main { min-width: 0; }
+.wrap {
+  max-width: 640px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + var(--space-4)) max(16px, env(safe-area-inset-left, 0px));
 }
-nav.tabs button {
-  flex: none; display: flex; align-items: center; gap: 7px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
-  padding: 10px 16px; cursor: pointer; color: var(--muted); line-height: 1;
-}
-nav.tabs button .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tab-c); }
-nav.tabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 700; }
 
-/* sections */
+/* the tab bar floats over the content in a glass capsule, above the home indicator */
+.menu {
+  position: fixed; z-index: 20;
+  left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  max-width: 440px; margin-inline: auto; padding: 4px; border-radius: 999px;
+  background: var(--glass); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--shadow), inset 0 0 0 .5px var(--glass-edge);
+}
+.menu ul { list-style: none; margin: 0; padding: 0; }
+.menu > ul { display: flex; }
+.menu > ul > li { flex: 1 1 0; min-width: 0; }
+.menu .sub { display: none; }
+/* tab labels stay at a fixed size (HIG: people don't expect them to grow with the text size) */
+.menu button {
+  width: 100%; min-height: calc(var(--tabbar) - 8px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  padding: 4px 2px; background: transparent; border: 0; border-radius: 999px; color: var(--fg); cursor: pointer;
+  font-size: 12px; line-height: 1.15; font-weight: 600; white-space: nowrap;
+}
+.menu .mi { display: grid; place-items: center; }
+.menu .mi .icon { width: 24px; height: 24px; }
+.menu .lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* the selected tab: tint colour on a lighter bubble */
+.menu button.on, .menu button.in { color: var(--accent); background: var(--pill); box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
+@media (max-width: 359px) { .menu button { font-size: 11px; } }
+
+/* the top bar: clear while the large title shows, glass with the page title once it has scrolled under */
+.navbar {
+  position: sticky; top: 0; z-index: 10;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center;
+  height: calc(44px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
+  transition: background-color .2s, box-shadow .2s;
+}
+.navbar.scrolled {
+  background: var(--glass); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: 0 .5px 0 var(--glass-edge);
+}
+.navtitle { grid-column: 2; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 600; opacity: 0; transition: opacity .2s; }
+.navbar.scrolled .navtitle { opacity: 1; }
+.back {
+  grid-column: 1; grid-row: 1; justify-self: start;
+  display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px 0 2px;
+  background: transparent; border: 0; color: var(--accent); font-size: 17px; cursor: pointer;
+}
+.back .icon { width: 22px; height: 22px; }
+@media (prefers-reduced-transparency: reduce) {
+  .menu, .navbar.scrolled { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* from 768px: a sidebar on the leading side, as iPad apps turn their tab bar into one */
+@media (min-width: 768px) {
+  .app { display: grid; grid-template-columns: 272px minmax(0, 1fr); align-items: start; }
+  .side {
+    display: block; position: sticky; top: 0; height: 100vh; height: 100dvh;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 0 12px max(12px, env(safe-area-inset-left, 0px));
+  }
+  .side-in { display: flex; flex-direction: column; height: 100%; overflow-y: auto; padding: 12px 8px; border-radius: 26px; background: var(--surface); box-shadow: var(--shadow); }
+  .app-title { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; padding: 8px 10px 12px; font-size: var(--t-title2); font-weight: 700; line-height: 1.2; }
+  .menu { position: static; max-width: none; margin: 0; padding: 0; border-radius: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  .menu > ul { display: block; }
+  .menu .sub { display: block; padding-left: 16px; }
+  .menu button {
+    flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 44px; padding: 6px 10px; border-radius: 12px;
+    font-size: var(--t-body); font-weight: 400; white-space: normal; text-align: left; line-height: 1.2;
+  }
+  .menu .mi { flex: none; width: 28px; height: 28px; border-radius: 7px; background: var(--item-f); color: #ffffff; }
+  .menu .mi .icon { width: 18px; height: 18px; }
+  .menu button.in { background: transparent; color: var(--fg); box-shadow: none; }
+  .menu button.on { background: var(--accent-fill); color: var(--accent-ink); font-weight: 600; box-shadow: none; }
+  .menu button.on .mi { background: #ffffff; color: var(--item-f); }
+  .wrap { max-width: 760px; padding: 0 var(--space-4) var(--space-8); }
+  .navbar { padding-inline: var(--space-3); }
+  .back { display: none; }
+}
+
+/* ---------- pages ---------- */
 section { display: flex; flex-direction: column; gap: var(--space-2); }
-.sec-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1) var(--space-2); flex-wrap: wrap; }
-h2 { font-family: var(--font-display); font-size: 1.5rem; line-height: 1.5; margin: 0; font-weight: 700; display: flex; align-items: center; gap: var(--space-1); }
-h2::before { content: ""; width: 12px; height: 12px; border-radius: 4px; background: var(--sec-c); }
+.sec-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+/* the large title (HIG): bold, left-aligned under the top bar */
+.sec-head h2 { margin: 0; font-size: var(--t-large); line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
+.sec-head .small { font-size: var(--t-sub); }
+.kicker { margin: 0; font-size: var(--t-sub); font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* date / month navigation */
-.datenav, .monthnav { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
-.datenav .rel { font-weight: 700; }
-.monthnav .cur { font-weight: 700; min-width: 7.5em; text-align: center; font-variant-numeric: tabular-nums; }
-.navbtn {
-  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; line-height: 1;
-}
-.navbtn:hover { border-color: var(--accent); }
-.chip-btn { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; cursor: pointer; color: var(--accent); line-height: 1; font-weight: 700; }
+/* date / month navigation: plain tint buttons, as in iOS */
+.datenav, .monthnav { display: flex; align-items: center; gap: 4px var(--space-1); flex-wrap: wrap; margin-inline-start: -8px; }
+.datenav .rel { padding-inline-start: 8px; font-size: var(--t-sub); font-weight: 600; color: var(--muted); }
+/* the -8px above lines the buttons' text up with the title; these two can wrap to a row of their own, so they step back in */
+.datenav .chip-btn, .monthnav .chip-btn { margin-inline-start: 8px; }
+.monthnav .cur { min-width: 6.5em; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.navbtn { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px; background: transparent; border: 0; color: var(--accent); cursor: pointer; line-height: 1.2; }
+.navbtn .icon { width: 18px; height: 18px; }
+.chip-btn { min-height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface); color: var(--accent); font-size: var(--t-sub); font-weight: 600; line-height: 1.2; cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 
-/* forms */
-form.add { display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: var(--space-2); }
-form.add input, form.add select, textarea, .inline input {
-  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; line-height: 1.5; min-width: 0;
+/* forms: rounded fields with an edge that reads 3:1 (UIKit's rounded-rect style) */
+form.add { display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: center; background: var(--surface); border-radius: var(--radius); padding: 12px; }
+form.add input, form.add select, textarea, .inline input, .goal-actions input[type="number"], .datenav input[type="date"] {
+  min-height: 44px; min-width: 0; padding: 0 12px;
+  background-color: var(--surface); border: 1px solid var(--line); border-radius: 12px; line-height: 1.3;
 }
-.datenav input[type="date"] { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; line-height: 1.5; min-width: 0; }
-.grow { flex: 1 1 180px; }
-.w-sm { flex: 0 1 130px; }
-.w-xs { flex: 0 1 96px; }
-/* DADS medium button: 48px tall, a 24px lead icon 4px from its label */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 48px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 700; line-height: 1; cursor: pointer; }
-.btn:hover { background: var(--accent-hover); }
-.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); font-weight: 400; }
-.btn.ghost:hover { background: var(--surface-2); }
-.btn.sm { min-height: 40px; padding: 4px 12px; }
-.link-btn { background: transparent; border: 0; color: var(--link); cursor: pointer; text-decoration: underline; padding: 8px 0; line-height: 1; }
-.link-btn.armed { color: var(--warn); font-weight: 700; }
-.link-btn:disabled { opacity: .4; cursor: default; text-decoration: none; }
-.bar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.seg { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
-.seg button { background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; color: var(--muted); line-height: 1; }
-.seg button[aria-pressed="true"] { background: var(--sec-c); color: var(--surface); font-weight: 700; }
+select { -webkit-appearance: none; appearance: none; padding-right: 30px !important; background-image: var(--chev); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px 12px; }
+textarea { width: 100%; padding: 10px 12px; line-height: 1.6; resize: vertical; }
+::placeholder { color: var(--muted); opacity: 1; }
+/* field widths in em, so they grow with the text size the user picked */
+.grow { flex: 1 1 10.6em; }
+.w-sm { flex: 0 1 9.2em; }  /* room for a whole date */
+.w-xs { flex: 0 1 5.7em; }
 .inline { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
-.inline input { padding: 7px 9px; width: 7em; text-align: right; font-variant-numeric: tabular-nums; }
+.inline input { width: 7em; padding: 0 10px; text-align: right; font-variant-numeric: tabular-nums; }
 .unit { color: var(--muted); }
 
-/* cards and lists */
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+/* buttons: a filled capsule for the main action (at most one per view), gray capsules for the rest, plain tint text links */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--accent-fill); color: var(--accent-ink); font-weight: 600; line-height: 1.2; cursor: pointer; }
+.btn .icon { width: 20px; height: 20px; }
+.btn.ghost { background: var(--fill); color: var(--fg); font-weight: 400; }
+.btn.sm { min-height: 34px; padding: 0 14px; font-size: var(--t-sub); }
+.bar .btn.ghost { background: var(--surface); }
+.link-btn { min-height: 44px; padding: 0 4px; background: transparent; border: 0; color: var(--accent); line-height: 1.2; text-align: left; cursor: pointer; }
+.link-btn.danger, .link-btn.armed { color: var(--warn); }
+.link-btn.armed { font-weight: 600; }
+.link-btn:disabled { opacity: .35; cursor: default; }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1) var(--space-2); flex-wrap: wrap; }
+/* segmented control: a gray track with the chosen segment raised on a white thumb */
+.seg { display: inline-flex; padding: 2px; border-radius: 999px; background: var(--fill); }
+.seg button { min-height: 32px; padding: 0 16px; background: transparent; border: 0; border-radius: 999px; color: var(--fg); font-size: var(--t-sub); line-height: 1.2; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--thumb); font-weight: 600; box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04), 0 0 0 .5px rgba(0, 0, 0, .04); }
+
+/* cards and inset grouped lists */
+.card { background: var(--surface); border-radius: var(--radius); }
 .card.pad { padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
-.card-head { padding: var(--space-2) var(--space-2) 0; color: var(--muted); font-weight: 700; }
+.card-head { padding: 14px var(--space-2) 2px; font-weight: 600; }
 ul.list { list-style: none; margin: 0; padding: 0; }
-ul.list li { display: flex; align-items: center; gap: var(--space-2); padding: 12px var(--space-2); border-top: 1px solid var(--line); }
-ul.list li:first-child { border-top: 0; }
+ul.list > li { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px var(--space-2); }
+/* separators start at the text, as in iOS lists */
+ul.list > li + li::before { content: ""; position: absolute; top: 0; left: var(--space-2); right: 0; border-top: .5px solid var(--separator); }
+ul.list.card > li:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+ul.list.card > li:last-child, .card > ul.list > li:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+ul.list.card > li:only-child { border-radius: var(--radius); }
 ul.list li.clickable { cursor: pointer; }
-ul.list li.clickable:hover { background: var(--surface-2); }
-ul.list li.current { box-shadow: inset 3px 0 0 var(--sec-c); }
-ul.list li.dayhead { background: var(--surface-2); padding: var(--space-1) var(--space-2); font-size: .875rem; line-height: 1.3; letter-spacing: 0; color: var(--muted); justify-content: space-between; font-variant-numeric: tabular-nums; }
-.body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+ul.list li.clickable:active { background: var(--fill-press); }
+@media (hover: hover) { ul.list li.clickable:hover, .row-btn:hover { background: var(--fill); } }
+ul.list li.current { background: var(--fill); }
+ul.list li.current .datecell { color: var(--fg); font-weight: 600; }
+ul.list li.dayhead { min-height: 0; padding: 14px var(--space-2) 4px; justify-content: space-between; font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+ul.list li.dayhead::before, ul.list li.dayhead + li::before { display: none; }
+.body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .text { overflow-wrap: anywhere; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.sub { font-size: .875rem; line-height: 1.3; letter-spacing: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
-.sub.warn { color: var(--warn); font-weight: 700; }
-.num { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }
-.amount { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.amount.in { color: var(--accent); font-weight: 700; }
-.chip { flex: none; font-size: .875rem; line-height: 1; font-weight: 700; color: var(--chip-c); border: 1px solid var(--chip-c); border-radius: 6px; padding: 5px 8px; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.datecell { flex: none; width: 7.5ch; font-variant-numeric: tabular-nums; color: var(--muted); }
-.empty { padding: var(--space-3) var(--space-2); text-align: center; color: var(--muted); display: block; }
-.del { flex: none; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; color: var(--muted); cursor: pointer; height: 44px; min-width: 44px; border-radius: 6px; line-height: 1; padding: 0 8px; }
-.del:hover { background: var(--surface-2); color: var(--warn); }
-.del.armed { color: var(--warn); font-weight: 700; font-size: .875rem; }
-.note { font-size: .875rem; line-height: 1.3; letter-spacing: 0; color: var(--muted); padding: var(--space-1) var(--space-2) var(--space-2); }
+.sub { font-size: var(--t-sub); line-height: 1.35; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sub.warn { color: var(--warn); font-weight: 600; }
+.num { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+.amount { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.amount.in { color: var(--accent); font-weight: 600; }
+/* a tag: the record's hue as a light tint, with label-coloured text so it reads at any hue */
+.chip { flex: none; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--chip-c) 16%, var(--surface)); color: var(--fg); font-size: var(--t-foot); line-height: 1.3; font-weight: 600; }
+.datecell { flex: none; width: 6em; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }  /* fits 10/25（日） */
+.empty { display: block; padding: var(--space-3) var(--space-2); text-align: center; color: var(--muted); }
+.note { padding: var(--space-1) var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
+/* delete: × first, then a red 削除する capsule to confirm (destructive role) */
+.del { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 44px; margin-inline-end: -10px; padding: 0 10px; background: transparent; border: 0; border-radius: 999px; color: var(--muted); cursor: pointer; line-height: 1; }
+.del .icon { width: 20px; height: 20px; }
+.del.armed { height: 32px; margin-block: 6px; padding: 0 14px; background: var(--warn-fill); color: #ffffff; font-size: var(--t-foot); font-weight: 600; }
 
-/* todo */
-/* the tick is DADS's success mark: a 24px ring that fills when done; the ::after widens the target to 44 × 44px */
-.check { flex: none; position: relative; width: 24px; height: 24px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; padding: 0; }
+/* ToDo: an empty ring that fills with the list colour when done, as in Reminders; the ::after makes it 44 × 44px */
+.check { flex: none; position: relative; width: 24px; height: 24px; padding: 0; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; }
 .check::after { content: ""; position: absolute; inset: -10px; }
-.check circle { fill: none; stroke: var(--line); stroke-width: 2; }
+.check circle { fill: none; stroke: var(--line); stroke-width: 1.5; }
 .check path { fill: none; }
-.check:hover circle { stroke: var(--c-todo); }
-li.done .check circle { fill: var(--c-todo); stroke: var(--c-todo); }
-li.done .check path { fill: var(--surface); }
+li.done .check circle { fill: var(--f-todo); stroke: var(--f-todo); }
+li.done .check path { fill: #ffffff; }
 li.done .text { color: var(--muted); text-decoration: line-through; }
 
 /* journal */
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1) var(--space-2); flex-wrap: wrap; }
-.label { font-weight: 700; }
+.label { font-weight: 600; }
 .moods { display: flex; gap: var(--space-1); flex-wrap: wrap; }
-.moods button { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px; cursor: pointer; color: var(--muted); line-height: 1; }
-.moods button[aria-pressed="true"] { background: var(--c-journal); color: var(--surface); border-color: var(--c-journal); font-weight: 700; }
-textarea { width: 100%; resize: vertical; line-height: 1.7; }
+.moods button { min-height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--fill); color: var(--fg); font-size: var(--t-sub); line-height: 1.2; cursor: pointer; }
+.moods button[aria-pressed="true"] { background: var(--f-journal); color: #ffffff; font-weight: 600; }
 
-/* stats (weight, money) */
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--space-2); }
-.stat { padding: 12px var(--space-2); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.stat .k { font-size: .875rem; line-height: 1.3; letter-spacing: 0; color: var(--muted); }
-.stat .v { font-weight: 700; font-size: 1.25rem; line-height: 1.5; overflow-wrap: anywhere; }
-.stat .d { font-size: .875rem; line-height: 1.3; letter-spacing: 0; color: var(--muted); }
+/* stats (weight, money): Health-style summary cards */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.stat { min-width: 0; padding: 12px var(--space-2) 14px; display: flex; flex-direction: column; gap: 2px; }
+.stat .k { font-size: var(--t-sub); line-height: 1.35; font-weight: 600; color: var(--muted); }
+.stat .v { font-family: var(--font-round); font-size: var(--t-title2); line-height: 1.25; font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.stat .d { font-size: var(--t-foot); line-height: 1.35; color: var(--muted); }
 
 /* weight chart */
 .chart-wrap { position: relative; padding: 8px 8px 4px; }
 .chart { display: block; width: 100%; height: auto; outline-offset: -2px; }
-.chart .gridline { stroke: var(--line); stroke-width: 1; }
-.chart .axis-text { fill: var(--muted); font-size: 14px; letter-spacing: 0; font-variant-numeric: tabular-nums; font-family: var(--font-body); }
-.chart .area { fill: var(--c-weight); opacity: .1; }
-.chart .line { fill: none; stroke: var(--c-weight); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .gridline { stroke: var(--separator); stroke-width: 1; }
+.chart .axis-text { fill: var(--muted); font-size: 13px; font-family: var(--font-body); font-variant-numeric: tabular-nums; }
+.chart .area { fill: var(--c-weight); opacity: .12; }
+.chart .line { fill: none; stroke: var(--c-weight); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .chart .dot { fill: var(--c-weight); stroke: var(--surface); stroke-width: 2; }
 .chart .target { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
 .chart .cross { stroke: var(--fg); stroke-width: 1; opacity: .4; }
-.chart .endlabel { fill: var(--fg); font-size: 14px; letter-spacing: 0; font-weight: 700; font-family: var(--font-body); }
+.chart .endlabel { fill: var(--fg); font-size: 13px; font-weight: 700; font-family: var(--font-body); }
 .tip {
-  position: absolute; pointer-events: none; background: var(--fg); color: var(--bg);
-  font-size: .875rem; line-height: 1.3; letter-spacing: 0; padding: 4px 9px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -100%);
-  font-variant-numeric: tabular-nums;
+  position: absolute; pointer-events: none; transform: translate(-50%, -100%);
+  padding: 4px 10px; border-radius: 10px; background: var(--fg); color: var(--bg);
+  font-size: var(--t-foot); line-height: 1.3; white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-.tip strong { font-size: 1rem; }
+.tip strong { font-size: var(--t-sub); }
 
 /* money */
-.money-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
-.cat-row { display: grid; grid-template-columns: 6em minmax(0, 1fr) auto; align-items: center; gap: var(--space-1); padding: 4px var(--space-2); }
+/* the month's totals as list rows, label and count on the left and the amount on the right, so long amounts never break */
+.money-sum { display: flex; flex-direction: column; margin-block: -8px; }
+.money-sum .stat { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-1); padding: 8px 0; background: transparent; border-radius: 0; }
+.money-sum .stat + .stat { border-top: .5px solid var(--separator); }
+.money-sum .stat .k { order: 0; font-size: var(--t-body); font-weight: 400; color: var(--fg); }
+.money-sum .stat .d { order: 1; }
+.money-sum .stat .v { order: 2; margin-inline-start: auto; font-size: var(--t-title3); overflow-wrap: break-word; }
+.cat-row { display: grid; grid-template-columns: 6em minmax(0, 1fr) auto; align-items: center; gap: var(--space-1); padding: 6px var(--space-2); }
 .cat-row .cat { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cat-track { height: 16px; display: flex; align-items: center; }
-.cat-bar { height: 14px; border-radius: 0 4px 4px 0; background: var(--c-money); min-width: 2px; }
+.cat-bar { height: 12px; min-width: 4px; border-radius: 6px; background: var(--c-money); }
 .cat-row .amount { color: var(--fg); }
-.cat-row .amount small { color: var(--muted); margin-left: 4px; font-size: .875rem; letter-spacing: 0; }
+.cat-row .amount small { margin-inline-start: 4px; font-size: var(--t-foot); color: var(--muted); }
 .budget-line { display: flex; flex-direction: column; gap: var(--space-1); }
 
 /* goals */
-.goal { padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); border-top: 1px solid var(--line); }
-.goal:first-child { border-top: 0; }
-.goal .title { font-weight: 700; overflow-wrap: anywhere; }
+.goal { position: relative; padding: 14px var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
+.goal + .goal::before { content: ""; position: absolute; top: 0; left: var(--space-2); right: 0; border-top: .5px solid var(--separator); }
+.goal .title { font-weight: 600; overflow-wrap: anywhere; }
 .goal.done .title { color: var(--muted); text-decoration: line-through; }
 .progress { display: flex; align-items: center; gap: var(--space-1); }
-.bar-track { flex: 1; height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-.bar-track i { display: block; height: 100%; background: var(--sec-c); border-radius: 999px; }
+.bar-track { flex: 1; height: 8px; border-radius: 999px; background: var(--fill); overflow: hidden; }
+.bar-track i { display: block; height: 100%; border-radius: 999px; background: var(--sec-c); }
 .bar-track i.over { background: var(--warn); }
-.pct { flex: none; font-size: .875rem; letter-spacing: 0; color: var(--muted); font-variant-numeric: tabular-nums; width: 4.5ch; text-align: right; }
+.pct { flex: none; width: 4.5ch; text-align: right; font-size: var(--t-foot); color: var(--muted); font-variant-numeric: tabular-nums; }
 .goal-actions { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
-.goal-actions input[type="number"] { width: 5.5rem; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; line-height: 1.5; text-align: right; font-variant-numeric: tabular-nums; }
-.stepper { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; width: 44px; height: 44px; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.goal-actions input[type="number"] { width: 5.5rem; padding: 0 10px; text-align: right; font-variant-numeric: tabular-nums; }
+.stepper { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: var(--fill); color: var(--fg); cursor: pointer; }
+.stepper .icon { width: 20px; height: 20px; }
 .spacer { flex: 1; }
 
-/* home */
-.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2) var(--gutter); }
+/* home: Health-style summary cards; the coloured head opens the page and its hit area covers the card */
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 @media (min-width: 480px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tile.wide { grid-column: 1 / -1; } }
-/* desktop: the page's 12 columns; the two wide tiles share a row (6 + 6), the rest go three to a row (4 + 4 + 4) */
-@media (min-width: 768px) {
-  .grid { grid-template-columns: repeat(12, minmax(0, 1fr)); row-gap: var(--space-4); }
-  .tile { grid-column: span 4; }
-  .tile.wide { grid-column: span 6; }
-}
-.tile { padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); border-top: 3px solid var(--tile-c); }
-.tile .eyebrow { line-height: 1; color: var(--muted); font-weight: 700; }
-.tile .big { font-size: 1.75rem; font-weight: 700; line-height: 1.5; letter-spacing: .01em; overflow-wrap: anywhere; }
-.tile .big small { font-size: 1rem; font-weight: 400; letter-spacing: .02em; color: var(--muted); margin-left: 4px; }
-.tile .sub { font-size: 1rem; line-height: 1.7; letter-spacing: .02em; }
-.tile ul { margin: 2px 0 0; padding: 0; list-style: none; }
-.tile ul li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile { position: relative; padding: 10px var(--space-2) var(--space-2); display: flex; flex-direction: column; gap: 4px; }
+.tile-head { display: flex; align-items: center; gap: 6px; min-height: 36px; margin-inline: -4px; padding: 0 4px; background: transparent; border: 0; color: var(--tile-c); font-size: var(--t-sub); font-weight: 600; line-height: 1.2; text-align: left; cursor: pointer; }
+.tile-head::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius); }
+.tile-head .lbl { flex: 1; min-width: 0; }
+.tile-head .chev { display: grid; color: var(--muted); }
+.tile:has(.tile-head:active) { background: color-mix(in srgb, var(--fg) 6%, var(--surface)); }
+.tile .big { font-family: var(--font-round); font-size: var(--t-title1); line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.tile .big small { margin-inline-start: 4px; font-family: var(--font-body); font-size: var(--t-sub); font-weight: 600; color: var(--muted); }
+.tile .sub { line-height: 1.4; }
+.tile ul { margin: 4px 0 0; padding: 0; list-style: none; }
+.tile ul li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.5; }
 .tile ul li::before { content: "・"; color: var(--tile-c); }
-.tile .open { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; margin-top: auto; background: transparent; border: 0; color: var(--tile-c); font-weight: 700; line-height: 1; cursor: pointer; padding: 10px 0 2px; }
-.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-1); }
-.day { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: .875rem; line-height: 1; color: var(--muted); }
-.day .n { font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; font-size: 1rem; }
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); padding: 12px var(--space-2) var(--space-1); }
+.day { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--t-foot); line-height: 1.2; color: var(--muted); }
+.day .n { font-size: var(--t-body); font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
 .day.today .n { color: var(--accent); }
 .day .cells { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
-.day .cell { display: block; width: 24px; height: 8px; border-radius: 2px; background: var(--surface-2); }
+.day .cell { display: block; width: 24px; height: 8px; border-radius: 4px; background: var(--fill); }
 .day .cell.on { background: var(--cell-c); }
-.legend { display: flex; gap: var(--space-1) var(--space-2); flex-wrap: wrap; font-size: .875rem; line-height: 1.3; letter-spacing: 0; color: var(--muted); padding: 0 var(--space-2) var(--space-2); }
-.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--lc); margin-right: 5px; vertical-align: -1px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px var(--space-2); padding: 0 var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.35; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; background: var(--lc); vertical-align: 1px; }
 
-/* calendar: Sunday-first month grid; marks under each date, the chosen day's list below */
-.cal { padding: var(--space-2) var(--space-1) 0; }
+/* calendar: Sunday-first month grid as in the Calendar app: today's date in the tint, the chosen day in a filled circle */
+.cal { padding: 12px var(--space-1) 0; }
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.cal-week span { text-align: center; font-size: .875rem; line-height: 1; color: var(--muted); padding-bottom: 6px; }
+.cal-week span { padding-bottom: 6px; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
 .cal-week span:first-child, .cal-day.sun .n { color: var(--warn); }
 .cal-week span:last-child, .cal-day.sat .n { color: var(--c-todo); }
-.cal-day { background: transparent; border: 0; border-radius: 8px; min-height: 58px; padding: 5px 0 7px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
-.cal-day:hover { background: var(--surface-2); }
+.cal-day { min-height: 54px; padding: 4px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; background: transparent; border: 0; border-radius: 12px; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
+@media (hover: hover) { .cal-day:hover { background: var(--fill); } }
+.cal-day .n { display: grid; place-items: center; width: 2.1em; height: 2.1em; border-radius: 50%; font-size: var(--t-callout); line-height: 1; }
 /* neighbouring months: muted text rather than transparency, so the dates still read at 4.5:1 */
-.cal-day.out .n { color: var(--muted); font-weight: 400; }
-.cal-day[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--c-cal); }
-.cal-day .n { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; line-height: 1; }
-.cal-day.today .n { background: var(--accent); color: var(--accent-ink); }
+.cal-day.out .n { color: var(--muted); }
+.cal-day.today .n { color: var(--accent); font-weight: 700; }
+.cal-day[aria-pressed="true"] .n { background: var(--fg); color: var(--surface); font-weight: 700; }
+.cal-day.today[aria-pressed="true"] .n { background: var(--accent-fill); color: var(--accent-ink); }
 .cal-day .marks { display: flex; gap: 3px; height: 6px; }
-.cal-day .marks i { width: 6px; height: 6px; border-radius: 2px; background: var(--mc); }
+.cal-day .marks i { width: 6px; height: 6px; border-radius: 50%; background: var(--mc); }
 .cal .legend { padding: var(--space-1) var(--space-1) var(--space-2); }
+/* the narrowest phones: give the seven columns all the width there is */
+@media (max-width: 359px) { .cal { padding-inline: 2px; } .cal-week, .cal-grid { gap: 0; } }
 
-.status { font-size: .875rem; line-height: 1.3; letter-spacing: 0; color: var(--muted); text-align: center; }
+/* 記録: the record pages as an iOS Settings list, then backup */
+ul.list > li.btn-row { padding: 0; }
+.row-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px var(--space-2); background: transparent; border: 0; border-radius: inherit; color: var(--accent); text-align: left; line-height: 1.3; cursor: pointer; }
+.row-btn.nav { color: var(--fg); }
+.row-btn .chev { display: grid; color: var(--muted); }
+.sq { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--sq); color: #ffffff; }
+.sq .icon { width: 20px; height: 20px; }
+ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
+.group-head { margin: var(--space-1) 0 -8px; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); }
+.group-foot { margin: -8px 0 0; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
+
+.status { font-size: var(--t-foot); line-height: 1.4; color: var(--muted); text-align: center; }
 .foot { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
-.backup { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1) var(--space-3); }
-.notice { display: flex; flex-direction: column; gap: 4px; padding: var(--space-2); border: 1px solid var(--warn); border-radius: 12px; background: var(--surface); text-wrap: pretty; }
-.notice strong { display: flex; align-items: center; gap: var(--space-1); color: var(--warn); font-family: var(--font-display); font-size: 1.125rem; line-height: 1.6; }
+.notice { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); border-radius: var(--radius); background: var(--surface); text-wrap: pretty; }
+.notice strong { display: flex; align-items: center; gap: var(--space-1); color: var(--warn); font-weight: 600; line-height: 1.3; }
 .notice .cut { fill: var(--surface); }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 </style>
+</head>
+<body>
 
-<!-- icon shapes from the Digital Agency's example components (MIT): chevrons, close and plus; minus is drawn to match the plus -->
+<!-- icons: chevrons, close and plus come from the Digital Agency's example components (MIT) and minus is drawn to match;
+     the tab and record icons are drawn for this app in the filled style HIG asks for in tab bars (SF Symbols may only
+     be used inside apps on Apple platforms, so a web page can't borrow them) -->
 <svg class="sprite" aria-hidden="true" focusable="false">
   <symbol id="i-prev" viewBox="0 0 16 16"><path d="m5.27 8 5.33-5.33-.93-.94L3.4 8l6.27 6.27.93-.94L5.27 8Z"/></symbol>
   <symbol id="i-next" viewBox="0 0 16 16"><path d="m6 1.73-.93.94L10.4 8l-5.33 5.33.93.94L12.27 8 6 1.73Z"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.4 18.6-1-1 5.5-5.6-5.6-5.6 1.1-1 5.6 5.5 5.6-5.6 1 1.1L13 12l5.6 5.6-1 1L12 13l-5.6 5.6Z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M21 11H13V3H11V11H3V13H11V21H13V13H21V11Z"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M21 11H3V13H21V11Z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M12.65 3.27a1 1 0 0 0-1.3 0l-8.5 7.3a1 1 0 0 0 1.3 1.52l.85-.73v8.14c0 .83.67 1.5 1.5 1.5H10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5h3.5c.83 0 1.5-.67 1.5-1.5v-8.14l.85.73a1 1 0 0 0 1.3-1.52l-8.5-7.3Z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M8 2.5a1 1 0 0 1 1 1V4h6v-.5a1 1 0 1 1 2 0V4h1.5A2.5 2.5 0 0 1 21 6.5v12a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5v-12A2.5 2.5 0 0 1 5.5 4H7v-.5a1 1 0 0 1 1-1ZM5 9v9.5c0 .28.22.5.5.5h13a.5.5 0 0 0 .5-.5V9H5Zm2 2.5h2.5V14H7v-2.5Zm3.75 0h2.5V14h-2.5v-2.5Zm3.75 0H17V14h-2.5v-2.5ZM7 15.5h2.5v2H7v-2Zm3.75 0h2.5v2h-2.5v-2Z"/></symbol>
+  <symbol id="i-todo" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19Zm4.6 6.65a.85.85 0 0 0-1.2 0l-4.65 4.65-2.15-2.15a.85.85 0 1 0-1.2 1.2l2.75 2.75a.85.85 0 0 0 1.2 0l5.25-5.25a.85.85 0 0 0 0-1.2Z"/></symbol>
+  <symbol id="i-records" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M5.5 3.5h13A2.5 2.5 0 0 1 21 6v12a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18V6a2.5 2.5 0 0 1 2.5-2.5ZM7.5 7a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Zm3 .35h7v1.5h-7v-1.5Zm-3 3.55a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Zm3 .35h7v1.5h-7v-1.5Zm-3 3.55a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Zm3 .35h7v1.5h-7v-1.5Z"/></symbol>
+  <symbol id="i-goal" viewBox="0 0 24 24"><path d="M5.5 2.75a1 1 0 0 1 1 1v.5c1.6-.9 3.37-1.03 5.27-.24 1.75.73 3.33.73 5.08-.1A1 1 0 0 1 18.25 4.8v8.4a1 1 0 0 1-.56.9c-2.37 1.15-4.6 1.2-6.84.26-1.53-.64-2.95-.6-4.35.18v6.71a1 1 0 1 1-2 0V3.75a1 1 0 0 1 1-1Z"/></symbol>
+  <symbol id="i-journal" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7.5 2.5h10.75c.69 0 1.25.56 1.25 1.25v12.5c0 .69-.56 1.25-1.25 1.25H7.5a1.25 1.25 0 0 0 0 2.5h11.25a.75.75 0 0 1 0 1.5H7.5a2.75 2.75 0 0 1-2.75-2.75V5.25A2.75 2.75 0 0 1 7.5 2.5Zm2 3.5a.75.75 0 0 0 0 1.5h6a.75.75 0 0 0 0-1.5h-6Z"/></symbol>
+  <symbol id="i-meal" viewBox="0 0 24 24"><path d="M5.25 2.75a.75.75 0 0 1 .75.75V8h1V3.5a.75.75 0 0 1 1.5 0V8h1V3.5a.75.75 0 0 1 1.5 0V9a3 3 0 0 1-2.25 2.9v8.6a1 1 0 1 1-2 0v-8.6A3 3 0 0 1 4.5 9V3.5a.75.75 0 0 1 .75-.75ZM17 2.75c1.79 0 3 2.46 3 6.25 0 1.69-.63 2.86-1.75 3.4v8.1a1 1 0 1 1-2 0V3.6c0-.47.33-.85.75-.85Z"/></symbol>
+  <symbol id="i-workout" viewBox="0 0 24 24"><path d="M5.25 6h1A1.75 1.75 0 0 1 8 7.75V11h8V7.75A1.75 1.75 0 0 1 17.75 6h1a1.75 1.75 0 0 1 1.75 1.75V9h.25a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-.25v1.25A1.75 1.75 0 0 1 18.75 18h-1A1.75 1.75 0 0 1 16 16.25V13H8v3.25A1.75 1.75 0 0 1 6.25 18h-1a1.75 1.75 0 0 1-1.75-1.75V15h-.25a1.5 1.5 0 0 1-1.5-1.5v-3A1.5 1.5 0 0 1 3.25 9h.25V7.75A1.75 1.75 0 0 1 5.25 6Z"/></symbol>
+  <symbol id="i-weight" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm1.25 7.5h7.5a3.75 3.75 0 0 0-7.5 0Z"/><path d="m11.4 10.1 1.6-2.75a.6.6 0 0 1 1.04.6l-1.6 2.75a.6.6 0 0 1-1.04-.6Z"/></symbol>
+  <symbol id="i-money" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19ZM8.3 6.9l1.3-.9 2.4 3.5 2.4-3.5 1.3.9-2.6 3.8H15v1.5h-2.25v1.2H15v1.5h-2.25V18h-1.5v-3.1H9v-1.5h2.25v-1.2H9v-1.5h1.9L8.3 6.9Z"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .53.22l3.25 3.25a.75.75 0 0 1-1.06 1.06l-1.97-1.97v9.44a.75.75 0 0 1-1.5 0V4.81L9.28 6.78a.75.75 0 0 1-1.06-1.06l3.25-3.25A.75.75 0 0 1 12 2.25ZM6.5 9.5h2a.75.75 0 0 1 0 1.5h-2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.75.75 0 0 1 0-1.5h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/></symbol>
+  <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .75.75v9.44l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0l-3.25-3.25a.75.75 0 1 1 1.06-1.06l1.97 1.97V3a.75.75 0 0 1 .75-.75ZM6.5 9.5h2a.75.75 0 0 1 0 1.5h-2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.75.75 0 0 1 0-1.5h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/></symbol>
 </svg>
 
-<div class="wrap">
-  <header class="top">
-    <h1>つみかさね</h1>
-    <div class="today" id="todayLabel"></div>
-  </header>
-
-  <!-- 保存できない場所で開いたときの注意 -->
-  <div class="notice" id="noSave" role="status" hidden>
-    <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="警告"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg>ここでは保存されません</strong>
-    <span>このブラウザは記録を保存できない設定になっています。プライベートブラウズをやめるか、別のブラウザで開いてください。</span>
+<div class="app">
+  <!-- tab bar on iPhone, sidebar from 768px; the buttons are filled in by the script -->
+  <div class="side">
+    <div class="side-in">
+      <h1 class="app-title">つみかさね</h1>
+      <nav class="menu" id="menu" aria-label="メニュー"></nav>
+    </div>
   </div>
 
-  <nav class="tabs" id="tabs" role="tablist" aria-label="記録の種類"></nav>
+  <main class="main">
+    <!-- iOS-style top bar: a back button on the record pages, and the page title once the large title scrolls under it -->
+    <header class="navbar" id="navbar">
+      <button type="button" class="back" id="backBtn" aria-label="記録に戻る" hidden><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg>記録</button>
+      <span class="navtitle" id="navTitle" aria-hidden="true"></span>
+    </header>
 
-  <!-- ホーム -->
-  <section id="sec-home" style="--sec-c: var(--accent)">
-    <div class="sec-head"><h2>きょうのようす</h2><span class="muted small" id="homeDate"></span></div>
-    <div class="grid" id="homeTiles"></div>
-    <div class="card">
-      <div class="card-head">この7日間のつみかさね</div>
-      <div class="week" id="week"></div>
-      <div class="legend">
-        <span style="--lc: var(--c-journal)">日記</span>
-        <span style="--lc: var(--c-meal)">食事</span>
-        <span style="--lc: var(--c-workout)">運動</span>
-        <span style="--lc: var(--c-weight)">体重</span>
+    <div class="wrap">
+      <!-- 保存できない場所で開いたときの注意 -->
+      <div class="notice" id="noSave" role="status" hidden>
+        <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="警告"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg>ここでは保存されません</strong>
+        <span>このブラウザは記録を保存できない設定になっています。プライベートブラウズをやめるか、別のブラウザで開いてください。</span>
       </div>
-    </div>
-  </section>
 
-  <!-- カレンダー -->
-  <section id="sec-calendar" style="--sec-c: var(--c-cal)" hidden>
-    <div class="sec-head"><h2>カレンダー</h2><div class="monthnav" id="calNav"></div></div>
-    <div class="card cal">
-      <div class="cal-week" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
-      <div class="cal-grid" id="calGrid"></div>
-      <div class="legend">
-        <span style="--lc: var(--c-cal)">予定</span>
-        <span style="--lc: var(--c-todo)">ToDo の期限</span>
-        <span style="--lc: var(--c-goal)">目標の期限</span>
-      </div>
-    </div>
-    <div class="row-between"><span class="label" id="calDayLabel"></span><span class="muted small" id="calDayCount"></span></div>
-    <form class="add" id="evForm" autocomplete="off">
-      <input type="time" id="evTime" class="w-sm" aria-label="時間（任意）">
-      <input type="text" id="evTitle" class="grow" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
-      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
-    </form>
-    <ul class="list card" id="calDayList"></ul>
-  </section>
+      <!-- ホーム -->
+      <section id="sec-home" style="--sec-c: var(--accent)">
+        <div class="sec-head"><p class="kicker" id="homeDate"></p><h2>きょう</h2></div>
+        <div class="grid" id="homeTiles"></div>
+        <div class="card">
+          <div class="card-head">この7日間のつみかさね</div>
+          <div class="week" id="week"></div>
+          <div class="legend">
+            <span style="--lc: var(--c-journal)">日記</span>
+            <span style="--lc: var(--c-meal)">食事</span>
+            <span style="--lc: var(--c-workout)">運動</span>
+            <span style="--lc: var(--c-weight)">体重</span>
+          </div>
+        </div>
+      </section>
 
-  <!-- ToDo -->
-  <section id="sec-todo" style="--sec-c: var(--c-todo)" hidden>
-    <div class="sec-head"><h2>ToDo</h2><span class="muted small" id="todoCount"></span></div>
-    <form class="add" id="todoForm" autocomplete="off">
-      <input type="text" id="todoText" class="grow" placeholder="やること（例：牛乳を買う）" aria-label="やること" maxlength="200" required>
-      <input type="date" id="todoDue" class="w-sm" aria-label="期限（任意）">
-      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
-    </form>
-    <div class="bar">
-      <div class="seg" role="group" aria-label="表示の切り替え" id="todoFilters">
-        <button type="button" data-filter="all" aria-pressed="true">すべて</button>
-        <button type="button" data-filter="active" aria-pressed="false">未完了</button>
-        <button type="button" data-filter="done" aria-pressed="false">完了</button>
-      </div>
-      <button type="button" class="link-btn" id="clearDone">完了したものを削除</button>
-    </div>
-    <ul class="list card" id="todoList"></ul>
-  </section>
+      <!-- カレンダー -->
+      <section id="sec-calendar" style="--sec-c: var(--c-cal)" hidden>
+        <div class="sec-head"><h2>カレンダー</h2><div class="monthnav" id="calNav"></div></div>
+        <div class="card cal">
+          <div class="cal-week" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="legend">
+            <span style="--lc: var(--c-cal)">予定</span>
+            <span style="--lc: var(--c-todo)">ToDo の期限</span>
+            <span style="--lc: var(--c-goal)">目標の期限</span>
+          </div>
+        </div>
+        <div class="row-between"><span class="label" id="calDayLabel"></span><span class="muted small" id="calDayCount"></span></div>
+        <form class="add" id="evForm" autocomplete="off">
+          <input type="time" id="evTime" class="w-sm" aria-label="時間（任意）">
+          <input type="text" id="evTitle" class="grow" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
+          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+        </form>
+        <ul class="list card" id="calDayList"></ul>
+      </section>
 
-  <!-- 日記 -->
-  <section id="sec-journal" style="--sec-c: var(--c-journal)" hidden>
-    <div class="sec-head"><h2>日記</h2><div class="datenav"></div></div>
-    <div class="card pad">
-      <div class="row-between"><span class="label" id="moodLabel">きょうの気分</span><span class="muted small" id="journalState"></span></div>
-      <div class="moods" id="moods"></div>
-      <textarea id="journalText" rows="6" placeholder="できごと、気づき、ひとこと。短くても大丈夫です。"></textarea>
-      <div class="row-between">
-        <span class="muted small">書くと自動で保存されます</span>
-        <button type="button" class="link-btn" id="journalDelete">この日の記録を削除</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head">これまでの記録</div>
-      <ul class="list" id="journalList"></ul>
-    </div>
-  </section>
+      <!-- ToDo -->
+      <section id="sec-todo" style="--sec-c: var(--c-todo)" hidden>
+        <div class="sec-head"><h2>ToDo</h2><span class="muted small" id="todoCount"></span></div>
+        <form class="add" id="todoForm" autocomplete="off">
+          <input type="text" id="todoText" class="grow" placeholder="やること（例：牛乳を買う）" aria-label="やること" maxlength="200" required>
+          <input type="date" id="todoDue" class="w-sm" aria-label="期限（任意）">
+          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+        </form>
+        <div class="bar">
+          <div class="seg" role="group" aria-label="表示の切り替え" id="todoFilters">
+            <button type="button" data-filter="all" aria-pressed="true">すべて</button>
+            <button type="button" data-filter="active" aria-pressed="false">未完了</button>
+            <button type="button" data-filter="done" aria-pressed="false">完了</button>
+          </div>
+          <button type="button" class="link-btn danger" id="clearDone">完了したものを削除</button>
+        </div>
+        <ul class="list card" id="todoList"></ul>
+      </section>
 
-  <!-- 食事 -->
-  <section id="sec-meal" style="--sec-c: var(--c-meal)" hidden>
-    <div class="sec-head"><h2>食事</h2><div class="datenav"></div></div>
-    <form class="add" id="mealForm" autocomplete="off">
-      <select id="mealSlot" class="w-xs" aria-label="区分">
-        <option>朝食</option><option>昼食</option><option>夕食</option><option>間食</option>
-      </select>
-      <input type="text" id="mealText" class="grow" placeholder="食べたもの（例：鮭定食）" aria-label="食べたもの" maxlength="200" required>
-      <input type="number" id="mealKcal" class="w-xs" placeholder="kcal" aria-label="カロリー（任意）" min="0" max="9999" inputmode="numeric">
-      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
-    </form>
-    <ul class="list card" id="mealList"></ul>
-    <div class="muted small" id="mealTotal"></div>
-  </section>
+      <!-- 記録: the record pages (the iPhone tab bar has room for five tabs) and backup -->
+      <section id="sec-records" style="--sec-c: var(--accent)" hidden>
+        <div class="sec-head"><h2>記録</h2></div>
+        <ul class="list card nav-list" id="recordsList"></ul>
+        <h3 class="group-head">バックアップ</h3>
+        <ul class="list card">
+          <li class="btn-row"><button type="button" class="row-btn" id="exportBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>記録を書き出す</button></li>
+          <li class="btn-row"><button type="button" class="row-btn" id="importBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-import"/></svg>記録を読み込む</button></li>
+        </ul>
+        <p class="group-foot">書き出したファイルを別の端末で読み込むと、記録をそちらへ移せます。</p>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </section>
 
-  <!-- 運動 -->
-  <section id="sec-workout" style="--sec-c: var(--c-workout)" hidden>
-    <div class="sec-head"><h2>運動</h2><div class="datenav"></div></div>
-    <form class="add" id="workoutForm" autocomplete="off">
-      <input type="text" id="woType" class="grow" list="woTypes" placeholder="種目（例：ウォーキング）" aria-label="種目" maxlength="100" required>
-      <datalist id="woTypes">
-        <option value="ウォーキング"><option value="ランニング"><option value="筋トレ"><option value="ストレッチ">
-        <option value="自転車"><option value="水泳"><option value="ヨガ"><option value="階段"><option value="散歩">
-      </datalist>
-      <input type="number" id="woMin" class="w-xs" placeholder="分" aria-label="時間（分）" min="1" max="1440" inputmode="numeric" required>
-      <input type="text" id="woNote" class="grow" placeholder="メモ（任意）" aria-label="メモ" maxlength="200">
-      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
-    </form>
-    <ul class="list card" id="workoutList"></ul>
-    <div class="muted small" id="workoutTotal"></div>
-  </section>
+      <!-- 日記 -->
+      <section id="sec-journal" style="--sec-c: var(--c-journal)" hidden>
+        <div class="sec-head"><h2>日記</h2><div class="datenav"></div></div>
+        <div class="card pad">
+          <div class="row-between"><span class="label" id="moodLabel">きょうの気分</span><span class="muted small" id="journalState"></span></div>
+          <div class="moods" id="moods"></div>
+          <textarea id="journalText" rows="6" placeholder="できごと、気づき、ひとこと。短くても大丈夫です。"></textarea>
+          <div class="row-between">
+            <span class="muted small">書くと自動で保存されます</span>
+            <button type="button" class="link-btn danger" id="journalDelete">この日の記録を削除</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">これまでの記録</div>
+          <ul class="list" id="journalList"></ul>
+        </div>
+      </section>
 
-  <!-- 体重 -->
-  <section id="sec-weight" style="--sec-c: var(--c-weight)" hidden>
-    <div class="sec-head"><h2>体重</h2><div class="datenav"></div></div>
-    <form class="add" id="wtForm" autocomplete="off">
-      <span class="label" id="wtFormLabel">きょうの体重</span>
-      <input type="number" id="wtInput" class="w-xs" step="0.1" min="20" max="300" placeholder="65.0" aria-label="体重（kg）" inputmode="decimal" required>
-      <span class="unit">kg</span>
-      <button class="btn" type="submit" id="wtSubmit">記録する</button>
-      <span class="muted small" id="wtState"></span>
-      <span class="spacer"></span>
-      <button type="button" class="link-btn" id="wtDelete" hidden>この日の記録を削除</button>
-    </form>
-    <div class="bar">
-      <div class="seg" role="group" aria-label="グラフの期間" id="wtRanges">
-        <button type="button" data-range="30" aria-pressed="true">1か月</button>
-        <button type="button" data-range="90" aria-pressed="false">3か月</button>
-        <button type="button" data-range="365" aria-pressed="false">1年</button>
-      </div>
-      <form class="inline" id="wtTargetForm" autocomplete="off">
-        <label for="wtTarget">目標体重</label>
-        <input type="number" id="wtTarget" step="0.1" min="20" max="300" placeholder="未設定" inputmode="decimal">
-        <span class="unit">kg</span>
-        <button class="btn ghost sm" type="submit">保存</button>
-      </form>
-    </div>
-    <div class="card">
-      <div class="chart-wrap" id="wtChartWrap">
-        <svg class="chart" id="wtChart" role="img" tabindex="0" aria-label="体重の推移グラフ。矢印キーで点を移動できます。数値は下の一覧にもあります。"></svg>
-        <div class="tip" id="wtTip" hidden></div>
-      </div>
-    </div>
-    <div class="stats" id="wtStats"></div>
-    <div class="card">
-      <div class="card-head">記録の一覧</div>
-      <ul class="list" id="wtList"></ul>
-    </div>
-  </section>
+      <!-- 食事 -->
+      <section id="sec-meal" style="--sec-c: var(--c-meal)" hidden>
+        <div class="sec-head"><h2>食事</h2><div class="datenav"></div></div>
+        <form class="add" id="mealForm" autocomplete="off">
+          <select id="mealSlot" class="w-xs" aria-label="区分">
+            <option>朝食</option><option>昼食</option><option>夕食</option><option>間食</option>
+          </select>
+          <input type="text" id="mealText" class="grow" placeholder="食べたもの（例：鮭定食）" aria-label="食べたもの" maxlength="200" required>
+          <input type="number" id="mealKcal" class="w-xs" placeholder="kcal" aria-label="カロリー（任意）" min="0" max="9999" inputmode="numeric">
+          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+        </form>
+        <ul class="list card" id="mealList"></ul>
+        <div class="muted small" id="mealTotal"></div>
+      </section>
 
-  <!-- 家計簿 -->
-  <section id="sec-money" style="--sec-c: var(--c-money)" hidden>
-    <div class="sec-head"><h2>家計簿</h2><div class="monthnav" id="monthNav"></div></div>
-    <div class="card pad">
-      <div class="money-sum" id="moneySum"></div>
-      <div class="budget-line" id="budgetLine"></div>
-      <form class="inline" id="budgetForm" autocomplete="off">
-        <label for="budgetInput">月の予算</label>
-        <input type="number" id="budgetInput" min="0" max="99999999" step="1" placeholder="未設定" inputmode="numeric">
-        <span class="unit">円</span>
-        <button class="btn ghost sm" type="submit">保存</button>
-      </form>
-    </div>
-    <form class="add" id="exForm" autocomplete="off">
-      <input type="date" id="exDate" class="w-sm" aria-label="日付" required>
-      <select id="exKind" class="w-xs" aria-label="種類">
-        <option value="out">支出</option><option value="in">収入</option>
-      </select>
-      <input type="text" id="exCat" class="w-xs" list="catOut" placeholder="費目" aria-label="費目" maxlength="20">
-      <datalist id="catOut">
-        <option value="食費"><option value="外食"><option value="日用品"><option value="交通"><option value="住居"><option value="光熱費">
-        <option value="通信"><option value="交際"><option value="趣味"><option value="医療"><option value="衣服"><option value="教育"><option value="その他">
-      </datalist>
-      <datalist id="catIn">
-        <option value="給与"><option value="副収入"><option value="おこづかい"><option value="その他">
-      </datalist>
-      <input type="number" id="exAmount" class="w-xs" placeholder="金額" aria-label="金額（円）" min="1" max="99999999" step="1" inputmode="numeric" required>
-      <input type="text" id="exMemo" class="grow" placeholder="メモ（例：スーパーで買い物）" aria-label="メモ" maxlength="200">
-      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
-    </form>
-    <div class="card" id="catCard">
-      <div class="card-head">費目ごとの支出</div>
-      <div id="catList"></div>
-    </div>
-    <div class="card">
-      <div class="card-head">明細</div>
-      <ul class="list" id="exList"></ul>
-    </div>
-  </section>
+      <!-- 運動 -->
+      <section id="sec-workout" style="--sec-c: var(--c-workout)" hidden>
+        <div class="sec-head"><h2>運動</h2><div class="datenav"></div></div>
+        <form class="add" id="workoutForm" autocomplete="off">
+          <input type="text" id="woType" class="grow" list="woTypes" placeholder="種目（例：ウォーキング）" aria-label="種目" maxlength="100" required>
+          <datalist id="woTypes">
+            <option value="ウォーキング"><option value="ランニング"><option value="筋トレ"><option value="ストレッチ">
+            <option value="自転車"><option value="水泳"><option value="ヨガ"><option value="階段"><option value="散歩">
+          </datalist>
+          <input type="number" id="woMin" class="w-xs" placeholder="分" aria-label="時間（分）" min="1" max="1440" inputmode="numeric" required>
+          <input type="text" id="woNote" class="grow" placeholder="メモ（任意）" aria-label="メモ" maxlength="200">
+          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+        </form>
+        <ul class="list card" id="workoutList"></ul>
+        <div class="muted small" id="workoutTotal"></div>
+      </section>
 
-  <!-- 目標 -->
-  <section id="sec-goal" style="--sec-c: var(--c-goal)" hidden>
-    <div class="sec-head"><h2>目標</h2><span class="muted small" id="goalCount"></span></div>
-    <form class="add" id="goalForm" autocomplete="off">
-      <input type="text" id="goalTitle" class="grow" placeholder="目標（例：本を読む）" aria-label="目標" maxlength="200" required>
-      <input type="number" id="goalTarget" class="w-xs" placeholder="目標値" aria-label="目標値（任意）" min="1" max="999999" inputmode="numeric">
-      <input type="text" id="goalUnit" class="w-xs" placeholder="単位" aria-label="単位（任意）" maxlength="10">
-      <input type="date" id="goalDeadline" class="w-sm" aria-label="期限（任意）">
-      <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
-    </form>
-    <div class="card" id="goalList"></div>
-  </section>
+      <!-- 体重 -->
+      <section id="sec-weight" style="--sec-c: var(--c-weight)" hidden>
+        <div class="sec-head"><h2>体重</h2><div class="datenav"></div></div>
+        <form class="add" id="wtForm" autocomplete="off">
+          <span class="label" id="wtFormLabel">きょうの体重</span>
+          <input type="number" id="wtInput" class="w-xs" step="0.1" min="20" max="300" placeholder="65.0" aria-label="体重（kg）" inputmode="decimal" required>
+          <span class="unit">kg</span>
+          <button class="btn" type="submit" id="wtSubmit">記録する</button>
+          <span class="muted small" id="wtState"></span>
+          <span class="spacer"></span>
+          <button type="button" class="link-btn danger" id="wtDelete" hidden>この日の記録を削除</button>
+        </form>
+        <div class="bar">
+          <div class="seg" role="group" aria-label="グラフの期間" id="wtRanges">
+            <button type="button" data-range="30" aria-pressed="true">1か月</button>
+            <button type="button" data-range="90" aria-pressed="false">3か月</button>
+            <button type="button" data-range="365" aria-pressed="false">1年</button>
+          </div>
+          <form class="inline" id="wtTargetForm" autocomplete="off">
+            <label for="wtTarget">目標体重</label>
+            <input type="number" id="wtTarget" step="0.1" min="20" max="300" placeholder="未設定" inputmode="decimal">
+            <span class="unit">kg</span>
+            <button class="btn ghost sm" type="submit">保存</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="chart-wrap" id="wtChartWrap">
+            <svg class="chart" id="wtChart" role="img" tabindex="0" aria-label="体重の推移グラフ。矢印キーで点を移動できます。数値は下の一覧にもあります。"></svg>
+            <div class="tip" id="wtTip" hidden></div>
+          </div>
+        </div>
+        <div class="stats" id="wtStats"></div>
+        <div class="card">
+          <div class="card-head">記録の一覧</div>
+          <ul class="list" id="wtList"></ul>
+        </div>
+      </section>
 
-  <footer class="foot">
-    <div class="status" id="status"></div>
-    <div class="backup">
-      <button type="button" class="link-btn" id="exportBtn">記録を書き出す</button>
-      <button type="button" class="link-btn" id="importBtn">記録を読み込む</button>
-      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <!-- 家計簿 -->
+      <section id="sec-money" style="--sec-c: var(--c-money)" hidden>
+        <div class="sec-head"><h2>家計簿</h2><div class="monthnav" id="monthNav"></div></div>
+        <div class="card pad">
+          <div class="money-sum" id="moneySum"></div>
+          <div class="budget-line" id="budgetLine"></div>
+          <form class="inline" id="budgetForm" autocomplete="off">
+            <label for="budgetInput">月の予算</label>
+            <input type="number" id="budgetInput" min="0" max="99999999" step="1" placeholder="未設定" inputmode="numeric">
+            <span class="unit">円</span>
+            <button class="btn ghost sm" type="submit">保存</button>
+          </form>
+        </div>
+        <form class="add" id="exForm" autocomplete="off">
+          <input type="date" id="exDate" class="w-sm" aria-label="日付" required>
+          <select id="exKind" class="w-xs" aria-label="種類">
+            <option value="out">支出</option><option value="in">収入</option>
+          </select>
+          <input type="text" id="exCat" class="w-xs" list="catOut" placeholder="費目" aria-label="費目" maxlength="20">
+          <datalist id="catOut">
+            <option value="食費"><option value="外食"><option value="日用品"><option value="交通"><option value="住居"><option value="光熱費">
+            <option value="通信"><option value="交際"><option value="趣味"><option value="医療"><option value="衣服"><option value="教育"><option value="その他">
+          </datalist>
+          <datalist id="catIn">
+            <option value="給与"><option value="副収入"><option value="おこづかい"><option value="その他">
+          </datalist>
+          <input type="number" id="exAmount" class="w-xs" placeholder="金額" aria-label="金額（円）" min="1" max="99999999" step="1" inputmode="numeric" required>
+          <input type="text" id="exMemo" class="grow" placeholder="メモ（例：スーパーで買い物）" aria-label="メモ" maxlength="200">
+          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+        </form>
+        <div class="card" id="catCard">
+          <div class="card-head">費目ごとの支出</div>
+          <div id="catList"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">明細</div>
+          <ul class="list" id="exList"></ul>
+        </div>
+      </section>
+
+      <!-- 目標 -->
+      <section id="sec-goal" style="--sec-c: var(--c-goal)" hidden>
+        <div class="sec-head"><h2>目標</h2><span class="muted small" id="goalCount"></span></div>
+        <form class="add" id="goalForm" autocomplete="off">
+          <input type="text" id="goalTitle" class="grow" placeholder="目標（例：本を読む）" aria-label="目標" maxlength="200" required>
+          <input type="number" id="goalTarget" class="w-xs" placeholder="目標値" aria-label="目標値（任意）" min="1" max="999999" inputmode="numeric">
+          <input type="text" id="goalUnit" class="w-xs" placeholder="単位" aria-label="単位（任意）" maxlength="10">
+          <input type="date" id="goalDeadline" class="w-sm" aria-label="期限（任意）">
+          <button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button>
+        </form>
+        <div class="card" id="goalList"></div>
+      </section>
+
+      <footer class="foot">
+        <div class="status" id="status"></div>
+      </footer>
     </div>
-  </footer>
+  </main>
 </div>
 
 <script>
@@ -615,19 +789,25 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
   }
 
   const todayKey = ymd(new Date());
-  $("todayLabel").textContent = fmtLong(todayKey);
 
+  // HIG: an iPhone tab bar holds five tabs at most, so the five record pages sit under 記録, the way iOS Health's Browse
+  // tab lists its categories; on wide screens the tabs turn into a sidebar that lists those pages too
   const TABS = [
-    ["home", "きょう", "var(--accent)"],
-    ["calendar", "カレンダー", "var(--c-cal)"],
-    ["todo", "ToDo", "var(--c-todo)"],
-    ["journal", "日記", "var(--c-journal)"],
-    ["meal", "食事", "var(--c-meal)"],
-    ["workout", "運動", "var(--c-workout)"],
-    ["weight", "体重", "var(--c-weight)"],
-    ["money", "家計簿", "var(--c-money)"],
-    ["goal", "目標", "var(--c-goal)"],
+    { key: "home", label: "きょう", icon: "home", fill: "var(--f-home)" },
+    { key: "calendar", label: "カレンダー", icon: "calendar", fill: "var(--f-cal)" },
+    { key: "todo", label: "ToDo", icon: "todo", fill: "var(--f-todo)" },
+    { key: "records", label: "記録", icon: "records", fill: "var(--f-records)" },
+    { key: "goal", label: "目標", icon: "goal", fill: "var(--f-goal)" },
   ];
+  const RECORDS = [
+    { key: "journal", label: "日記", icon: "journal", fill: "var(--f-journal)" },
+    { key: "meal", label: "食事", icon: "meal", fill: "var(--f-meal)" },
+    { key: "workout", label: "運動", icon: "workout", fill: "var(--f-workout)" },
+    { key: "weight", label: "体重", icon: "weight", fill: "var(--f-weight)" },
+    { key: "money", label: "家計簿", icon: "money", fill: "var(--f-money)" },
+  ];
+  const PAGES = [...TABS, ...RECORDS];
+  const isRecord = (key) => RECORDS.some((r) => r.key === key);
   const MOODS = ["", "つらい", "いまいち", "ふつう", "よい", "最高"];
   const SLOTS = ["朝食", "昼食", "夕食", "間食"];
 
@@ -718,21 +898,58 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
     function reset() { btn.classList.remove("armed"); btn.textContent = label; }
   }
 
-  // ---------- tabs ----------
-  const tabsEl = $("tabs");
-  for (const [key, label, color] of TABS) {
-    tabsEl.append(el("button", { type: "button", role: "tab", "data-tab": key, "aria-selected": "false", style: `--tab-c:${color}`, onclick: () => showTab(key) },
-      el("span", { class: "dot" }), label));
+  // ---------- tabs (a sidebar on wide screens) ----------
+  const menuEl = $("menu");
+  const wideScreen = matchMedia("(min-width: 768px)");
+  let lastRecord = null; // the record page the 記録 tab returns to (HIG: a tab keeps its place while you visit others)
+  function menuButton(p) {
+    return el("button", { type: "button", "data-tab": p.key, style: `--item-f:${p.fill}`, onclick: () => openTab(p.key) },
+      el("span", { class: "mi" }, icon(p.icon, 24)), el("span", { class: "lbl" }, p.label));
+  }
+  setChildren(menuEl, el("ul", {}, TABS.map((p) => el("li", {}, menuButton(p),
+    p.key === "records" ? el("ul", { class: "sub" }, RECORDS.map((r) => el("li", {}, menuButton(r)))) : null))));
+  function openTab(key) {
+    // on iPhone the 記録 tab reopens the record page left open there; pressed again from inside, it goes back to its list
+    if (key === "records" && !wideScreen.matches && lastRecord && tab !== "records" && !isRecord(tab)) key = lastRecord;
+    showTab(key);
   }
   function showTab(key) {
     if (tab === "journal" && key !== "journal") flushJournal();
     tab = key;
-    for (const [k] of TABS) $("sec-" + k).hidden = k !== key;
-    tabsEl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === key)));
+    if (isRecord(key)) lastRecord = key;
+    else if (key === "records") lastRecord = null;
+    for (const p of PAGES) $("sec-" + p.key).hidden = p.key !== key;
+    // the 記録 tab stays lit on its record pages; aria-current says the same to screen readers
+    menuEl.querySelectorAll("button[data-tab]").forEach((b) => {
+      const k = b.dataset.tab, within = k === "records" && isRecord(key);
+      b.classList.toggle("on", k === key);
+      b.classList.toggle("in", within);
+      if (k === key) b.setAttribute("aria-current", "page");
+      else if (within) b.setAttribute("aria-current", "true");
+      else b.removeAttribute("aria-current");
+    });
+    $("backBtn").hidden = !isRecord(key);
     try { history.replaceState(null, "", "#" + key); } catch {}
     window.scrollTo(0, 0);
+    watchTitle();
     if (key === "weight") renderWeightChart();
   }
+  $("backBtn").addEventListener("click", () => showTab("records"));
+
+  // the large title folds into the top bar once it has scrolled under it, as iOS navigation bars do
+  const navbar = $("navbar"), navTitle = $("navTitle");
+  let titleEl = null;
+  function watchTitle() {
+    titleEl = $("sec-" + tab).querySelector("h2");
+    navTitle.textContent = titleEl ? titleEl.textContent : "";
+    updateBar();
+  }
+  function updateBar() {
+    const under = titleEl ? titleEl.getBoundingClientRect().bottom <= navbar.getBoundingClientRect().bottom : window.scrollY > 0;
+    navbar.classList.toggle("scrolled", under);
+  }
+  // browsers send scroll events at most once a frame, and this only reads two boxes
+  window.addEventListener("scroll", updateBar, { passive: true });
 
   // ---------- date navigation (shared by 日記・食事・運動・体重) ----------
   let lastNavDate = null;
@@ -1428,14 +1645,15 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
   }
 
   // ---------- ホーム ----------
+  // a Health-style summary card: the coloured head with its chevron opens the page, and its hit area covers the card
   function tile(color, label, big, unit, sub, extra, tabKey, wide) {
+    const page = PAGES.find((p) => p.key === tabKey);
     return el("div", { class: "card tile" + (wide ? " wide" : ""), style: `--tile-c:${color}` },
-      el("div", { class: "eyebrow" }, label),
+      el("button", { type: "button", class: "tile-head", "aria-label": label + "を開く", onclick: () => showTab(tabKey) },
+        icon(page.icon, 18), el("span", { class: "lbl" }, label), el("span", { class: "chev" }, icon("next", 16))),
       el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
       sub ? el("div", { class: "sub" }, sub) : null,
-      extra,
-      // eight tiles each say 開く, so the name adds which one (and still contains the visible word)
-      el("button", { type: "button", class: "open", "aria-label": label + "を開く", onclick: () => showTab(tabKey) }, "開く", icon("next")));
+      extra);
   }
   function renderHome() {
     $("homeDate").textContent = fmtLong(todayKey);
@@ -1487,6 +1705,20 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
         null, "goal")
     );
     renderWeek();
+
+    // the 記録 list, iOS Settings style: an icon square, the page, and how it stands today
+    const status = {
+      journal: j ? "きょう：" + (j.mood ? MOODS[j.mood] : "書きました") : "きょうはまだ書いていません",
+      meal: ms.length ? `きょう ${ms.length} 回` + (kcal ? `・${kcal} kcal` : "") : "きょうはまだ記録がありません",
+      workout: `きょう ${mins} 分・この7日間 ${wk.minutes} 分`,
+      weight: wLast ? `${fmtKg(wLast.kg)} kg（${relLabel(wLast.id) || fmtMD(wLast.id)}）` : "まだ記録がありません",
+      money: `今月の支出 ${fmtYen(mon.out)}`,
+    };
+    setChildren($("recordsList"), RECORDS.map((r) => el("li", { class: "btn-row" },
+      el("button", { type: "button", class: "row-btn nav", onclick: () => showTab(r.key) },
+        el("span", { class: "sq", style: `--sq:${r.fill}` }, icon(r.icon, 20)),
+        el("span", { class: "body" }, el("span", { class: "text" }, r.label), el("span", { class: "sub" }, status[r.key])),
+        el("span", { class: "chev" }, icon("next", 16))))));
   }
   function renderWeek() {
     const w = $("week");
@@ -1557,10 +1789,12 @@ textarea { width: 100%; resize: vertical; line-height: 1.7; }
     renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderWeight(); renderMoney(); renderGoals(); renderCalendar();
   }
   const initial = (location.hash || "").slice(1);
-  showTab(TABS.some(([k]) => k === initial) ? initial : "home");
+  showTab(PAGES.some((p) => p.key === initial) ? initial : "home");
   loadJournalForm();
   renderAll();
   showMode();
+  // iOS only shows :active (the pressed look HIG asks for) once the page listens for touches
+  document.addEventListener("touchstart", () => {}, { passive: true });
 
   // another tab of this app saved: pick up its records so the two tabs don't overwrite each other
   window.addEventListener("storage", (e) => {

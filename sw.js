@@ -1,8 +1,8 @@
 // つみかさね service worker: keeps the app usable offline.
 // The page itself is fetched fresh whenever there is a connection, so an update shows up the next time the app opens;
-// icons and fonts are served from the cache once they have loaded.
-// Bump CACHE when the icons change, so phones drop the old ones.
-const CACHE = "tsumikasane-v1";
+// the manifest and icons are served from the cache once they have loaded.
+// Bump CACHE when the icons or the manifest change, so phones drop the old ones.
+const CACHE = "tsumikasane-v2";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
