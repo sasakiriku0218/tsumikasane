@@ -595,9 +595,26 @@ ul.list > li.btn-row { padding: 0; }
 .row-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px var(--space-2); background: transparent; border: 0; border-radius: inherit; color: var(--accent); text-align: left; line-height: 1.3; cursor: pointer; }
 .row-btn.nav { color: var(--fg); }
 .row-btn .chev { display: grid; color: var(--muted); }
-.sq { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--sq); color: #ffffff; }
-.sq .icon { width: 20px; height: 20px; }
-ul.list.nav-list > li + li::before { left: calc(var(--space-2) + 42px); }
+/* 記録: looking back over the records (the user's call: entries are made from きょう, this page only sums up). A 週・月・年
+   control and the period with ‹ ›, then a card per record in its colour, Health-style: the main number, a line under it,
+   and a chart — bars for amounts, a line for weight and mood, dots for the days anything was recorded */
+.sum-period { display: flex; align-items: center; gap: var(--space-1); margin-block: -8px; }
+.sum-period .cur { flex: 1; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sum-period .navbtn { min-width: 44px; justify-content: center; padding: 0; }
+.navbtn:disabled { opacity: .3; cursor: default; }
+.sum-card { padding: 12px var(--space-2) var(--space-2); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sum-head { display: flex; align-items: center; gap: 6px; min-height: 28px; margin: 0; color: var(--sum-c); font-size: var(--t-sub); font-weight: 600; line-height: 1.2; }
+.sum-card .big { font-family: var(--font-round); font-size: var(--t-title1); line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sum-card .big small { margin-inline-start: 4px; font-family: var(--font-body); font-size: var(--t-sub); font-weight: 600; color: var(--muted); }
+.sum-chart { margin-top: 8px; }
+.sum-chart svg { display: block; max-width: 100%; height: auto; }
+.sum-empty { margin: 0; padding: 12px 0 4px; text-align: center; font-size: var(--t-foot); color: var(--muted); }
+.sum-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px 4px; justify-items: center; font-size: var(--t-cap); line-height: 1.2; color: var(--muted); }
+.sum-days i { display: block; width: min(100%, 28px); aspect-ratio: 1; border-radius: 50%; background: var(--fill); }
+.sum-days i.on { background: var(--accent-fill); }
+.sum-days i.today { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent); }
+.sum-days i.later { background: transparent; box-shadow: inset 0 0 0 1px var(--separator); }
+@media (min-width: 480px) { .sum-card.wide { grid-column: 1 / -1; } }
 .group-head { margin: var(--space-1) 0 -8px; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); }
 .group-foot { margin: -8px 0 0; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 
@@ -672,7 +689,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     <!-- iOS-style top bar: a back button on the record pages, and the page title once the large title scrolls under it -->
     <header class="navbar" id="navbar">
       <!-- HIG toolbars: the standard back button is a symbol, not a text label; its name still says where it goes -->
-      <button type="button" class="back" id="backBtn" aria-label="記録に戻る" hidden><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
+      <button type="button" class="back" id="backBtn" aria-label="きょうに戻る" hidden><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
       <span class="navtitle" id="navTitle" aria-hidden="true"></span>
     </header>
 
@@ -758,10 +775,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="list-foot"><button type="button" class="link-btn danger" id="clearDone">完了したものを削除</button></div>
       </section>
 
-      <!-- 記録: the record pages (the iPhone tab bar has room for five tabs) and backup -->
+      <!-- 記録: looking back over the records by week, month or year (the user's call: entries are made from きょう, not here),
+           then backup -->
       <section id="sec-records" style="--sec-c: var(--accent)" hidden>
         <div class="sec-head"><h2>記録</h2></div>
-        <ul class="list card nav-list" id="recordsList"></ul>
+        <div class="seg" role="group" aria-label="集計する期間" id="sumRanges">
+          <button type="button" data-range="week" aria-pressed="false">週</button>
+          <button type="button" data-range="month" aria-pressed="true">月</button>
+          <button type="button" data-range="year" aria-pressed="false">年</button>
+        </div>
+        <div class="sum-period">
+          <button type="button" class="navbtn" id="sumPrev" aria-label="前の期間"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
+          <span class="cur" id="sumLabel" aria-live="polite"></span>
+          <button type="button" class="navbtn" id="sumNext" aria-label="次の期間"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></button>
+        </div>
+        <div class="grid" id="sumCards"></div>
         <h3 class="group-head">バックアップ</h3>
         <ul class="list card">
           <li class="btn-row"><button type="button" class="row-btn" id="exportBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>記録を書き出す</button></li>
@@ -1162,27 +1190,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // ---------- tabs (a sidebar on wide screens) ----------
   const menuEl = $("menu");
   const wideScreen = matchMedia("(min-width: 768px)");
-  let lastRecord = null; // the record page the 記録 tab returns to (HIG: a tab keeps its place while you visit others)
+  let lastRecord = null; // the record page the きょう tab returns to (HIG: a tab keeps its place while you visit others)
   function menuButton(p) {
     return el("button", { type: "button", "data-tab": p.key, style: `--item-f:${p.fill}`, onclick: () => openTab(p.key) },
       el("span", { class: "mi" }, icon(p.icon, 24)), el("span", { class: "lbl" }, p.label));
   }
   setChildren(menuEl, el("ul", {}, TABS.map((p) => el("li", {}, menuButton(p),
-    p.key === "records" ? el("ul", { class: "sub" }, RECORDS.map((r) => el("li", {}, menuButton(r)))) : null))));
+    p.key === "home" ? el("ul", { class: "sub" }, RECORDS.map((r) => el("li", {}, menuButton(r)))) : null))));
   function openTab(key) {
-    // on iPhone the 記録 tab reopens the record page left open there; pressed again from inside, it goes back to its list
-    if (key === "records" && !wideScreen.matches && lastRecord && tab !== "records" && !isRecord(tab)) key = lastRecord;
+    // the record pages open from きょう (entries are made there; 記録 only sums up). On iPhone the きょう tab reopens the record
+    // page left open there; pressed again from inside, it goes back to きょう
+    if (key === "home" && !wideScreen.matches && lastRecord && tab !== "home" && !isRecord(tab)) key = lastRecord;
     // the calendar has no きょうへ button (the user's call): its tab pressed again comes back to today, as iOS tabs reset
     if (key === "calendar" && tab === "calendar") setCalDay(todayKey);
     showTab(key);
   }
-  // opening a record page from 記録 slides it in from the right and the back button slides it away, as iOS navigation
+  // opening a record page from きょう slides it in from the right and the back button slides it away, as iOS navigation
   // does; switching tabs stays instant (HIG: no extra motion for frequent actions). Phones only, never with Reduce Motion.
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let navSeq = 0; // a transition whose update arrives after a newer tap must not undo that tap
   function showTab(key) {
     const seq = ++navSeq;
-    const nav = isRecord(key) && tab === "records" ? "push" : key === "records" && isRecord(tab) ? "pop" : "";
+    const nav = isRecord(key) && tab === "home" ? "push" : key === "home" && isRecord(tab) ? "pop" : "";
     if (!nav || !document.startViewTransition || reduceMotion.matches || wideScreen.matches) { delete document.documentElement.dataset.nav; setTab(key); return; }
     document.documentElement.dataset.nav = nav;
     document.startViewTransition(() => { if (seq === navSeq) setTab(key); })
@@ -1193,11 +1222,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     tab = key;
     document.documentElement.dataset.tab = key; // lets a page drop the top bar (the calendar does)
     if (isRecord(key)) lastRecord = key;
-    else if (key === "records") lastRecord = null;
+    else if (key === "home") lastRecord = null;
     for (const p of PAGES) $("sec-" + p.key).hidden = p.key !== key;
-    // the 記録 tab stays lit on its record pages; aria-current says the same to screen readers
+    // the きょう tab stays lit on its record pages; aria-current says the same to screen readers
     menuEl.querySelectorAll("button[data-tab]").forEach((b) => {
-      const k = b.dataset.tab, within = k === "records" && isRecord(key);
+      const k = b.dataset.tab, within = k === "home" && isRecord(key);
       b.classList.toggle("on", k === key);
       b.classList.toggle("in", within);
       if (k === key) b.setAttribute("aria-current", "page");
@@ -1209,8 +1238,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     window.scrollTo(0, 0);
     watchTitle();
     if (key === "weight") renderWeightChart();
+    if (key === "records") renderSummary();
   }
-  $("backBtn").addEventListener("click", () => showTab("records"));
+  $("backBtn").addEventListener("click", () => showTab("home"));
 
   // the large title folds into the top bar once it has scrolled under it, as iOS navigation bars do
   const navbar = $("navbar"), navTitle = $("navTitle");
@@ -2284,20 +2314,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         null, "goal")
     );
     renderWeek();
-
-    // the 記録 list, iOS Settings style: an icon square, the page, and how it stands today
-    const status = {
-      journal: j ? "きょう：" + (j.mood ? MOODS[j.mood] : "書きました") : "きょうはまだ書いていません",
-      meal: ms.length ? `きょう ${ms.length} 回` + (kcal ? `・${kcal} kcal` : "") : "きょうはまだ記録がありません",
-      workout: `きょう ${mins} 分・この7日間 ${wk.minutes} 分`,
-      weight: wLast ? `${fmtKg(wLast.kg)} kg（${relLabel(wLast.id) || fmtMD(wLast.id)}）` : "まだ記録がありません",
-      money: `今月の支出 ${fmtYen(mon.out)}`,
-    };
-    setChildren($("recordsList"), RECORDS.map((r) => el("li", { class: "btn-row" },
-      el("button", { type: "button", class: "row-btn nav", onclick: () => showTab(r.key) },
-        el("span", { class: "sq", style: `--sq:${r.fill}` }, icon(r.icon, 20)),
-        el("span", { class: "body" }, el("span", { class: "text" }, r.label), el("span", { class: "sub" }, status[r.key])),
-        el("span", { class: "chev" }, icon("next", 16))))));
   }
   function renderWeek() {
     const w = $("week");
@@ -2314,6 +2330,226 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("div", { class: "cells" }, has.map((h, k) => el("i", { class: "cell" + (h ? " on" : ""), style: `--cell-c:${colors[k]}`, title: `${names[k]}：${h ? "あり" : "なし"}` })))
       ));
     }
+  }
+
+  // ---------- 記録: looking back (the user's call: entries are made from きょう; this page only sums up) ----------
+  // the period shown is the week (Sunday first, as the calendar), month or year holding sumAnchor
+  let sumRange = "month", sumAnchor = todayKey;
+  function sumPeriod() {
+    if (sumRange === "week") { const start = addDays(sumAnchor, -parseYmd(sumAnchor).getDay()); return { start, end: addDays(start, 6) }; }
+    if (sumRange === "month") { const ym = monthOf(sumAnchor); return { start: ym + "-01", end: `${ym}-${pad(daysInMonth(ym))}` }; }
+    const y = sumAnchor.slice(0, 4);
+    return { start: `${y}-01-01`, end: `${y}-12-31` };
+  }
+  function sumPeriodLabel({ start, end }) {
+    if (sumRange === "year") return `${start.slice(0, 4)}年`;
+    if (sumRange === "month") return fmtMonth(monthOf(start));
+    const a = parseYmd(start), b = parseYmd(end);
+    return `${a.getMonth() + 1}月${a.getDate()}日〜${a.getMonth() === b.getMonth() ? "" : b.getMonth() + 1 + "月"}${b.getDate()}日`;
+  }
+  // the chart's columns: a day each in a week or a month, a month each in a year
+  function sumBuckets({ start, end }) {
+    if (sumRange === "year") {
+      const y = start.slice(0, 4);
+      return Array.from({ length: 12 }, (_, i) => { const ym = `${y}-${pad(i + 1)}`; return { label: `${i + 1}月`, start: ym + "-01", end: `${ym}-${pad(daysInMonth(ym))}` }; });
+    }
+    const out = [];
+    for (let d = start; d <= end; d = addDays(d, 1)) out.push({ label: sumRange === "week" ? WD[parseYmd(d).getDay()] : String(parseYmd(d).getDate()), start: d, end: d });
+    return out;
+  }
+  // a round step for a chart's scale: 1, 2 or 5 times a power of ten
+  function niceTick(raw) {
+    if (!(raw > 0)) return 1;
+    const p = 10 ** Math.floor(Math.log10(raw)), f = raw / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+  }
+  const fmtYenTick = (v) => (v >= 10000 ? `${+(v / 10000).toFixed(1)}万` : Math.round(v).toLocaleString("ja-JP"));
+  // the frame both charts share: the scale on the trailing side and the day or month names underneath, thinned out
+  // so they never crowd (in a month, every week's first day)
+  function sumFrame(box, buckets, ticks, padR) {
+    const W = Math.max(240, Math.round(box.clientWidth) || 300), H = 150, padL = 2, padT = 10, padB = 22;
+    const g = { W, H, padL, padR, padT, pw: W - padL - padR, ph: H - padT - padB };
+    g.slot = g.pw / buckets.length;
+    g.svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img" });
+    for (const t of ticks) {
+      const y = g.padT + g.ph - t.at * g.ph;
+      g.svg.append(svgEl("line", { class: "gridline", x1: padL, x2: W - padR, y1: y, y2: y }), svgEl("text", { class: "axis-text", x: W - padR + 6, y: y + 4 }, t.label));
+    }
+    const every = sumRange === "month" ? 7 : Math.max(1, Math.ceil(buckets.length / Math.max(1, Math.floor(g.pw / 26))));
+    buckets.forEach((b, i) => { if (i % every === 0) g.svg.append(svgEl("text", { class: "axis-text", x: padL + i * g.slot + g.slot / 2, y: H - 6, "text-anchor": "middle" }, b.label)); });
+    return g;
+  }
+  // amounts per day or month as bars in the record's colour
+  function sumBars(box, buckets, values, color, fmtTick, aria) {
+    if (!values.some((v) => v > 0)) { setChildren(box, el("p", { class: "sum-empty" }, "この期間の記録はありません")); return; }
+    const max = Math.max(...values), step = niceTick(max / 3), top = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = 0; v <= top + step / 2; v += step) ticks.push({ at: v / top, label: fmtTick(v) });
+    const g = sumFrame(box, buckets, ticks, 44);
+    const bw = Math.max(2, Math.min(22, g.slot * 0.62));
+    values.forEach((v, i) => {
+      if (!(v > 0)) return;
+      const h = Math.max(2, (v / top) * g.ph);
+      g.svg.append(svgEl("rect", { x: g.padL + i * g.slot + (g.slot - bw) / 2, y: g.padT + g.ph - h, width: bw, height: h, rx: Math.min(3, bw / 2), style: `fill:${color}` }));
+    });
+    g.svg.setAttribute("aria-label", aria);
+    setChildren(box, g.svg);
+  }
+  // values that come and go (weight, mood) as a line through the days that have one
+  function sumLine(box, buckets, values, color, scale, aria) {
+    if (!values.some((v) => v != null)) { setChildren(box, el("p", { class: "sum-empty" }, scale.empty)); return; }
+    const g = sumFrame(box, buckets, scale.ticks, scale.padR);
+    const pts = [];
+    values.forEach((v, i) => { if (v != null) pts.push({ x: g.padL + i * g.slot + g.slot / 2, y: g.padT + g.ph - scale.at(v) * g.ph }); });
+    if (pts.length > 1) g.svg.append(svgEl("path", { d: pts.map((q, i) => `${i ? "L" : "M"}${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" "), style: `fill:none;stroke:${color};stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round` }));
+    for (const q of pts) g.svg.append(svgEl("circle", { cx: q.x, cy: q.y, r: 3.5, style: `fill:${color};stroke:var(--surface);stroke-width:1.5` }));
+    g.svg.setAttribute("aria-label", aria);
+    setChildren(box, g.svg);
+  }
+  // the days of a week or a month as dots, filled in the tint where anything was recorded
+  function sumDots(box, days, recorded, aria) {
+    const lead = parseYmd(days[0]).getDay();
+    setChildren(box, el("div", { class: "sum-days", role: "img", "aria-label": aria },
+      WD.map((w) => el("span", { "aria-hidden": "true" }, w)),
+      Array.from({ length: lead }, () => el("span", { "aria-hidden": "true" })),
+      days.map((d) => el("i", { class: [recorded.has(d) ? "on" : "", d === todayKey ? "today" : "", d > todayKey ? "later" : ""].filter(Boolean).join(" "), "aria-hidden": "true" }))));
+  }
+  function sumCard(color, iconName, title, big, unit, sub, wide) {
+    const chart = el("div", { class: "sum-chart" });
+    const card = el("div", { class: "card sum-card" + (wide ? " wide" : ""), style: `--sum-c:${color}` },
+      el("h3", { class: "sum-head" }, icon(iconName, 18), el("span", {}, title)),
+      el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
+      sub ? el("div", { class: "sub" }, sub) : null,
+      chart);
+    return { card, chart };
+  }
+  // a day counts as recorded when it has any record: a journal entry, a meal, a workout, a weight or money in or out
+  function recordedDays() {
+    const s = new Set();
+    for (const j of journal.items) s.add(j.date || j.id);
+    for (const x of meals.items) s.add(x.date);
+    for (const x of workouts.items) s.add(x.date);
+    for (const w of sortedWeights()) s.add(w.id);
+    for (const x of expenses.items) s.add(x.date);
+    return s;
+  }
+  // charts measure their cards, so they are drawn only while the page shows (and again when it is opened)
+  function renderSummary() {
+    if (tab !== "records") return;
+    const per = sumPeriod(), buckets = sumBuckets(per), lastDay = per.end < todayKey ? per.end : todayKey;
+    const name = sumPeriodLabel(per), inP = (d) => d >= per.start && d <= per.end;
+    if ($("sumLabel").textContent !== name) $("sumLabel").textContent = name;
+    $("sumNext").disabled = per.end >= todayKey;
+    $("sumRanges").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === sumRange)));
+    const perBucket = (items, dateOf, value) => buckets.map((b) => sum(items.filter((x) => dateOf(x) >= b.start && dateOf(x) <= b.end), value));
+    const cards = [], draws = [];
+
+    // 続けた日
+    const rec = recordedDays();
+    const days = [];
+    for (let d = per.start; d <= per.end; d = addDays(d, 1)) days.push(d);
+    const elapsed = days.filter((d) => d <= lastDay).length;
+    const done = days.filter((d) => d <= lastDay && rec.has(d)).length;
+    let streak = 0;
+    for (let d = rec.has(todayKey) ? todayKey : addDays(todayKey, -1); rec.has(d); d = addDays(d, -1)) streak++;
+    const c1 = sumCard("var(--accent)", "records", "続けた日", String(done), "日 記録した日", `${elapsed} 日中・いまの連続 ${streak} 日`, true);
+    cards.push(c1.card);
+    draws.push(() => sumRange === "year"
+      ? sumBars(c1.chart, buckets, buckets.map((b) => days.filter((d) => d >= b.start && d <= b.end && rec.has(d)).length), "var(--accent-fill)", (v) => String(v), `${name}の記録した日数の棒グラフ。${done}日。`)
+      : sumDots(c1.chart, days, rec, `${name}：${elapsed}日中${done}日記録。`));
+
+    // 日記
+    const js = journal.items.filter((j) => inP(j.date || j.id));
+    const moods = js.filter((j) => j.mood);
+    const avgMood = moods.length ? sum(moods, (j) => j.mood) / moods.length : 0;
+    const c2 = sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日",
+      js.length ? (moods.length ? `気分の平均：${MOODS[Math.round(avgMood)]}` : "気分の記録はありません") : "この期間はまだ書いていません");
+    cards.push(c2.card);
+    draws.push(() => {
+      const vals = buckets.map((b) => { const m = moods.filter((j) => (j.date || j.id) >= b.start && (j.date || j.id) <= b.end); return m.length ? sum(m, (j) => j.mood) / m.length : null; });
+      sumLine(c2.chart, buckets, vals, "var(--c-journal)", {
+        at: (v) => (v - 1) / 4, padR: 58, empty: "気分の記録はまだありません",
+        ticks: [1, 3, 5].map((m) => ({ at: (m - 1) / 4, label: MOODS[m] })),
+      }, `${name}の気分の推移。平均は「${MOODS[Math.round(avgMood)] || "なし"}」。`);
+    });
+
+    // 食事
+    const ms = meals.items.filter((m) => inP(m.date));
+    const kcalDays = new Map();
+    for (const m of ms) if (typeof m.kcal === "number") kcalDays.set(m.date, (kcalDays.get(m.date) || 0) + m.kcal);
+    const avgKcal = kcalDays.size ? sum([...kcalDays.values()], (v) => v) / kcalDays.size : 0;
+    const c3 = sumCard("var(--c-meal)", "meal", "食事", String(ms.length), "回",
+      `${new Set(ms.map((m) => m.date)).size} 日記録` + (kcalDays.size ? `・1日平均 ${Math.round(avgKcal).toLocaleString("ja-JP")} kcal` : ""));
+    cards.push(c3.card);
+    draws.push(() => sumBars(c3.chart, buckets, perBucket(ms, (m) => m.date, () => 1), "var(--c-meal)", (v) => String(v), `${name}の食事の回数の棒グラフ。${ms.length}回。`));
+
+    // 運動
+    const ws = workouts.items.filter((w) => inP(w.date));
+    const wMin = sum(ws, (w) => w.minutes);
+    const c4 = sumCard("var(--c-workout)", "workout", "運動", wMin.toLocaleString("ja-JP"), "分", `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日`);
+    cards.push(c4.card);
+    draws.push(() => sumBars(c4.chart, buckets, perBucket(ws, (w) => w.date, (w) => w.minutes), "var(--c-workout)", (v) => String(v), `${name}の運動時間の棒グラフ。合計${wMin}分。`));
+
+    // 体重
+    const wts = sortedWeights().filter((w) => inP(w.id));
+    const wFirst = wts[0], wLast = wts[wts.length - 1];
+    const c5 = sumCard("var(--c-weight)", "weight", "体重", wLast ? fmtKg(wLast.kg) : "—", wLast ? "kg" : null,
+      !wLast ? "この期間の記録はありません" : wts.length > 1 ? `${fmtMD(wFirst.id)}から ${signed(num(wLast.kg) - num(wFirst.kg))} kg・${wts.length} 回` : `${fmtMD(wLast.id)}の記録`);
+    cards.push(c5.card);
+    draws.push(() => {
+      const vals = buckets.map((b) => { const r = wts.filter((w) => w.id >= b.start && w.id <= b.end); return r.length ? sum(r, (w) => num(w.kg)) / r.length : null; });
+      const have = vals.filter((v) => v != null);
+      let lo = Math.min(...have), hi = Math.max(...have);
+      if (hi - lo < 1) { const mid = (hi + lo) / 2; lo = mid - 0.5; hi = mid + 0.5; }
+      const step = niceTick((hi - lo) / 3), yLo = Math.floor(lo / step) * step, yHi = Math.ceil(hi / step) * step;
+      const ticks = [];
+      for (let v = yLo; v <= yHi + step / 2; v += step) ticks.push({ at: (v - yLo) / (yHi - yLo), label: v.toFixed(step < 1 ? 1 : 0) });
+      sumLine(c5.chart, buckets, vals, "var(--c-weight)", { at: (v) => (v - yLo) / (yHi - yLo), padR: 44, ticks, empty: "この期間の記録はありません" },
+        wLast ? `${name}の体重の推移。${fmtKg(wLast.kg)} kg。` : "");
+    });
+
+    // 家計簿
+    const ex = expenses.items.filter((e) => inP(e.date));
+    const outs = ex.filter((e) => e.kind !== "in"), ins = ex.filter((e) => e.kind === "in");
+    const out = sum(outs, (e) => e.amount), inn = sum(ins, (e) => e.amount), net = inn - out;
+    const c6 = sumCard("var(--c-money)", "money", "家計簿", Math.round(out).toLocaleString("ja-JP"), "円 支出",
+      `収入 ${fmtYen(inn)}・収支 ${net > 0 ? "+" : ""}${fmtYen(net)}`);
+    cards.push(c6.card);
+    draws.push(() => {
+      sumBars(c6.chart, buckets, perBucket(outs, (e) => e.date, (e) => e.amount), "var(--c-money)", fmtYenTick, `${name}の支出の棒グラフ。合計${fmtYen(out)}。`);
+      // where the money went: the three largest categories, as on the 家計簿 page
+      const byCat = new Map();
+      for (const e of outs) byCat.set(e.category || "未分類", (byCat.get(e.category || "未分類") || 0) + num(e.amount));
+      const top = [...byCat.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+      if (top.length) c6.chart.append(el("div", { style: "margin-top:8px" }, top.map(([cat, amt]) => el("div", { class: "cat-row", style: "padding-inline:0" },
+        el("span", { class: "cat" }, cat),
+        el("div", { class: "cat-track" }, el("div", { class: "cat-bar", style: `width:${Math.max(1, (amt / top[0][1]) * 100)}%` })),
+        el("span", { class: "amount" }, fmtYen(amt))))));
+    });
+
+    setChildren($("sumCards"), cards);
+    for (const draw of draws) draw();
+  }
+  $("sumRanges").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-range]");
+    if (!b || b.dataset.range === sumRange) return;
+    sumRange = b.dataset.range;
+    renderSummary();
+  });
+  $("sumPrev").addEventListener("click", () => { sumAnchor = addDays(sumPeriod().start, -1); renderSummary(); });
+  $("sumNext").addEventListener("click", () => {
+    const next = addDays(sumPeriod().end, 1);
+    if (next > todayKey) return;
+    sumAnchor = next;
+    if (sumPeriod().end >= todayKey) sumAnchor = todayKey; // back at the present: 週 and 月 then mean this week and this month
+    renderSummary();
+  });
+  if ("ResizeObserver" in window) {
+    let last = 0;
+    new ResizeObserver(() => {
+      const w = $("sumCards").clientWidth;
+      if (w && w !== last) { last = w; renderSummary(); }
+    }).observe($("sumCards"));
   }
 
   // ---------- 記録の書き出し・読み込み ----------
@@ -2470,7 +2706,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup();
+    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup(); renderSummary();
   }
   const initial = (location.hash || "").slice(1);
   showTab(PAGES.some((p) => p.key === initial) ? initial : "home");
