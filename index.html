@@ -58,11 +58,12 @@
   --c-weight: #564ade;      /* indigo */
   --c-money: #a16a00;       /* yellow */
   --c-goal: #008575;        /* mint */
+  --c-routine: #4f7a00;     /* olive (lime) */
   --sat: #1662de;           /* Saturdays in the calendar: blue, 4.5:1 even on the chosen day's tint */
   /* behind white glyphs and text (icon squares, selected chips): the same in both modes, each 4.5:1 with white */
   --f-home: #007d2e; --f-records: #6c6c70;
   --f-todo: #1e6ef4; --f-cal: #b02fc2; --f-journal: #956d51; --f-meal: #c55300;
-  --f-workout: #007eae; --f-study: #e7124d; --f-weight: #564ade; --f-money: #a16a00; --f-goal: #008575;
+  --f-workout: #007eae; --f-study: #e7124d; --f-weight: #564ade; --f-money: #a16a00; --f-goal: #008575; --f-routine: #4f7a00;
   /* event label hues, the user's pick among iOS system colours: --lc-* for dots and light tints (follows dark mode),
      --lf-* behind white text (the same in both modes, 4.5:1 with white) */
   --lc-red: #e9152d; --lc-orange: #c55300; --lc-yellow: #a16a00; --lc-green: #008932; --lc-cyan: #007eae;
@@ -99,7 +100,7 @@
     --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
     --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
     --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-study: #ff375f; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --sat: #5cb8ff;
+    --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-study: #ff375f; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --c-routine: #9ad23a; --sat: #5cb8ff;
     --lc-red: #ff4245; --lc-orange: #ff9230; --lc-yellow: #ffd600; --lc-green: #30d158; --lc-cyan: #3cd3fe; --lc-blue: #0091ff; --lc-purple: #db34f2; --lc-pink: #ff375f; --lc-brown: #b78a66; --lc-gray: #8e8e93;
     color-scheme: dark;
   }
@@ -111,7 +112,7 @@
   --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
   --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
   --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-study: #ff375f; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --sat: #5cb8ff;
+  --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-study: #ff375f; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --c-routine: #9ad23a; --sat: #5cb8ff;
   --lc-red: #ff4245; --lc-orange: #ff9230; --lc-yellow: #ffd600; --lc-green: #30d158; --lc-cyan: #3cd3fe; --lc-blue: #0091ff; --lc-purple: #db34f2; --lc-pink: #ff375f; --lc-brown: #b78a66; --lc-gray: #8e8e93;
   color-scheme: dark;
 }
@@ -123,7 +124,7 @@
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --muted: #c7c7cc; --line: #aeaeb2; --accent: #4ad968;
-    --c-todo: #5cb8ff; --c-cal: #ea8dff; --c-journal: #dba679; --c-meal: #ffa056; --c-workout: #6dd9ff; --c-study: #ff8aa9; --c-weight: #a7aaff; --c-money: #fedf43; --c-goal: #54dfcb;
+    --c-todo: #5cb8ff; --c-cal: #ea8dff; --c-journal: #dba679; --c-meal: #ffa056; --c-workout: #6dd9ff; --c-study: #ff8aa9; --c-weight: #a7aaff; --c-money: #fedf43; --c-goal: #54dfcb; --c-routine: #b5e46a;
   }
 }
 
@@ -391,6 +392,9 @@ ul.list li.dayhead::before, ul.list li.dayhead + li::before { display: none; }
 li.done .check circle { fill: var(--f-todo); stroke: var(--f-todo); }
 li.done .check path { fill: #ffffff; }
 li.done .text { color: var(--muted); text-decoration: line-through; }
+/* ルーティーン: a done item fills its check in the record's colour; no strike-through, it's a habit kept, not a task gone */
+#rtList li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
+#rtList li.done .text { color: var(--fg); text-decoration: none; }
 
 /* journal */
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1) var(--space-2); flex-wrap: wrap; }
@@ -710,6 +714,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-meal" viewBox="0 0 24 24"><path d="M5.25 2.75a.75.75 0 0 1 .75.75V8h1V3.5a.75.75 0 0 1 1.5 0V8h1V3.5a.75.75 0 0 1 1.5 0V9a3 3 0 0 1-2.25 2.9v8.6a1 1 0 1 1-2 0v-8.6A3 3 0 0 1 4.5 9V3.5a.75.75 0 0 1 .75-.75ZM17 2.75c1.79 0 3 2.46 3 6.25 0 1.69-.63 2.86-1.75 3.4v8.1a1 1 0 1 1-2 0V3.6c0-.47.33-.85.75-.85Z"/></symbol>
   <symbol id="i-workout" viewBox="0 0 24 24"><path d="M5.25 6h1A1.75 1.75 0 0 1 8 7.75V11h8V7.75A1.75 1.75 0 0 1 17.75 6h1a1.75 1.75 0 0 1 1.75 1.75V9h.25a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-.25v1.25A1.75 1.75 0 0 1 18.75 18h-1A1.75 1.75 0 0 1 16 16.25V13H8v3.25A1.75 1.75 0 0 1 6.25 18h-1a1.75 1.75 0 0 1-1.75-1.75V15h-.25a1.5 1.5 0 0 1-1.5-1.5v-3A1.5 1.5 0 0 1 3.25 9h.25V7.75A1.75 1.75 0 0 1 5.25 6Z"/></symbol>
   <symbol id="i-study" viewBox="0 0 24 24"><path d="M3.4 20.6 4.5 15.9 15 5.4 18.6 9 8.1 19.5Z"/><path d="M16.1 4.3 17.3 3.1A1.7 1.7 0 0 1 19.7 3.1L20.9 4.3A1.7 1.7 0 0 1 20.9 6.7L19.7 7.9Z"/></symbol>
+  <!-- ルーティーン: a turning arrow round a check, drawn for this app -->
+  <symbol id="i-routine" viewBox="0 0 24 24"><path d="M20.22 9.01A8.75 8.75 0 1 1 12 3.25V5.25A6.75 6.75 0 1 0 18.34 9.69Z"/><path d="M12 .9 16 4.25 12 7.6Z"/><path d="M10.6 15.6 7.6 12.6l1.2-1.2 1.8 1.8 4.6-4.6 1.2 1.2-5.8 5.8Z"/></symbol>
   <symbol id="i-weight" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm1.25 7.5h7.5a3.75 3.75 0 0 0-7.5 0Z"/><path d="m11.4 10.1 1.6-2.75a.6.6 0 0 1 1.04.6l-1.6 2.75a.6.6 0 0 1-1.04-.6Z"/></symbol>
   <symbol id="i-money" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19ZM8.3 6.9l1.3-.9 2.4 3.5 2.4-3.5 1.3.9-2.6 3.8H15v1.5h-2.25v1.2H15v1.5h-2.25V18h-1.5v-3.1H9v-1.5h2.25v-1.2H9v-1.5h1.9L8.3 6.9Z"/></symbol>
   <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .53.22l3.25 3.25a.75.75 0 0 1-1.06 1.06l-1.97-1.97v9.44a.75.75 0 0 1-1.5 0V4.81L9.28 6.78a.75.75 0 0 1-1.06-1.06l3.25-3.25A.75.75 0 0 1 12 2.25ZM6.5 9.5h2a.75.75 0 0 1 0 1.5h-2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.75.75 0 0 1 0-1.5h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/></symbol>
@@ -902,6 +908,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </form>
         <ul class="list card" id="studyList"></ul>
         <div class="muted small" id="studyTotal"></div>
+      </section>
+
+      <!-- ルーティーン: the user's own list of things to do every day, checked off day by day (the user's call: a daily
+           checklist, the same items every day, one list) -->
+      <section id="sec-routine" style="--sec-c: var(--c-routine)" hidden>
+        <div class="sec-head"><h2>ルーティーン</h2><div class="datenav"></div></div>
+        <div class="card">
+          <div class="card-head row-between"><span id="rtHead">きょうのルーティーン</span><span class="muted small" id="rtCount"></span></div>
+          <ul class="list" id="rtList"></ul>
+        </div>
+        <form class="add" id="rtForm" autocomplete="off">
+          <input type="text" id="rtName" class="full" placeholder="新しい項目" aria-label="新しい項目" maxlength="40" required>
+          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
+        </form>
+        <p class="group-foot">× を2回押すと、その項目を消します。</p>
       </section>
 
       <!-- 体重 -->
@@ -1187,6 +1208,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     { key: "meal", label: "食事", icon: "meal", fill: "var(--f-meal)" },
     { key: "workout", label: "運動", icon: "workout", fill: "var(--f-workout)" },
     { key: "study", label: "勉強", icon: "study", fill: "var(--f-study)" },
+    { key: "routine", label: "ルーティーン", icon: "routine", fill: "var(--f-routine)" },
     { key: "weight", label: "体重", icon: "weight", fill: "var(--f-weight)" },
     { key: "money", label: "家計簿", icon: "money", fill: "var(--f-money)" },
   ];
@@ -1243,7 +1265,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const labels = new Store("labels"); // the user's categories for events
   const study = new Store("study"); // time studied: {date, minutes, subjectId?, note?}
   const subjects = new Store("subjects"); // the user's subjects for study, with a colour each, like the labels
-  const ALL_STORES = [todos, journal, meals, workouts, weights, expenses, goals, settings, events, labels, study, subjects];
+  const routines = new Store("routines"); // the user's own things to do every day: {name, createdAt}
+  const routineDays = new Store("routineDays"); // one entry a day, id = the date: {date, done: [routine ids]}
+  const ALL_STORES = [todos, journal, meals, workouts, weights, expenses, goals, settings, events, labels, study, subjects, routines, routineDays];
 
   const statusEl = $("status");
   let statusTimer = null;
@@ -1628,6 +1652,48 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   $("studySettings").addEventListener("click", (ev) => openSettings(ev.detail === 0, "study"));
   $("subjectAdd").addEventListener("click", () => addTag(subjects, $("subjectList"), "新しい科目"));
+
+  // ---------- ルーティーン ----------
+  // a checklist of the user's own, the same every day (the user's call: daily, no weekdays, no groups), checked off for the
+  // day shown; each item says how many days in a row it has been done
+  const sortedRoutines = () => [...routines.items].sort((a, b) => num(a.createdAt) - num(b.createdAt));
+  const routineDone = (date) => new Set((routineDays.get(date)?.done || []).filter((id) => routines.get(id)));
+  // days in a row up to the day shown; today not done yet doesn't break the run until the day is over
+  function routineStreak(id, date) {
+    const doneOn = (d) => (routineDays.get(d)?.done || []).includes(id);
+    let n = 0;
+    for (let d = doneOn(date) ? date : date === todayKey ? addDays(date, -1) : null; d && doneOn(d); d = addDays(d, -1)) n++;
+    return n;
+  }
+  function toggleRoutine(id) {
+    const date = viewDate, done = new Set(routineDays.get(date)?.done || []);
+    if (done.has(id)) done.delete(id); else done.add(id);
+    act(() => (done.size ? routineDays.set(date, { date, done: [...done], updatedAt: Date.now() }) : routineDays.remove(date)));
+  }
+  $("rtForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const name = $("rtName").value.trim();
+    if (!name) return;
+    act(() => routines.add({ name, createdAt: Date.now() }));
+    $("rtName").value = ""; $("rtName").focus();
+  });
+  function renderRoutine() {
+    const items = sortedRoutines(), done = routineDone(viewDate);
+    $("rtHead").textContent = viewDate === todayKey ? "きょうのルーティーン" : `${fmtMDW(viewDate)}のルーティーン`;
+    $("rtCount").textContent = items.length ? `${items.filter((r) => done.has(r.id)).length} / ${items.length}` : "";
+    const list = $("rtList");
+    list.replaceChildren();
+    if (!items.length) { list.append(el("li", { class: "empty" }, "まだ項目がありません。下の欄から、毎日やることを追加してください。")); return; }
+    for (const r of items) {
+      const on = done.has(r.id), streak = routineStreak(r.id, viewDate);
+      list.append(el("li", { class: on ? "done" : "" },
+        el("button", { type: "button", class: "check", "aria-label": on ? `「${r.name}」のチェックを外す` : `「${r.name}」をやった`, onclick: () => toggleRoutine(r.id) }, checkMark()),
+        el("span", { class: "body" }, el("span", { class: "text" }, r.name)),
+        streak >= 2 ? el("span", { class: "num" }, `${streak}日連続`) : null,
+        delButton(() => act(() => routines.remove(r.id)))
+      ));
+    }
+  }
 
   // ---------- 体重 ----------
   let wtRange = 30, wtHover = -1, wtPts = [], wtOverlay = null;
@@ -2644,6 +2710,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const mins = sum(ws, (w) => w.minutes);
     const wk = weekMinutes();
     const sts = study.items.filter((x) => x.date === todayKey), stMins = sum(sts, (x) => x.minutes), stWk = studyWeek();
+    const rts = sortedRoutines(), rtDone = routineDone(todayKey), rtLeft = rts.filter((r) => !rtDone.has(r.id));
     const wts = sortedWeights();
     const wLast = wts[wts.length - 1], wPrev = wts[wts.length - 2];
     const mon = monthSummary(monthOf(todayKey));
@@ -2670,6 +2737,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         `きょう ${ws.length} 件・この7日間 ${wk.minutes} 分（${wk.days} 日）`, null, "workout"),
       tile("var(--c-study)", "勉強", String(stMins), "分",
         `きょう ${sts.length} 件・この7日間 ${stWk.minutes} 分（${stWk.days} 日）`, null, "study"),
+      tile("var(--c-routine)", "ルーティーン", rts.length ? String(rts.length - rtLeft.length) : "まだ", rts.length ? `/ ${rts.length} できた` : null,
+        !rts.length ? "毎日やることを登録して、チェックしていきましょう。"
+          : rtLeft.length ? `残り：${rtLeft.slice(0, 3).map((r) => r.name).join("・")}${rtLeft.length > 3 ? " ほか" : ""}` : "全部できました", null, "routine"),
       tile("var(--c-weight)", "体重", wLast ? fmtKg(wLast.kg) : "未記録", wLast ? "kg" : null,
         wLast
           ? (wLast.id === todayKey ? "きょう記録済み" : `${relLabel(wLast.id) || fmtMD(wLast.id)}の記録`) + (wPrev ? `・前回比 ${signed(num(wLast.kg) - num(wPrev.kg))} kg` : "")
@@ -2691,6 +2761,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const x of meals.items) s.add(x.date);
     for (const x of workouts.items) s.add(x.date);
     for (const x of study.items) s.add(x.date);
+    for (const x of routineDays.items) if (x.done?.length) s.add(x.date);
     for (const w of sortedWeights()) s.add(w.id);
     for (const x of expenses.items) s.add(x.date);
     return s;
@@ -2759,6 +2830,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const byCat = new Map();
     for (const e of outs) byCat.set(e.category || "未分類", (byCat.get(e.category || "未分類") || 0) + num(e.amount));
 
+    // ルーティーン: every check so far, on how many days, and the items done most
+    const rtDays = routineDays.items.filter((x) => x.date <= todayKey && x.done?.length);
+    const byRoutine = new Map();
+    for (const x of rtDays) for (const id of x.done) { const r = routines.get(id); if (r) byRoutine.set(r.name, (byRoutine.get(r.name) || 0) + 1); }
+
     setChildren($("sumCards"),
       sumCard("var(--accent)", "records", "続けた日", String(rec.length), "日 記録した日", `いまの連続 ${streak} 日・いちばん長い連続 ${longest} 日`, true),
       sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日", js.length ? null : "まだ書いていません", false, null, "journal"),
@@ -2767,6 +2843,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       sumCard("var(--c-workout)", "workout", "運動", ...durBig(wMin), `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日`, false, null, "workout"),
       sumCard("var(--c-study)", "study", "勉強", ...durBig(stMin), `${sts.length} 回・${new Set(sts.map((x) => x.date)).size} 日`, false,
         topList(bySub, subColor, durText), "study"),
+      sumCard("var(--c-routine)", "routine", "ルーティーン", sum(rtDays, (x) => x.done.length).toLocaleString("ja-JP"), "回 できた",
+        rtDays.length ? `${rtDays.length} 日チェック` : "まだチェックしていません", false, topList(byRoutine, () => "var(--c-routine)", (n) => `${n} 回`), "routine"),
       sumCard("var(--c-weight)", "weight", "体重", wLast ? fmtKg(wLast.kg) : "—", wLast ? "kg" : null,
         !wLast ? "まだ記録がありません" : wts.length > 1
           ? `はじめ（${fmtMD(wFirst.id)}）の ${fmtKg(wFirst.kg)} kg から ${signed(num(wLast.kg) - num(wFirst.kg))} kg・${wts.length} 回`
@@ -2791,6 +2869,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       lines: (xs) => byCreated(xs).map((w) => recLine(null, [w.type, w.note].filter(Boolean).join("・"), `${num(w.minutes)} 分`)) },
     study: { label: "勉強", items: () => study.items,
       lines: (xs) => byCreated(xs).map((x) => { const sub = subjectOf(x); return recLine(sub ? sub.name : "科目なし", x.note, `${num(x.minutes)} 分`, sub ? labelHue(sub) : "var(--c-study)"); }) },
+    routine: { label: "ルーティーン", items: () => routineDays.items.filter((x) => x.done?.length),
+      lines: (xs) => xs.map((x) => recLine(null, x.done.map((id) => routines.get(id)?.name).filter(Boolean).join("・") || "（消した項目）", `${x.done.length} 項目`)) },
     weight: { label: "体重", items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
       lines: (xs) => xs.map((w) => recLine(null, `${fmtKg(w.kg)} kg`)) },
     money: { label: "家計簿", items: () => expenses.items,
@@ -2976,7 +3056,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderStudy(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup(); renderSummary(); paintChart(); if (tab === "reclist") renderRecList();
+    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderStudy(); renderRoutine(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup(); renderSummary(); paintChart(); if (tab === "reclist") renderRecList();
   }
   const initial = (location.hash || "").slice(1);
   // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
