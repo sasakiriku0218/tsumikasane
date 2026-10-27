@@ -377,7 +377,7 @@ ul.list li.dayhead::before, ul.list li.dayhead + li::before { display: none; }
   ul.list > li:has(> .chip, > .datecell, > .num, > .amount) > .del { margin-inline-start: auto; }
 }
 .empty { display: block; padding: var(--space-3) var(--space-2); text-align: center; color: var(--muted); }
-.empty .phrase { display: inline-block; }  /* a sentence kept whole, so the line breaks between sentences */
+.phrase { display: inline-block; }  /* a sentence kept whole, so the line breaks between sentences */
 .note { padding: var(--space-1) var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 /* delete: × first, then a red 削除する capsule to confirm (destructive role) */
 .del { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 44px; margin-inline-end: -10px; padding: 0 10px; background: transparent; border: 0; border-radius: 999px; color: var(--muted); cursor: pointer; line-height: 1; }
@@ -394,7 +394,9 @@ li.done .check path { fill: #ffffff; }
 li.done .text { color: var(--muted); text-decoration: line-through; }
 /* ルーティーン: a done item fills its check in the record's colour; no strike-through, it's a habit kept, not a task gone */
 #rtList li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
-#rtList li.done .text { color: var(--fg); text-decoration: none; }
+/* an item's name is typed over where it stands, as in Reminders; it reads as plain text until tapped */
+.rt-name { display: block; width: calc(100% + 12px); min-width: 0; margin: -4px -6px; padding: 4px 6px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; line-height: 1.3; }
+.rt-name:focus { background: var(--fill); }
 
 /* journal */
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1) var(--space-2); flex-wrap: wrap; }
@@ -919,7 +921,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <input type="text" id="rtName" class="full" placeholder="新しい項目" aria-label="新しい項目" maxlength="40" required>
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
-        <p class="group-foot">× を2回押すと、その項目を消します。</p>
+        <p class="group-foot"><span class="phrase">名前はタップすると書きかえられます。</span><span class="phrase">× を2回押すと、その項目を消します。</span></p>
       </section>
 
       <!-- 体重 -->
@@ -1673,6 +1675,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (done.has(id)) done.delete(id); else done.add(id);
     act(() => (done.size ? routineDays.set(date, { date, done: [...done], updatedAt: Date.now() }) : routineDays.remove(date)));
   }
+  // an item's name changed where it stands (the user's call); emptied, it keeps its old name. The item stays the same one,
+  // so its days and its run of days carry on
+  function renameRoutine(r, input) {
+    const name = input.value.trim();
+    if (!name) { input.value = r.name; return; }
+    if (name !== r.name) act(() => routines.update(r.id, { name }));
+  }
   $("rtForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const name = $("rtName").value.trim();
@@ -1691,7 +1700,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const on = done.has(r.id), streak = routineStreak(r.id, viewDate);
       list.append(el("li", { class: on ? "done" : "" },
         el("button", { type: "button", class: "check", "aria-label": on ? `「${r.name}」のチェックを外す` : `「${r.name}」をやった`, onclick: () => toggleRoutine(r.id) }, checkMark()),
-        el("span", { class: "body" }, el("span", { class: "text" }, r.name)),
+        el("span", { class: "body" }, el("input", { type: "text", class: "rt-name", value: r.name, maxlength: 40, "aria-label": "項目の名前",
+          onchange: (ev) => renameRoutine(r, ev.target), onkeydown: (ev) => { if (ev.key === "Enter" && !ev.isComposing) ev.target.blur(); } })),
         streak >= 2 ? el("span", { class: "num" }, `${streak}日連続`) : null,
         delButton(() => act(() => routines.remove(r.id)))
       ));
