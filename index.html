@@ -252,6 +252,7 @@ html[data-tab="calendar"] .wrap { padding-top: max(var(--space-1), env(safe-area
   .wrap { max-width: 760px; padding: 0 var(--space-4) var(--space-8); }
   .navbar { padding-inline: var(--space-3); }
   .back { display: none; }
+  html[data-tab="reclist"] .back { display: grid; }
 }
 
 /* ---------- pages ---------- */
@@ -629,8 +630,9 @@ ul.list > li.btn-row { padding: 0; }
 .sum-list .name { min-width: 0; overflow-wrap: anywhere; }
 .sum-list .amount { margin-inline-start: auto; flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
 .sum-empty { margin: 0; padding: 12px 0 4px; text-align: center; font-size: var(--t-foot); color: var(--muted); }
-/* a card opens its record's entries in the sheet (the user's call: what was written, not only how many days); the whole
-   card is the button, as the tiles on きょう are */
+/* a card opens its record's entries on a page of their own that slides in from the right, as a record page does from
+   きょう (the user's call: what was written, not only how many days, and no sheet from below); the whole card is the
+   button, as the tiles on きょう are */
 .sum-card { position: relative; }
 .sum-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .sum-open::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius); }
@@ -639,6 +641,7 @@ ul.list > li.btn-row { padding: 0; }
 .sum-card:has(.sum-open:active) { background: color-mix(in srgb, var(--fg) 6%, var(--surface)); }
 /* the entries, a row per day under its month: the date level with the first line, then each entry as written, its kind
    in grey at the start and its number kept to the right */
+.rec-groups { display: flex; flex-direction: column; gap: var(--space-2); }
 ul.list.rec-list > li { align-items: baseline; }
 ul.list.rec-list > li > .body { order: 0; }  /* with large text the date stays above its entries, not under them */
 .rec-list .body { gap: 6px; }
@@ -670,7 +673,8 @@ ul.list.rec-list > li > .body { order: 0; }  /* with large text the date stays a
 .backup-nudge { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); }
 .backup-nudge strong { font-weight: 600; }
 .backup-nudge .nudge-text { font-size: var(--t-sub); line-height: 1.45; color: var(--muted); }
-/* iOS-style push and pop between 記録 and a record page; the script only starts it on phones without Reduce Motion */
+/* iOS-style push and pop between a page and the one under it (きょう and a record page, 記録 and a record's entries);
+   the script only starts it on phones without Reduce Motion */
 .menu { view-transition-name: tabbar; }
 .navbar { view-transition-name: topbar; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .32s; animation-timing-function: cubic-bezier(.25, .9, .3, 1); }
@@ -814,6 +818,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </ul>
         <p class="group-foot" id="storeNote"></p>
         <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </section>
+
+      <!-- 記録 › a record's entries, read-only, newest first by month: opened from its card on 記録, sliding in from the right -->
+      <section id="sec-reclist" hidden>
+        <div class="sec-head"><h2 id="recListTitle"></h2><p class="sum-since" id="recListNote"></p></div>
+        <div class="rec-groups" id="recList"></div>
       </section>
 
       <!-- 日記: the writing only, under 「ひとこと」 (the user's call: no mood scale of つらい … 最高) -->
@@ -991,8 +1001,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 </div>
 
 <!-- a day's plans in an iOS-style sheet: a tap on a day in the month opens it, and they are added, changed and deleted here.
-     The gears open their settings in it, 目標's ＋ a new goal's form, a goal in the list its mandala chart, and a card on
-     記録 that record's entries -->
+     The gears open their settings in it, 目標's ＋ a new goal's form, and a goal in the list its mandala chart -->
 <dialog class="sheet" id="daySheet" aria-labelledby="sheetTitle">
   <div class="sheet-head" id="sheetHead">
     <button type="button" class="sheet-btn start" id="sheetCancel" hidden>キャンセル</button>
@@ -1089,8 +1098,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="card"><button type="button" class="link-btn danger sheet-del" id="mDelete">この目標を削除</button></div>
       </div>
     </div>
-    <!-- a record's entries, from its card on 記録: read-only like the rest of 記録, newest first, by month -->
-    <div class="sheet-view" id="recordsView" hidden></div>
   </div>
   <div class="toast" id="sheetStatus" role="status"></div>
 </dialog>
@@ -1185,6 +1192,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   ];
   const PAGES = [...TABS, ...RECORDS];
   const isRecord = (key) => RECORDS.some((r) => r.key === key);
+  // a page a level down, under a tab, outside the menu: a record's entries under 記録
+  const SUBPAGES = [{ key: "reclist", parent: "records" }];
+  // the page a page sits under: きょう for the record pages, 記録 for a record's entries
+  const parentOf = (key) => (isRecord(key) ? "home" : SUBPAGES.find((p) => p.key === key)?.parent || null);
   const SLOTS = ["朝食", "昼食", "夕食", "間食"];
 
   let tab = "home";
@@ -1284,6 +1295,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const menuEl = $("menu");
   const wideScreen = matchMedia("(min-width: 768px)");
   let lastRecord = null; // the record page the きょう tab returns to (HIG: a tab keeps its place while you visit others)
+  let recListKind = null; // the record whose entries show under 記録; the 記録 tab returns to them the same way
   function menuButton(p) {
     return el("button", { type: "button", "data-tab": p.key, style: `--item-f:${p.fill}`, onclick: () => openTab(p.key) },
       el("span", { class: "mi" }, icon(p.icon, 24)), el("span", { class: "lbl" }, p.label));
@@ -1294,17 +1306,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // the record pages open from きょう (entries are made there; 記録 only sums up). On iPhone the きょう tab reopens the record
     // page left open there; pressed again from inside, it goes back to きょう
     if (key === "home" && !wideScreen.matches && lastRecord && tab !== "home" && !isRecord(tab)) key = lastRecord;
+    if (key === "records" && !wideScreen.matches && recListKind && tab !== "records" && tab !== "reclist") key = "reclist";
     // the calendar has no きょうへ button (the user's call): its tab pressed again comes back to today, as iOS tabs reset
     if (key === "calendar" && tab === "calendar") setCalDay(todayKey);
     showTab(key);
   }
-  // opening a record page from きょう slides it in from the right and the back button slides it away, as iOS navigation
-  // does; switching tabs stays instant (HIG: no extra motion for frequent actions). Phones only, never with Reduce Motion.
+  // opening a page from the one above it (a record page from きょう, a record's entries from 記録) slides it in from the
+  // right and the back button slides it away, as iOS navigation does; switching tabs stays instant (HIG: no extra motion
+  // for frequent actions). Phones only, never with Reduce Motion.
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let navSeq = 0; // a transition whose update arrives after a newer tap must not undo that tap
   function showTab(key) {
     const seq = ++navSeq;
-    const nav = isRecord(key) && tab === "home" ? "push" : key === "home" && isRecord(tab) ? "pop" : "";
+    const nav = parentOf(key) === tab ? "push" : parentOf(tab) === key ? "pop" : "";
     if (!nav || !document.startViewTransition || reduceMotion.matches || wideScreen.matches) { delete document.documentElement.dataset.nav; setTab(key); return; }
     document.documentElement.dataset.nav = nav;
     document.startViewTransition(() => { if (seq === navSeq) setTab(key); })
@@ -1316,24 +1330,30 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     document.documentElement.dataset.tab = key; // lets a page drop the top bar (the calendar does)
     if (isRecord(key)) lastRecord = key;
     else if (key === "home") lastRecord = null;
-    for (const p of PAGES) $("sec-" + p.key).hidden = p.key !== key;
-    // the きょう tab stays lit on its record pages; aria-current says the same to screen readers
+    if (key === "records") recListKind = null;
+    for (const p of [...PAGES, ...SUBPAGES]) $("sec-" + p.key).hidden = p.key !== key;
+    // a tab stays lit on the pages under it (きょう on its record pages, 記録 on a record's entries); aria-current says
+    // the same to screen readers
+    const parent = parentOf(key);
     menuEl.querySelectorAll("button[data-tab]").forEach((b) => {
-      const k = b.dataset.tab, within = k === "home" && isRecord(key);
-      b.classList.toggle("on", k === key);
+      // a record's entries have no item of their own in the sidebar, so 記録 stands lit for them there
+      const k = b.dataset.tab, within = k === parent;
+      b.classList.toggle("on", k === key || (within && !isRecord(key)));
       b.classList.toggle("in", within);
       if (k === key) b.setAttribute("aria-current", "page");
       else if (within) b.setAttribute("aria-current", "true");
       else b.removeAttribute("aria-current");
     });
-    $("backBtn").hidden = !isRecord(key);
+    $("backBtn").hidden = !parent;
+    if (parent) $("backBtn").setAttribute("aria-label", PAGES.find((p) => p.key === parent).label + "に戻る");
     try { history.replaceState(null, "", "#" + key); } catch {}
     window.scrollTo(0, 0);
     watchTitle();
     if (key === "weight") renderWeightChart();
     if (key === "records") renderSummary();
+    if (key === "reclist") renderRecList();
   }
-  $("backBtn").addEventListener("click", () => showTab("home"));
+  $("backBtn").addEventListener("click", () => { const up = parentOf(tab); if (up) showTab(up); });
 
   // the large title folds into the top bar once it has scrolled under it, as iOS navigation bars do
   const navbar = $("navbar"), navTitle = $("navTitle");
@@ -2175,13 +2195,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let goalNew = false; // the sheet holds a new goal's form, opened from 目標's ＋
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
   let chartDraft = null, composing = false, mDelTimer = null; // a cell's text not saved yet; a kana conversion under way
-  let recordsKind = null, recordsReturn = null; // the record whose entries the sheet lists (from 記録), and its card
-  // what the sheet holds, one view at a time: a new goal, a goal's chart, a record's entries, the settings, an event's
-  // edit form, or (by default) a day's plans
-  const SHEET_VIEWS = { goal: "goalView", chart: "mandalaView", records: "recordsView", settings: "settingsView", edit: "editView", day: "dayView" };
-  const sheetMode = () => (goalNew ? "goal" : mandalaGoal ? "chart" : recordsKind ? "records" : settingsFrom ? "settings" : editingId ? "edit" : "day");
-  // the bar on top: 完了 over the day's list, the settings, a chart and a record's entries; キャンセル and 保存 over an
-  // event's edit form, as iOS edit sheets have, and キャンセル and 追加 over a new goal; 戻る over the settings when a day's
+  // what the sheet holds, one view at a time: a new goal, a goal's chart, the settings, an event's edit form, or (by
+  // default) a day's plans
+  const SHEET_VIEWS = { goal: "goalView", chart: "mandalaView", settings: "settingsView", edit: "editView", day: "dayView" };
+  const sheetMode = () => (goalNew ? "goal" : mandalaGoal ? "chart" : settingsFrom ? "settings" : editingId ? "edit" : "day");
+  // the bar on top: 完了 over the day's list, the settings and a chart; キャンセル and 保存 over an event's edit form, as iOS edit sheets have, and キャンセル and 追加 over a new goal; 戻る over the settings when a day's
   // sheet led to them, and over a chart's cell to go back out of it
   function syncSheetHead() {
     const mode = sheetMode();
@@ -2191,7 +2209,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("sheetCancel").hidden = !(mode === "edit" || mode === "goal" || (mode === "chart" && mPath.length) || (mode === "settings" && settingsFrom === "day"));
     $("sheetCancel").textContent = mode === "edit" || mode === "goal" ? "キャンセル" : "戻る";
     const rel = mode === "day" ? relLabel(calDay) : "";
-    $("sheetTitle").textContent = mode === "goal" ? "新しい目標" : mode === "chart" ? chartTitle() : mode === "records" ? recordsTitle()
+    $("sheetTitle").textContent = mode === "goal" ? "新しい目標" : mode === "chart" ? chartTitle()
       : mode === "settings" ? "設定" : mode === "edit" ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
   }
   // a closed sheet's starting state: no animation or drag left over, the day's list showing
@@ -2201,7 +2219,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     sheetAnims = []; sheetClosing = false; drag = null;
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; mandalaGoal = null; mPath = []; recordsKind = null;
+    editingId = null; settingsFrom = null; goalNew = false; mandalaGoal = null; mPath = [];
     disarmDelete(); disarmGoalDelete(); syncSheetHead();
   }
   function openDay(d, byKey) {
@@ -2277,8 +2295,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (sheetEl.open) return; // opened again before this arrived
     resetSheet();
     // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
-    if (sheetByKey) ({ gear: $("calSettings"), study: $("studySettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd"),
-      records: $("sumCards").querySelector(`[data-kind="${recordsReturn}"]`) }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
+    if (sheetByKey) ({ gear: $("calSettings"), study: $("studySettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
   // Esc: from an edit form (or settings reached from a day) back to the day's list, from a chart's cell back out of it,
   // otherwise out of the sheet
@@ -2685,7 +2702,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function sumCard(color, iconName, title, big, unit, sub, wide, extra, kind) {
     return el("div", { class: "card sum-card" + (wide ? " wide" : ""), style: `--sum-c:${color}` },
       el("h3", { class: "sum-head" }, kind
-        ? el("button", { type: "button", class: "sum-open", "data-kind": kind, "aria-label": `${title}の記録を見る`, onclick: (ev) => openRecords(kind, ev.detail === 0) },
+        ? el("button", { type: "button", class: "sum-open", "data-kind": kind, "aria-label": `${title}の記録を見る`, onclick: () => openRecList(kind) },
           icon(iconName, 18), el("span", { class: "lbl" }, title), el("span", { class: "chev" }, icon("next", 16)))
         : [icon(iconName, 18), el("span", {}, title)]),
       el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
@@ -2758,8 +2775,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         topList(byCat, () => "var(--c-money)", fmtYen), "money"));
   }
 
-  // 記録: a card opens its record's entries in the sheet, read-only, newest first by month; a row per day with each entry
-  // as it was written (the user's call: the content too, not only how many days)
+  // 記録 › a record's entries: a card opens them on a page that slides in from the right, read-only, newest first by
+  // month; a row per day with each entry as it was written (the user's call: the content too, not only how many days)
   const recLine = (tag, words, n, dot, isIn) => el("span", { class: "rec-line" },
     el("span", { class: "rec-what" }, tag ? el("span", { class: "rec-tag" + (dot ? " dot" : ""), style: dot ? `--dot:${dot}` : null }, tag) : null, words || null),
     n ? el("span", { class: "rec-num" + (isIn ? " in" : "") }, n) : null);
@@ -2779,28 +2796,30 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     money: { label: "家計簿", items: () => expenses.items,
       lines: (xs) => byCreated(xs).map((e) => recLine(e.category || (e.kind === "in" ? "収入" : "支出"), e.memo, (e.kind === "in" ? "+" : "") + fmtYen(e.amount), null, e.kind === "in")) },
   };
-  function recordsTitle() { return RECORD_LISTS[recordsKind]?.label || ""; }
-  function openRecords(kind, byKey) {
-    if (sheetEl.open || !RECORD_LISTS[kind]) return;
-    resetSheet();
-    recordsKind = recordsReturn = kind;
-    renderRecordList();
-    syncSheetHead();
-    presentSheet(byKey, "records");
+  // drawn before the page slides in, so it arrives whole
+  function openRecList(kind) {
+    if (!RECORD_LISTS[kind]) return;
+    recListKind = kind;
+    renderRecList();
+    showTab("reclist");
   }
   // up to today, as the cards count
-  function renderRecordList() {
-    const spec = RECORD_LISTS[recordsKind], byDay = groupBy(spec.items().filter((x) => x.date && x.date <= todayKey), (x) => x.date);
+  function renderRecList() {
+    const spec = RECORD_LISTS[recListKind];
+    if (!spec) return;
+    const byDay = groupBy(spec.items().filter((x) => x.date && x.date <= todayKey), (x) => x.date), days = [...byDay.keys()].sort().reverse();
+    $("recListTitle").textContent = spec.label;
+    $("recListNote").textContent = days.length ? `${days.length} 日分・新しい順` : "";
     const parts = [];
     let month = null, ul = null;
-    for (const d of [...byDay.keys()].sort().reverse()) {
+    for (const d of days) {
       if (d.slice(0, 7) !== month) {
         month = d.slice(0, 7);
         parts.push(el("h3", { class: "group-head" }, fmtMonth(month)), ul = el("ul", { class: "list card rec-list" }));
       }
       ul.append(el("li", {}, el("span", { class: "datecell" }, d === todayKey ? "きょう" : fmtShort(d)), el("span", { class: "body" }, spec.lines(byDay.get(d)))));
     }
-    setChildren($("recordsView"), parts.length ? parts : el("div", { class: "card empty" }, "まだ記録がありません。「きょう」から記録すると、ここに並びます。"));
+    setChildren($("recList"), parts.length ? parts : el("div", { class: "card empty" }, "まだ記録がありません。「きょう」から記録すると、ここに並びます。"));
   }
 
   // ---------- 記録の書き出し・読み込み ----------
@@ -2957,10 +2976,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderStudy(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup(); renderSummary(); paintChart();
+    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderStudy(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup(); renderSummary(); paintChart(); if (tab === "reclist") renderRecList();
   }
   const initial = (location.hash || "").slice(1);
-  setTab(PAGES.some((p) => p.key === initial) ? initial : "home"); // straight there: no slide in from きょう as the app opens
+  // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
+  setTab(initial === "reclist" ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home");
   loadJournalForm();
   renderAll();
   showMode();
