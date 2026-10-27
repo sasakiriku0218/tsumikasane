@@ -3105,6 +3105,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("restoreNote").hidden = true;
   });
   // the backup line on 記録 and the reminder on the home page
+  // the browser is asked to keep this site's storage even when the device runs low on space: storage not marked
+  // persistent may be cleared then, as on 2026-10-26. It may say no, so the daily copies and the exports stay the real
+  // safeguard; when it says yes, the backup note says so
+  let storageKept = false;
+  async function askPersist() {
+    try {
+      if (!navigator.storage?.persist) return;
+      storageKept = (await navigator.storage.persisted()) || (await navigator.storage.persist());
+    } catch { storageKept = false; }
+    renderBackup();
+  }
   function renderBackup() {
     const b = settings.get("backup") || {};
     const last = num(b.lastExport);
@@ -3114,7 +3125,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       : "まだ一度も書き出していません。";
     $("storeNote").textContent = (canStoreLocal
       ? "記録はこの端末のブラウザにだけ保存されます。端末の空き容量が少ないときなどに消えることがあるので、ときどき書き出して、ファイルを iCloud Drive などに保存しておくと安心です。書き出したファイルを読み込むと、記録を戻したり別の端末へ移したりできます。"
-      : "この画面では記録が保存されません。") + " " + lastText;
+      : "この画面では記録が保存されません。") + (canStoreLocal && storageKept ? " 空き容量が少なくなっても記録を消さないよう、ブラウザに頼んであります。" : "") + " " + lastText;
     const due = !last || days >= 7;
     const snoozed = b.snoozeUntil && b.snoozeUntil > todayKey;
     $("backupNudge").hidden = !(canStoreLocal && due && !snoozed && recordCount(allData()) >= 10);
@@ -3142,6 +3153,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   renderAll();
   showMode();
   checkRestore().then(() => saveCopy());
+  askPersist();
   // iOS only shows :active (the pressed look HIG asks for) once the page listens for touches
   document.addEventListener("touchstart", () => {}, { passive: true });
 
