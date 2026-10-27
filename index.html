@@ -300,7 +300,6 @@ form.add > .full, form.add > .actions { grid-column: 1 / -1; }
 .ffield > .seg { max-width: 22em; }
 .ffield input[type="number"] { flex: 0 1 7em; text-align: right; font-variant-numeric: tabular-nums; }
 .ffield input[type="date"], .ffield input[type="time"] { flex: 0 1 10em; }
-.ffield .unit-field { flex: 1 1 6em; }
 form.add .actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
 form.add .actions .link-btn { margin-inline-end: auto; }
 @container (max-width: 19.5em) {
@@ -1024,14 +1023,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     </div>
     <!-- a new goal, from the ＋ on 目標: キャンセル and 追加 on the bar, as iOS sheets for a new item have -->
     <div class="sheet-view" id="goalView" hidden>
+      <!-- all three are needed (the user's call); 達成基準 is one field where 目標値 and 単位 were two -->
       <form class="add" id="goalForm" autocomplete="off">
-        <input type="text" id="goalTitle" class="full" placeholder="目標（例：本を読む）" aria-label="目標" maxlength="200" required>
-        <label class="flabel" for="goalTarget">目標値 <span class="opt">任意</span></label>
-        <div class="ffield"><input type="number" id="goalTarget" placeholder="10" min="1" max="999999" inputmode="numeric"><input type="text" id="goalUnit" class="unit-field" placeholder="単位（冊など）" aria-label="単位（任意）" maxlength="10"></div>
-        <label class="flabel" for="goalDeadline">期限 <span class="opt">任意</span></label>
-        <div class="ffield"><input type="date" id="goalDeadline"></div>
+        <input type="text" id="goalTitle" class="full" placeholder="新たな目標" aria-label="新たな目標" maxlength="200" required>
+        <label class="flabel" for="goalCriterion">達成基準</label>
+        <div class="ffield"><input type="text" id="goalCriterion" maxlength="40" required></div>
+        <label class="flabel" for="goalDeadline">期限</label>
+        <div class="ffield"><input type="date" id="goalDeadline" required></div>
       </form>
-      <p class="group-foot">数で追える目標なら、目標値と単位も入れると進み具合が見えます。</p>
+      <p class="group-foot">達成基準を「10冊」のように数から書くと、一覧で進み具合を記録できます。</p>
     </div>
   </div>
   <div class="toast" id="sheetStatus" role="status"></div>
@@ -1890,23 +1890,25 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
 
   // ---------- 目標 ----------
-  // a new goal is made in the sheet the ＋ opens (openNewGoal); 追加 there stays grey until the goal has a name
-  const syncGoalSave = () => { $("goalSave").disabled = !$("goalTitle").value.trim(); };
-  $("goalTitle").addEventListener("input", syncGoalSave);
+  // a new goal is made in the sheet the ＋ opens (openNewGoal). Its name, 達成基準 and 期限 are all needed (the user's
+  // call), so 追加 there stays grey until each one is filled in
+  const goalFields = ["goalTitle", "goalCriterion", "goalDeadline"];
+  const syncGoalSave = () => { $("goalSave").disabled = goalFields.some((id) => !$(id).value.trim()); };
+  for (const id of goalFields) for (const type of ["input", "change"]) $(id).addEventListener(type, syncGoalSave);
   function clearGoalForm() { $("goalForm").reset(); syncGoalSave(); }
+  // 達成基準 written from a number ("10冊", "100 回") is counted toward that number, as 目標値 and 単位 were; other words
+  // are kept as they are, and that goal is marked 達成 by hand
+  function criterionTarget(text) {
+    const m = text.normalize("NFKC").trim().match(/^(\d+)(?![.,]\d)\s*(.*)$/);
+    const n = m ? Number(m[1]) : 0, unit = m ? m[2].trim() : "";
+    return n >= 1 && n <= 999999 && unit.length <= 10 ? { target: n, unit: unit || undefined } : null;
+  }
   $("goalAdd").addEventListener("click", (ev) => openNewGoal(ev.detail === 0));
   $("goalForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    const title = $("goalTitle").value.trim();
-    if (!title) return;
-    const item = { title, current: 0, done: false, createdAt: Date.now() };
-    const target = Number($("goalTarget").value);
-    if (target > 0) item.target = target;
-    const unit = $("goalUnit").value.trim();
-    if (unit) item.unit = unit;
-    const deadline = $("goalDeadline").value;
-    if (deadline) item.deadline = deadline;
-    act(() => goals.add(item));
+    const title = $("goalTitle").value.trim(), criterion = $("goalCriterion").value.trim(), deadline = $("goalDeadline").value;
+    if (!title || !criterion || !deadline) return;
+    act(() => goals.add({ title, criterion, ...criterionTarget(criterion), deadline, current: 0, done: false, createdAt: Date.now() }));
     clearGoalForm();
     closeSheet(); // the new goal shows in the list as the sheet goes down
   });
@@ -1939,6 +1941,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("div", { class: "row-between" },
           el("span", { class: "title" }, g.title),
           g.done ? el("span", { class: "chip", style: "--chip-c: var(--c-goal)" }, "達成") : deadlineText(g)),
+        // a 達成基準 in words shows under the name; one from a number shows as the count below
+        !hasTarget && g.criterion ? el("span", { class: "sub" }, `達成基準：${g.criterion}`) : null,
         hasTarget ? el("div", { class: "progress" },
           el("div", { class: "bar-track" }, el("i", { style: `width:${pct}%` })),
           el("span", { class: "pct" }, `${pct}%`)) : null,
