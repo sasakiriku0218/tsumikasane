@@ -153,8 +153,8 @@ button { touch-action: manipulation; transition: opacity .2s; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .icon { flex: none; fill: currentColor; }
 /* small controls keep their look; an invisible box makes them 44px tall to tap (HIG: 44 × 44pt) */
-.chip-btn, .seg button, .moods button, .btn.sm, .del { position: relative; }
-.chip-btn::after, .seg button::after, .moods button::after, .btn.sm::after, .del::after {
+.chip-btn, .seg button, .btn.sm, .del { position: relative; }
+.chip-btn::after, .seg button::after, .btn.sm::after, .del::after {
   content: ""; position: absolute; inset: 0; margin: auto; height: 44px;
 }
 /* pressed states (HIG: every custom button shows one): plain buttons dim, rows and cards darken. iOS only shows :active
@@ -394,9 +394,6 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* journal */
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1) var(--space-2); flex-wrap: wrap; }
 .label { font-weight: 600; }
-.moods { display: flex; gap: var(--space-1); flex-wrap: wrap; }
-.moods button { min-height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--fill); color: var(--fg); font-size: var(--t-sub); line-height: 1.2; cursor: pointer; }
-.moods button[aria-pressed="true"] { background: var(--f-journal); color: #ffffff; font-weight: 600; }
 
 /* stats (weight, money): Health-style summary cards */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
@@ -799,12 +796,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <input type="file" id="importFile" accept=".json,application/json" hidden>
       </section>
 
-      <!-- 日記 -->
+      <!-- 日記: the writing only, under 「ひとこと」 (the user's call: no mood scale of つらい … 最高) -->
       <section id="sec-journal" style="--sec-c: var(--c-journal)" hidden>
         <div class="sec-head"><h2>日記</h2><div class="datenav"></div></div>
         <div class="card pad">
-          <div class="row-between"><span class="label" id="moodLabel">きょうの気分</span><span class="muted small" id="journalState"></span></div>
-          <div class="moods" id="moods"></div>
+          <div class="row-between"><label class="label" for="journalText">ひとこと</label><span class="muted small" id="journalState"></span></div>
           <textarea id="journalText" rows="6" placeholder="できごと、気づき、ひとこと。短くても大丈夫です。"></textarea>
           <div class="row-between">
             <span class="muted small">書くと自動で保存されます</span>
@@ -1166,7 +1162,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   ];
   const PAGES = [...TABS, ...RECORDS];
   const isRecord = (key) => RECORDS.some((r) => r.key === key);
-  const MOODS = ["", "つらい", "いまいち", "ふつう", "よい", "最高"];
   const SLOTS = ["朝食", "昼食", "夕食", "間食"];
 
   let tab = "home";
@@ -1414,17 +1409,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
 
   // ---------- 日記 ----------
-  const moodsEl = $("moods"), journalText = $("journalText"), journalState = $("journalState");
-  let journalMood = 0, journalDirty = false, journalTimer = null, journalChain = Promise.resolve();
-  MOODS.forEach((label, i) => {
-    if (!i) return;
-    moodsEl.append(el("button", { type: "button", "data-mood": i, "aria-pressed": "false", onclick: () => {
-      journalMood = journalMood === i ? 0 : i; renderMoods(); markJournalDirty();
-    } }, label));
-  });
-  function renderMoods() {
-    moodsEl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.mood) === journalMood)));
-  }
+  const journalText = $("journalText"), journalState = $("journalState");
+  let journalDirty = false, journalTimer = null, journalChain = Promise.resolve();
   journalText.addEventListener("input", markJournalDirty);
   journalText.addEventListener("blur", () => flushJournal());
   window.addEventListener("beforeunload", () => flushJournal());
@@ -1443,17 +1429,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function flushJournal() {
     clearTimeout(journalTimer);
     if (!journalDirty) return journalChain;
-    const date = viewDate, mood = journalMood, text = journalText.value.trim();
+    const date = viewDate, text = journalText.value.trim();
     journalDirty = false;
     journalState.textContent = "保存中…";
     journalChain = journalChain.then(async () => {
       try {
-        if (!text && !mood) {
+        if (!text) {
           if (journal.get(date)) await journal.remove(date);
         } else {
-          await journal.set(date, { date, mood, text, updatedAt: Date.now() });
+          // a mood from before the scale went stays in the entry (and its backups), unseen
+          await journal.set(date, { ...journal.get(date), date, text, updatedAt: Date.now() });
         }
-        if (!journalDirty && date === viewDate) journalState.textContent = text || mood ? "保存済み" : "";
+        if (!journalDirty && date === viewDate) journalState.textContent = text ? "保存済み" : "";
       } catch (e) {
         showError(e);
         if (date === viewDate) { journalDirty = true; journalState.textContent = "保存できませんでした"; }
@@ -1463,21 +1450,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   function loadJournalForm() {
     const e = journal.get(viewDate);
-    journalMood = e ? Number(e.mood) || 0 : 0;
     const text = e ? e.text || "" : "";
     if (journalText.value !== text) journalText.value = text;
     journalDirty = false;
     journalState.textContent = e ? "保存済み" : "";
-    renderMoods();
   }
   armLink($("journalDelete"), "この日の記録を削除", "もう一度押すと削除します", () => {
     clearTimeout(journalTimer); journalDirty = false;
-    journalMood = 0; journalText.value = ""; renderMoods(); journalState.textContent = "";
+    journalText.value = ""; journalState.textContent = "";
     act(() => journal.remove(viewDate));
   });
   function renderJournal() {
     if (!journalDirty) loadJournalForm();
-    $("moodLabel").textContent = viewDate === todayKey ? "きょうの気分" : "この日の気分";
     $("journalDelete").hidden = !journal.get(viewDate);
     const list = $("journalList");
     const items = [...journal.items].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 30);
@@ -1486,9 +1470,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const e of items) {
       list.append(el("li", { class: "clickable" + (e.id === viewDate ? " current" : ""), onclick: () => setViewDate(e.id) },
         el("span", { class: "datecell" }, e.id === todayKey ? "きょう" : fmtShort(e.id)),
-        el("span", { class: "body" },
-          el("span", { class: "text clamp" }, e.text || "（本文なし）"),
-          e.mood ? el("span", { class: "sub" }, "気分：" + (MOODS[e.mood] || "")) : null)
+        el("span", { class: "body" }, el("span", { class: "text clamp" }, e.text || "（本文なし）"))
       ));
     }
   }
@@ -2632,8 +2614,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       tile("var(--c-cal)", "きょうの予定", String(evToday.length), "件",
         evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evText(nextEv)}` : "まだ予定はありません",
         evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null, "calendar", true),
-      tile("var(--c-journal)", "日記", j ? (j.mood ? MOODS[j.mood] : "書きました") : "まだ", null,
-        j ? (j.text ? j.text.slice(0, 60) + (j.text.length > 60 ? "…" : "") : "気分だけ記録しています") : "ひとことでも残しておくと、あとで効いてきます。", null, "journal"),
+      tile("var(--c-journal)", "日記", j?.text ? "書きました" : "まだ", null,
+        j?.text ? j.text.slice(0, 60) + (j.text.length > 60 ? "…" : "") : "ひとことでも残しておくと、あとで効いてきます。", null, "journal"),
       tile("var(--c-meal)", "食事", String(ms.length), "回",
         ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだ記録がありません", null, "meal"),
       tile("var(--c-workout)", "運動", String(mins), "分",
@@ -2699,9 +2681,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (let d = recSet.has(todayKey) ? todayKey : addDays(todayKey, -1); recSet.has(d); d = addDays(d, -1)) streak++;
     for (const d of rec) { run = prev && addDays(prev, 1) === d ? run + 1 : 1; longest = Math.max(longest, run); prev = d; }
 
-    const js = journal.items.filter((j) => (j.date || j.id) <= todayKey);
-    const moods = js.filter((j) => j.mood);
-    const avgMood = moods.length ? sum(moods, (j) => j.mood) / moods.length : 0;
+    const js = journal.items.filter((j) => (j.date || j.id) <= todayKey && j.text?.trim());
 
     const ms = meals.items.filter((m) => m.date <= todayKey);
     const kcalDays = new Map();
@@ -2729,8 +2709,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
     setChildren($("sumCards"),
       sumCard("var(--accent)", "records", "続けた日", String(rec.length), "日 記録した日", `いまの連続 ${streak} 日・いちばん長い連続 ${longest} 日`, true),
-      sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日",
-        moods.length ? `気分の平均：${MOODS[Math.round(avgMood)]}` : js.length ? "気分の記録はありません" : "まだ書いていません"),
+      sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日", js.length ? null : "まだ書いていません"),
       sumCard("var(--c-meal)", "meal", "食事", ms.length.toLocaleString("ja-JP"), "回",
         `${new Set(ms.map((m) => m.date)).size} 日記録` + (kcalDays.size ? `・1日平均 ${Math.round(avgKcal).toLocaleString("ja-JP")} kcal` : "")),
       sumCard("var(--c-workout)", "workout", "運動", ...durBig(wMin), `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日`),
