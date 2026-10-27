@@ -629,6 +629,26 @@ ul.list > li.btn-row { padding: 0; }
 .sum-list .name { min-width: 0; overflow-wrap: anywhere; }
 .sum-list .amount { margin-inline-start: auto; flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
 .sum-empty { margin: 0; padding: 12px 0 4px; text-align: center; font-size: var(--t-foot); color: var(--muted); }
+/* a card opens its record's entries in the sheet (the user's call: what was written, not only how many days); the whole
+   card is the button, as the tiles on きょう are */
+.sum-card { position: relative; }
+.sum-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sum-open::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius); }
+.sum-open .lbl { flex: 1; min-width: 0; }
+.sum-open .chev { display: grid; color: var(--muted); }
+.sum-card:has(.sum-open:active) { background: color-mix(in srgb, var(--fg) 6%, var(--surface)); }
+/* the entries, a row per day under its month: the date level with the first line, then each entry as written, its kind
+   in grey at the start and its number kept to the right */
+ul.list.rec-list > li { align-items: baseline; }
+ul.list.rec-list > li > .body { order: 0; }  /* with large text the date stays above its entries, not under them */
+.rec-list .body { gap: 6px; }
+.rec-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.rec-line { display: flex; align-items: baseline; gap: 8px; }
+.rec-what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rec-tag { margin-inline-end: 8px; color: var(--muted); font-size: var(--t-sub); }
+.rec-tag.dot::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 5px; border-radius: 50%; background: var(--dot); vertical-align: 1px; }
+.rec-num { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rec-num.in { color: var(--accent); font-weight: 600; }
 @media (min-width: 480px) { .sum-card.wide { grid-column: 1 / -1; } }
 .group-head { margin: var(--space-1) 0 -8px; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); }
 .group-foot { margin: -8px 0 0; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
@@ -971,7 +991,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 </div>
 
 <!-- a day's plans in an iOS-style sheet: a tap on a day in the month opens it, and they are added, changed and deleted here.
-     The gears open their settings in it, 目標's ＋ a new goal's form, and a goal in the list its mandala chart -->
+     The gears open their settings in it, 目標's ＋ a new goal's form, a goal in the list its mandala chart, and a card on
+     記録 that record's entries -->
 <dialog class="sheet" id="daySheet" aria-labelledby="sheetTitle">
   <div class="sheet-head" id="sheetHead">
     <button type="button" class="sheet-btn start" id="sheetCancel" hidden>キャンセル</button>
@@ -1068,6 +1089,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="card"><button type="button" class="link-btn danger sheet-del" id="mDelete">この目標を削除</button></div>
       </div>
     </div>
+    <!-- a record's entries, from its card on 記録: read-only like the rest of 記録, newest first, by month -->
+    <div class="sheet-view" id="recordsView" hidden></div>
   </div>
   <div class="toast" id="sheetStatus" role="status"></div>
 </dialog>
@@ -2152,17 +2175,24 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let goalNew = false; // the sheet holds a new goal's form, opened from 目標's ＋
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
   let chartDraft = null, composing = false, mDelTimer = null; // a cell's text not saved yet; a kana conversion under way
-  // the bar on top: 完了 over the day's list, the settings and a chart; キャンセル and 保存 over an event's edit form, as
-  // iOS edit sheets have, and キャンセル and 追加 over a new goal; 戻る over the settings when a day's sheet led to them,
-  // and over a chart's cell to go back out of it
+  let recordsKind = null, recordsReturn = null; // the record whose entries the sheet lists (from 記録), and its card
+  // what the sheet holds, one view at a time: a new goal, a goal's chart, a record's entries, the settings, an event's
+  // edit form, or (by default) a day's plans
+  const SHEET_VIEWS = { goal: "goalView", chart: "mandalaView", records: "recordsView", settings: "settingsView", edit: "editView", day: "dayView" };
+  const sheetMode = () => (goalNew ? "goal" : mandalaGoal ? "chart" : recordsKind ? "records" : settingsFrom ? "settings" : editingId ? "edit" : "day");
+  // the bar on top: 完了 over the day's list, the settings, a chart and a record's entries; キャンセル and 保存 over an
+  // event's edit form, as iOS edit sheets have, and キャンセル and 追加 over a new goal; 戻る over the settings when a day's
+  // sheet led to them, and over a chart's cell to go back out of it
   function syncSheetHead() {
-    const goal = goalNew, chart = !goal && !!mandalaGoal, settings = !goal && !chart && !!settingsFrom, editing = !goal && !chart && !settings && !!editingId, rel = relLabel(calDay);
-    $("dayView").hidden = goal || chart || settings || editing; $("editView").hidden = !editing; $("settingsView").hidden = !settings; $("goalView").hidden = !goal; $("mandalaView").hidden = !chart;
+    const mode = sheetMode();
+    for (const [m, id] of Object.entries(SHEET_VIEWS)) $(id).hidden = m !== mode;
     $("labelsGroup").hidden = settingsScope !== "calendar"; $("subjectsGroup").hidden = settingsScope !== "study";
-    $("sheetDone").hidden = editing || goal; $("sheetSave").hidden = !editing; $("goalSave").hidden = !goal;
-    $("sheetCancel").hidden = !editing && !goal && !(chart && mPath.length) && settingsFrom !== "day";
-    $("sheetCancel").textContent = editing || goal ? "キャンセル" : "戻る";
-    $("sheetTitle").textContent = goal ? "新しい目標" : chart ? chartTitle() : settings ? "設定" : editing ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
+    $("sheetDone").hidden = mode === "edit" || mode === "goal"; $("sheetSave").hidden = mode !== "edit"; $("goalSave").hidden = mode !== "goal";
+    $("sheetCancel").hidden = !(mode === "edit" || mode === "goal" || (mode === "chart" && mPath.length) || (mode === "settings" && settingsFrom === "day"));
+    $("sheetCancel").textContent = mode === "edit" || mode === "goal" ? "キャンセル" : "戻る";
+    const rel = mode === "day" ? relLabel(calDay) : "";
+    $("sheetTitle").textContent = mode === "goal" ? "新しい目標" : mode === "chart" ? chartTitle() : mode === "records" ? recordsTitle()
+      : mode === "settings" ? "設定" : mode === "edit" ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
   }
   // a closed sheet's starting state: no animation or drag left over, the day's list showing
   function resetSheet() {
@@ -2171,7 +2201,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     sheetAnims = []; sheetClosing = false; drag = null;
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; mandalaGoal = null; mPath = [];
+    editingId = null; settingsFrom = null; goalNew = false; mandalaGoal = null; mPath = []; recordsKind = null;
     disarmDelete(); disarmGoalDelete(); syncSheetHead();
   }
   function openDay(d, byKey) {
@@ -2247,7 +2277,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (sheetEl.open) return; // opened again before this arrived
     resetSheet();
     // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
-    if (sheetByKey) ({ gear: $("calSettings"), study: $("studySettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
+    if (sheetByKey) ({ gear: $("calSettings"), study: $("studySettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd"),
+      records: $("sumCards").querySelector(`[data-kind="${recordsReturn}"]`) }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
   // Esc: from an edit form (or settings reached from a day) back to the day's list, from a chart's cell back out of it,
   // otherwise out of the sheet
@@ -2650,9 +2681,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // minutes as hours once they add up: 53 時間 20 分
   const durBig = (min) => (min >= 60 ? [String(Math.floor(min / 60)), `時間 ${min % 60} 分`] : [String(min), "分"]);
   const durText = (min) => durBig(min).join(" ");
-  function sumCard(color, iconName, title, big, unit, sub, wide, extra) {
+  // kind: the record whose entries the card opens (続けた日 has none)
+  function sumCard(color, iconName, title, big, unit, sub, wide, extra, kind) {
     return el("div", { class: "card sum-card" + (wide ? " wide" : ""), style: `--sum-c:${color}` },
-      el("h3", { class: "sum-head" }, icon(iconName, 18), el("span", {}, title)),
+      el("h3", { class: "sum-head" }, kind
+        ? el("button", { type: "button", class: "sum-open", "data-kind": kind, "aria-label": `${title}の記録を見る`, onclick: (ev) => openRecords(kind, ev.detail === 0) },
+          icon(iconName, 18), el("span", { class: "lbl" }, title), el("span", { class: "chev" }, icon("next", 16)))
+        : [icon(iconName, 18), el("span", {}, title)]),
       el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
       sub ? el("div", { class: "sub" }, sub) : null,
       extra);
@@ -2709,18 +2744,63 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
     setChildren($("sumCards"),
       sumCard("var(--accent)", "records", "続けた日", String(rec.length), "日 記録した日", `いまの連続 ${streak} 日・いちばん長い連続 ${longest} 日`, true),
-      sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日", js.length ? null : "まだ書いていません"),
+      sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日", js.length ? null : "まだ書いていません", false, null, "journal"),
       sumCard("var(--c-meal)", "meal", "食事", ms.length.toLocaleString("ja-JP"), "回",
-        `${new Set(ms.map((m) => m.date)).size} 日記録` + (kcalDays.size ? `・1日平均 ${Math.round(avgKcal).toLocaleString("ja-JP")} kcal` : "")),
-      sumCard("var(--c-workout)", "workout", "運動", ...durBig(wMin), `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日`),
+        `${new Set(ms.map((m) => m.date)).size} 日記録` + (kcalDays.size ? `・1日平均 ${Math.round(avgKcal).toLocaleString("ja-JP")} kcal` : ""), false, null, "meal"),
+      sumCard("var(--c-workout)", "workout", "運動", ...durBig(wMin), `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日`, false, null, "workout"),
       sumCard("var(--c-study)", "study", "勉強", ...durBig(stMin), `${sts.length} 回・${new Set(sts.map((x) => x.date)).size} 日`, false,
-        topList(bySub, subColor, durText)),
+        topList(bySub, subColor, durText), "study"),
       sumCard("var(--c-weight)", "weight", "体重", wLast ? fmtKg(wLast.kg) : "—", wLast ? "kg" : null,
         !wLast ? "まだ記録がありません" : wts.length > 1
           ? `はじめ（${fmtMD(wFirst.id)}）の ${fmtKg(wFirst.kg)} kg から ${signed(num(wLast.kg) - num(wFirst.kg))} kg・${wts.length} 回`
-          : `${fmtMD(wLast.id)}の記録`),
+          : `${fmtMD(wLast.id)}の記録`, false, null, "weight"),
       sumCard("var(--c-money)", "money", "家計簿", Math.round(out).toLocaleString("ja-JP"), "円 支出", `収入 ${fmtYen(inn)}・収支 ${net > 0 ? "+" : ""}${fmtYen(net)}`, false,
-        topList(byCat, () => "var(--c-money)", fmtYen)));
+        topList(byCat, () => "var(--c-money)", fmtYen), "money"));
+  }
+
+  // 記録: a card opens its record's entries in the sheet, read-only, newest first by month; a row per day with each entry
+  // as it was written (the user's call: the content too, not only how many days)
+  const recLine = (tag, words, n, dot, isIn) => el("span", { class: "rec-line" },
+    el("span", { class: "rec-what" }, tag ? el("span", { class: "rec-tag" + (dot ? " dot" : ""), style: dot ? `--dot:${dot}` : null }, tag) : null, words || null),
+    n ? el("span", { class: "rec-num" + (isIn ? " in" : "") }, n) : null);
+  const byCreated = (xs) => [...xs].sort((a, b) => num(a.createdAt) - num(b.createdAt));
+  const RECORD_LISTS = {
+    journal: { label: "日記", items: () => journal.items.filter((j) => j.text?.trim()).map((j) => ({ ...j, date: j.date || j.id })),
+      lines: (xs) => xs.map((j) => el("span", { class: "rec-text" }, j.text.trim())) },
+    meal: { label: "食事", items: () => meals.items,
+      lines: (xs) => [...xs].sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || num(a.createdAt) - num(b.createdAt))
+        .map((m) => recLine(m.slot || "食事", m.text, typeof m.kcal === "number" ? `${m.kcal} kcal` : "")) },
+    workout: { label: "運動", items: () => workouts.items,
+      lines: (xs) => byCreated(xs).map((w) => recLine(null, [w.type, w.note].filter(Boolean).join("・"), `${num(w.minutes)} 分`)) },
+    study: { label: "勉強", items: () => study.items,
+      lines: (xs) => byCreated(xs).map((x) => { const sub = subjectOf(x); return recLine(sub ? sub.name : "科目なし", x.note, `${num(x.minutes)} 分`, sub ? labelHue(sub) : "var(--c-study)"); }) },
+    weight: { label: "体重", items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
+      lines: (xs) => xs.map((w) => recLine(null, `${fmtKg(w.kg)} kg`)) },
+    money: { label: "家計簿", items: () => expenses.items,
+      lines: (xs) => byCreated(xs).map((e) => recLine(e.category || (e.kind === "in" ? "収入" : "支出"), e.memo, (e.kind === "in" ? "+" : "") + fmtYen(e.amount), null, e.kind === "in")) },
+  };
+  function recordsTitle() { return RECORD_LISTS[recordsKind]?.label || ""; }
+  function openRecords(kind, byKey) {
+    if (sheetEl.open || !RECORD_LISTS[kind]) return;
+    resetSheet();
+    recordsKind = recordsReturn = kind;
+    renderRecordList();
+    syncSheetHead();
+    presentSheet(byKey, "records");
+  }
+  // up to today, as the cards count
+  function renderRecordList() {
+    const spec = RECORD_LISTS[recordsKind], byDay = groupBy(spec.items().filter((x) => x.date && x.date <= todayKey), (x) => x.date);
+    const parts = [];
+    let month = null, ul = null;
+    for (const d of [...byDay.keys()].sort().reverse()) {
+      if (d.slice(0, 7) !== month) {
+        month = d.slice(0, 7);
+        parts.push(el("h3", { class: "group-head" }, fmtMonth(month)), ul = el("ul", { class: "list card rec-list" }));
+      }
+      ul.append(el("li", {}, el("span", { class: "datecell" }, d === todayKey ? "きょう" : fmtShort(d)), el("span", { class: "body" }, spec.lines(byDay.get(d)))));
+    }
+    setChildren($("recordsView"), parts.length ? parts : el("div", { class: "card empty" }, "まだ記録がありません。「きょう」から記録すると、ここに並びます。"));
   }
 
   // ---------- 記録の書き出し・読み込み ----------
