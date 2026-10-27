@@ -479,9 +479,6 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .m-center .m-tools { min-height: 0; justify-content: center; }
 .m-center .m-tools:not(:empty) { min-height: 30px; }
 /* the goal's own part, under its chart */
-.m-info .m-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 44px; padding: 10px var(--space-2); }
-.m-info .m-row + .m-row { border-top: .5px solid var(--separator); }
-.m-row > :last-child { min-width: 0; color: var(--muted); text-align: right; overflow-wrap: anywhere; }
 .m-split { padding: 8px var(--space-2); }
 
 /* home: Health-style summary cards; the coloured head opens the page and its hit area covers the card */
@@ -1103,10 +1100,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <div class="mandala" id="mGrid"></div>
       <p class="group-foot" id="mHint"></p>
       <div class="sheet-view" id="mRoot">
-        <div class="card m-info">
-          <div class="m-row"><span>達成基準</span><span id="mCriterion"></span></div>
-          <div class="m-row"><span>期限</span><span id="mDeadline"></span></div>
-        </div>
+        <!-- the goal itself, changed in place (the user's call: goals can be put right after they're made) -->
+        <h3 class="group-head">目標の内容</h3>
+        <form class="add" id="mEdit" autocomplete="off">
+          <input type="text" id="mTitle" class="full" aria-label="目標の名前" maxlength="200" required>
+          <label class="flabel" for="mCriterion">達成基準</label>
+          <div class="ffield"><input type="text" id="mCriterion" maxlength="40" required></div>
+          <label class="flabel" for="mDeadline">期限</label>
+          <div class="ffield"><input type="date" id="mDeadline" required></div>
+        </form>
+        <p class="group-foot">書きかえると、そのまま保存されます。</p>
         <h3 class="group-head" id="mSplitLabel">分割の回数</h3>
         <div class="card m-split">
           <div class="seg seg-radio" role="radiogroup" aria-labelledby="mSplitLabel">
@@ -2346,7 +2349,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // it slides back down (fades on wide screens) before it closes; instant when the page under it needs focus at once
   function closeSheet(instant) {
     if (!sheetEl.open || sheetClosing) return;
-    commitChartText(); // a cell's text typed last is saved now, not when the close event comes (it can come late)
+    commitChartText(); saveGoalEdit(); // what was typed last is saved now, not when the close event comes (it can come late)
     if (instant === true || reduceMotion.matches) { sheetEl.close(); return; }
     sheetClosing = true;
     const opts = { duration: 220, easing: "cubic-bezier(.4, 0, 1, 1)", fill: "forwards" };
@@ -2451,11 +2454,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       : "まわりの8マスに書き出して、できたら ○ をタップして達成にします。";
     $("mRoot").hidden = !!mPath.length;
     if (!mPath.length) {
-      $("mCriterion").textContent = criterionText(g) || "なし";
-      $("mDeadline").textContent = g.deadline ? fmtMDW(g.deadline) : "なし";
+      for (const [id, key] of GOAL_EDIT) if (document.activeElement !== $(id)) $(id).value = goalField(g, key);
       for (const r of document.querySelectorAll('input[name="chartSplit"]')) r.checked = Number(r.value) === depth;
     }
   }
+  // the goal's own name, 達成基準 and 期限, changed in place under its first chart. All three were needed to make the goal,
+  // so a field left empty takes its old value back
+  const GOAL_EDIT = [["mTitle", "title"], ["mCriterion", "criterion"], ["mDeadline", "deadline"]];
+  const goalField = (g, key) => (key === "criterion" ? criterionText(g) : g[key] || "");
+  function saveGoalEdit() {
+    const g = goals.get(mandalaGoal);
+    if (!g || mPath.length) return;
+    const patch = {};
+    for (const [id, key] of GOAL_EDIT) {
+      const v = $(id).value.trim(), was = goalField(g, key);
+      if (!v) $(id).value = was; else if (v !== was) patch[key] = v;
+    }
+    if (!Object.keys(patch).length) return;
+    act(() => goals.update(g.id, patch));
+    syncSheetHead(); // the bar's title is the goal's name
+  }
+  $("mEdit").addEventListener("change", saveGoalEdit);
+  $("mEdit").addEventListener("submit", (ev) => { ev.preventDefault(); saveGoalEdit(); });
   // a copy of the goal's chart to change, and the eight under the cell at path in it (made as needed)
   const editChart = (g) => JSON.parse(JSON.stringify(g.mandala || Array(8).fill(null)));
   function slotsAt(chart, path) {
