@@ -1,0 +1,22 @@
+<!-- the app icon, 「日々のマス」: the PNGs in this folder are drawn from this file. A square with no rounded corners, as
+     iOS masks it itself (HIG app icons); today is the round yellow day on top of the stack -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17a24f"/><stop offset="1" stop-color="#007d2e"/></linearGradient></defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<rect x="163.8" y="163.8" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.16"/>
+<rect x="349.2" y="163.8" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.16"/>
+<rect x="534.5" y="163.8" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.16"/>
+<rect x="719.8" y="163.8" width="140.4" height="140.4" rx="70.2" fill="#ffcc00" fill-opacity="1.0"/>
+<rect x="163.8" y="349.2" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.16"/>
+<rect x="349.2" y="349.2" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.16"/>
+<rect x="534.5" y="349.2" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+<rect x="719.8" y="349.2" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+<rect x="163.8" y="534.5" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.16"/>
+<rect x="349.2" y="534.5" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+<rect x="534.5" y="534.5" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+<rect x="719.8" y="534.5" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+<rect x="163.8" y="719.8" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+<rect x="349.2" y="719.8" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+<rect x="534.5" y="719.8" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+<rect x="719.8" y="719.8" width="140.4" height="140.4" rx="39.3" fill="#ffffff" fill-opacity="0.95"/>
+</svg>
