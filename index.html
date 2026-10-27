@@ -598,16 +598,21 @@ ul.list > li.btn-row { padding: 0; }
 .row-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px var(--space-2); background: transparent; border: 0; border-radius: inherit; color: var(--accent); text-align: left; line-height: 1.3; cursor: pointer; }
 .row-btn.nav { color: var(--fg); }
 .row-btn .chev { display: grid; color: var(--muted); }
-/* 記録: これまでの積み重ね — everything recorded so far in one view (the user's call: no weeks, months or years; entries are
-   made from きょう). A card per record in its colour, Health-style: the total, a line under it, and a chart from the first
-   record to today — a running total filled underneath for counts and time, the line itself for weight */
+/* 記録: これまでの積み重ね — everything recorded so far in one view (the user's call: no weeks, months or years, and no
+   charts; entries are made from きょう). A card per record in its colour, Health-style: the total and a line or two under
+   it; for study and money, the three largest as a short list */
 .sum-since { margin: 0; font-size: var(--t-sub); font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* each half stays whole, so a narrow line breaks after から rather than inside a word */
+.sum-since span { display: inline-block; }
 .sum-card { padding: 12px var(--space-2) var(--space-2); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .sum-head { display: flex; align-items: center; gap: 6px; min-height: 28px; margin: 0; color: var(--sum-c); font-size: var(--t-sub); font-weight: 600; line-height: 1.2; }
 .sum-card .big { font-family: var(--font-round); font-size: var(--t-title1); line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .sum-card .big small { margin-inline-start: 4px; font-family: var(--font-body); font-size: var(--t-sub); font-weight: 600; color: var(--muted); }
-.sum-chart { margin-top: 8px; }
-.sum-chart svg { display: block; max-width: 100%; height: auto; }
+.sum-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--t-sub); line-height: 1.4; }
+.sum-list li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sum-list li::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--lc, var(--sum-c)); }
+.sum-list .name { min-width: 0; overflow-wrap: anywhere; }
+.sum-list .amount { margin-inline-start: auto; flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
 .sum-empty { margin: 0; padding: 12px 0 4px; text-align: center; font-size: var(--t-foot); color: var(--muted); }
 @media (min-width: 480px) { .sum-card.wide { grid-column: 1 / -1; } }
 .group-head { margin: var(--space-1) 0 -8px; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); }
@@ -2409,7 +2414,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
   }
 
-  // ---------- 記録: これまでの積み重ね (the user's call: everything so far in one view, no weeks, months or years) ----------
+  // ---------- 記録: これまでの積み重ね (the user's call: everything so far in one view; no weeks, months or years, no charts) ----------
   // a day counts as recorded when it has any record: a journal entry, a meal, a workout, study, a weight or money in or out
   function recordedDays() {
     const s = new Set();
@@ -2421,103 +2426,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const x of expenses.items) s.add(x.date);
     return s;
   }
-  // a round step for a chart's scale: 1, 2 or 5 times a power of ten
-  function niceTick(raw) {
-    if (!(raw > 0)) return 1;
-    const p = 10 ** Math.floor(Math.log10(raw)), f = raw / p;
-    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
-  }
-  const fmtYenTick = (v) => (v >= 10000 ? `${+(v / 10000).toFixed(1)}万` : Math.round(v).toLocaleString("ja-JP"));
   // minutes as hours once they add up: 53 時間 20 分
   const durBig = (min) => (min >= 60 ? [String(Math.floor(min / 60)), `時間 ${min % 60} 分`] : [String(min), "分"]);
-  // the chart frame: days from the first record to today across, the scale on the trailing side, and under it the
-  // months (weeks over a short span; years once it runs longer), thinned out so they never crowd
-  function sumChart(box, first, span, lo, hi, step, fmtTick) {
-    // the trailing margin fits the longest scale label (about 7.5px a Latin character, 13px a Japanese one at 13px)
-    const ticks = [];
-    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(v);
-    const longest = Math.max(...ticks.map((v) => [...fmtTick(v)].reduce((w, ch) => w + (ch.charCodeAt(0) < 128 ? 7.5 : 13), 0)));
-    const W = Math.max(240, Math.round(box.clientWidth) || 300), H = 150, padL = 2, padR = Math.ceil(longest) + 10, padT = 10, padB = 22;
-    const g = { W, H, pw: W - padL - padR, ph: H - padT - padB };
-    g.x = (i) => padL + (span > 1 ? (i / (span - 1)) * g.pw : g.pw / 2);
-    g.y = (v) => padT + g.ph - ((v - lo) / (hi - lo)) * g.ph;
-    g.svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img" });
-    for (const v of ticks) {
-      const y = g.y(v);
-      g.svg.append(svgEl("line", { class: "gridline", x1: padL, x2: W - padR, y1: y, y2: y }), svgEl("text", { class: "axis-text", x: W - padR + 6, y: y + 4 }, fmtTick(v)));
-    }
-    const marks = [];
-    if (span <= 62) for (let i = 0; i < span; i += 7) marks.push([i, fmtMD(addDays(first, i))]);
-    else {
-      for (let i = 0; i < span; i++) {
-        const d = addDays(first, i);
-        if (!d.endsWith("-01")) continue;
-        const dt = parseYmd(d);
-        marks.push([i, span > 400 && dt.getMonth() === 0 ? `${dt.getFullYear()}年` : `${dt.getMonth() + 1}月`]);
-      }
-    }
-    const every = Math.ceil(marks.length / Math.max(2, Math.floor(g.pw / 44)));
-    marks.forEach(([i, text], k) => {
-      if (k % every === 0) g.svg.append(svgEl("text", { class: "axis-text", x: g.x(i), y: H - 6, "text-anchor": g.x(i) < padL + 16 ? "start" : "middle" }, text));
-    });
-    return g;
-  }
-  // a running total from the first record to today, filled underneath: the stacking up the app is named after
-  function sumGrowth(box, first, span, daily, color, fmtTick, aria, minStep = 0) {
-    let run = 0;
-    const vals = [];
-    for (let i = 0; i < span; i++) { run += daily.get(addDays(first, i)) || 0; vals.push(run); }
-    if (!(run > 0)) { setChildren(box, el("p", { class: "sum-empty" }, "まだ記録がありません")); return; }
-    const step = Math.max(minStep, niceTick(run / 3)), top = Math.ceil(run / step) * step;
-    const g = sumChart(box, first, span, 0, top, step, fmtTick);
-    const line = vals.map((v, i) => `${i ? "L" : "M"}${g.x(i).toFixed(1)},${g.y(v).toFixed(1)}`).join(" ");
-    const base = g.y(0).toFixed(1);
-    g.svg.append(
-      svgEl("path", { d: `${line} L${g.x(span - 1).toFixed(1)},${base} L${g.x(0).toFixed(1)},${base} Z`, style: `fill:${color};fill-opacity:.16;stroke:none` }),
-      svgEl("path", { d: line, style: `fill:none;stroke:${color};stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round` }),
-      svgEl("circle", { cx: g.x(span - 1), cy: g.y(run), r: 4, style: `fill:${color};stroke:var(--surface);stroke-width:1.5` }));
-    g.svg.setAttribute("aria-label", aria);
-    setChildren(box, g.svg);
-  }
-  // weight is not a total: its own line through every record, on the same days
-  function sumWeight(box, first, span, wts, aria) {
-    if (!wts.length) { setChildren(box, el("p", { class: "sum-empty" }, "まだ記録がありません")); return; }
-    const vals = wts.map((w) => num(w.kg));
-    let lo = Math.min(...vals), hi = Math.max(...vals);
-    if (hi - lo < 1) { const mid = (hi + lo) / 2; lo = mid - 0.5; hi = mid + 0.5; }
-    const step = niceTick((hi - lo) / 3), yLo = Math.floor(lo / step) * step, yHi = Math.ceil(hi / step) * step;
-    const g = sumChart(box, first, span, yLo, yHi, step, (v) => v.toFixed(step < 1 ? 1 : 0));
-    const pts = wts.map((w) => [g.x(daysBetween(first, w.id)), g.y(num(w.kg))]);
-    if (pts.length > 1) g.svg.append(svgEl("path", { d: pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" "), style: "fill:none;stroke:var(--c-weight);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" }));
-    // a dot on each record while they are few; with many the line says it
-    for (const [x, y] of pts.length <= 40 ? pts : pts.slice(-1)) g.svg.append(svgEl("circle", { cx: x, cy: y, r: 3.5, style: "fill:var(--c-weight);stroke:var(--surface);stroke-width:1.5" }));
-    g.svg.setAttribute("aria-label", aria);
-    setChildren(box, g.svg);
-  }
-  function sumCard(color, iconName, title, big, unit, sub, wide) {
-    const chart = el("div", { class: "sum-chart" });
-    const card = el("div", { class: "card sum-card" + (wide ? " wide" : ""), style: `--sum-c:${color}` },
+  const durText = (min) => durBig(min).join(" ");
+  function sumCard(color, iconName, title, big, unit, sub, wide, extra) {
+    return el("div", { class: "card sum-card" + (wide ? " wide" : ""), style: `--sum-c:${color}` },
       el("h3", { class: "sum-head" }, icon(iconName, 18), el("span", {}, title)),
       el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
       sub ? el("div", { class: "sub" }, sub) : null,
-      chart);
-    return { card, chart };
+      extra);
   }
-  // the largest few of a total, as bars in their colours (where the money or the study time went)
-  function topRows(entries, colorOf, fmt) {
-    const top = [...entries].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  // the three largest of a total, as a short list with a dot in each one's colour (where the study time or the money went)
+  function topList(totals, colorOf, fmt) {
+    const top = [...totals].sort((a, b) => b[1] - a[1]).slice(0, 3);
     if (!top.length) return null;
-    return el("div", { style: "margin-top:8px" }, top.map(([name, amt]) => el("div", { class: "cat-row", style: "padding-inline:0" },
-      el("span", { class: "cat" }, name),
-      el("div", { class: "cat-track" }, el("div", { class: "cat-bar", style: `width:${Math.max(1, (amt / top[0][1]) * 100)}%;background:${colorOf(name)}` })),
-      el("span", { class: "amount" }, fmt(amt)))));
+    return el("ul", { class: "sum-list" }, top.map(([name, amt]) => el("li", { style: `--lc:${colorOf(name)}` },
+      el("span", { class: "name" }, name), el("span", { class: "amount" }, fmt(amt)))));
   }
-  const byDate = (items, dateOf, value) => {
-    const m = new Map();
-    for (const x of items) { const d = dateOf(x); if (d && d <= todayKey) m.set(d, (m.get(d) || 0) + value(x)); }
-    return m;
-  };
-  // charts measure their cards, so they are drawn only while the page shows (and again when it is opened)
   function renderSummary() {
     if (tab !== "records") return;
     const rec = [...recordedDays()].filter((d) => d && d <= todayKey).sort();
@@ -2527,87 +2452,57 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       return;
     }
     const first = rec[0], span = daysBetween(first, todayKey) + 1, f = parseYmd(first);
-    $("sumSince").textContent = `${f.getFullYear()}年${f.getMonth() + 1}月${f.getDate()}日から ${span} 日の積み重ね`;
-    const cards = [], draws = [];
+    setChildren($("sumSince"), el("span", {}, `${f.getFullYear()}年${f.getMonth() + 1}月${f.getDate()}日から`), " ", el("span", {}, `${span} 日の積み重ね`));
 
     // 続けた日: every day with a record, the streak running now and the longest one
     let streak = 0, longest = 0, run = 0, prev = null;
     const recSet = new Set(rec);
     for (let d = recSet.has(todayKey) ? todayKey : addDays(todayKey, -1); recSet.has(d); d = addDays(d, -1)) streak++;
     for (const d of rec) { run = prev && addDays(prev, 1) === d ? run + 1 : 1; longest = Math.max(longest, run); prev = d; }
-    const c1 = sumCard("var(--accent)", "records", "続けた日", String(rec.length), "日 記録した日", `いまの連続 ${streak} 日・いちばん長い連続 ${longest} 日`, true);
-    cards.push(c1.card);
-    draws.push(() => sumGrowth(c1.chart, first, span, new Map(rec.map((d) => [d, 1])), "var(--accent)", (v) => `${v}日`, `記録した日の積み重ね。${span}日のうち${rec.length}日。`, 1));
 
-    // 日記
     const js = journal.items.filter((j) => (j.date || j.id) <= todayKey);
     const moods = js.filter((j) => j.mood);
     const avgMood = moods.length ? sum(moods, (j) => j.mood) / moods.length : 0;
-    const c2 = sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日", moods.length ? `気分の平均：${MOODS[Math.round(avgMood)]}` : js.length ? "気分の記録はありません" : "まだ書いていません");
-    cards.push(c2.card);
-    draws.push(() => sumGrowth(c2.chart, first, span, byDate(js, (j) => j.date || j.id, () => 1), "var(--c-journal)", (v) => `${v}日`, `日記を書いた日の積み重ね。${js.length}日。`, 1));
 
-    // 食事
     const ms = meals.items.filter((m) => m.date <= todayKey);
-    const kcalDays = byDate(ms.filter((m) => typeof m.kcal === "number"), (m) => m.date, (m) => m.kcal);
+    const kcalDays = new Map();
+    for (const m of ms) if (typeof m.kcal === "number") kcalDays.set(m.date, (kcalDays.get(m.date) || 0) + m.kcal);
     const avgKcal = kcalDays.size ? sum([...kcalDays.values()], (v) => v) / kcalDays.size : 0;
-    const c3 = sumCard("var(--c-meal)", "meal", "食事", ms.length.toLocaleString("ja-JP"), "回",
-      `${new Set(ms.map((m) => m.date)).size} 日記録` + (kcalDays.size ? `・1日平均 ${Math.round(avgKcal).toLocaleString("ja-JP")} kcal` : ""));
-    cards.push(c3.card);
-    draws.push(() => sumGrowth(c3.chart, first, span, byDate(ms, (m) => m.date, () => 1), "var(--c-meal)", (v) => `${v}回`, `食事の記録の積み重ね。${ms.length}回。`, 1));
 
-    // 運動 and 勉強: time, in hours once it adds up
-    const hoursTick = (v) => `${+v.toFixed(1)}時間`;
     const ws = workouts.items.filter((w) => w.date <= todayKey);
     const wMin = sum(ws, (w) => w.minutes);
-    const c4 = sumCard("var(--c-workout)", "workout", "運動", ...durBig(wMin), `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日`);
-    cards.push(c4.card);
-    draws.push(() => sumGrowth(c4.chart, first, span, byDate(ws, (w) => w.date, (w) => num(w.minutes) / 60), "var(--c-workout)", hoursTick, `運動時間の積み重ね。合計${wMin}分。`));
 
     const sts = study.items.filter((x) => x.date <= todayKey);
     const stMin = sum(sts, (x) => x.minutes);
-    const c5 = sumCard("var(--c-study)", "study", "勉強", ...durBig(stMin), `${sts.length} 回・${new Set(sts.map((x) => x.date)).size} 日`);
-    cards.push(c5.card);
-    draws.push(() => {
-      sumGrowth(c5.chart, first, span, byDate(sts, (x) => x.date, (x) => num(x.minutes) / 60), "var(--c-study)", hoursTick, `勉強時間の積み重ね。合計${stMin}分。`);
-      const bySub = new Map();
-      for (const x of sts) { const k = subjectOf(x)?.name || "科目なし"; bySub.set(k, (bySub.get(k) || 0) + num(x.minutes)); }
-      const colorOf = (n) => { const sub = subjects.items.find((x) => x.name === n); return sub ? labelHue(sub) : "var(--c-study)"; };
-      const rows = topRows(bySub, colorOf, (m) => { const [b, u] = durBig(m); return `${b} ${u}`; });
-      if (rows && c5.chart.querySelector("svg")) c5.chart.append(rows);
-    });
+    const bySub = new Map();
+    for (const x of sts) { const k = subjectOf(x)?.name || "科目なし"; bySub.set(k, (bySub.get(k) || 0) + num(x.minutes)); }
+    const subColor = (n) => { const sub = subjects.items.find((x) => x.name === n); return sub ? labelHue(sub) : "var(--c-study)"; };
 
     // 体重: where it started, where it is now
     const wts = sortedWeights().filter((w) => w.id <= todayKey);
     const wFirst = wts[0], wLast = wts[wts.length - 1];
-    const c6 = sumCard("var(--c-weight)", "weight", "体重", wLast ? fmtKg(wLast.kg) : "—", wLast ? "kg" : null,
-      !wLast ? "まだ記録がありません" : wts.length > 1 ? `はじめ（${fmtMD(wFirst.id)}）から ${signed(num(wLast.kg) - num(wFirst.kg))} kg・${wts.length} 回` : `${fmtMD(wLast.id)}の記録`);
-    cards.push(c6.card);
-    draws.push(() => sumWeight(c6.chart, first, span, wts, wLast ? `体重の推移。いまは${fmtKg(wLast.kg)} kg。` : ""));
 
-    // 家計簿: money out so far, and where it went
     const ex = expenses.items.filter((e) => e.date <= todayKey);
     const outs = ex.filter((e) => e.kind !== "in"), ins = ex.filter((e) => e.kind === "in");
     const out = sum(outs, (e) => e.amount), inn = sum(ins, (e) => e.amount), net = inn - out;
-    const c7 = sumCard("var(--c-money)", "money", "家計簿", Math.round(out).toLocaleString("ja-JP"), "円 支出", `収入 ${fmtYen(inn)}・収支 ${net > 0 ? "+" : ""}${fmtYen(net)}`);
-    cards.push(c7.card);
-    draws.push(() => {
-      sumGrowth(c7.chart, first, span, byDate(outs, (e) => e.date, (e) => num(e.amount)), "var(--c-money)", fmtYenTick, `支出の積み重ね。合計${fmtYen(out)}。`);
-      const byCat = new Map();
-      for (const e of outs) byCat.set(e.category || "未分類", (byCat.get(e.category || "未分類") || 0) + num(e.amount));
-      const rows = topRows(byCat, () => "var(--c-money)", fmtYen);
-      if (rows && c7.chart.querySelector("svg")) c7.chart.append(rows);
-    });
+    const byCat = new Map();
+    for (const e of outs) byCat.set(e.category || "未分類", (byCat.get(e.category || "未分類") || 0) + num(e.amount));
 
-    setChildren($("sumCards"), cards);
-    for (const draw of draws) draw();
-  }
-  if ("ResizeObserver" in window) {
-    let last = 0;
-    new ResizeObserver(() => {
-      const w = $("sumCards").clientWidth;
-      if (w && w !== last) { last = w; renderSummary(); }
-    }).observe($("sumCards"));
+    setChildren($("sumCards"),
+      sumCard("var(--accent)", "records", "続けた日", String(rec.length), "日 記録した日", `いまの連続 ${streak} 日・いちばん長い連続 ${longest} 日`, true),
+      sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日",
+        moods.length ? `気分の平均：${MOODS[Math.round(avgMood)]}` : js.length ? "気分の記録はありません" : "まだ書いていません"),
+      sumCard("var(--c-meal)", "meal", "食事", ms.length.toLocaleString("ja-JP"), "回",
+        `${new Set(ms.map((m) => m.date)).size} 日記録` + (kcalDays.size ? `・1日平均 ${Math.round(avgKcal).toLocaleString("ja-JP")} kcal` : "")),
+      sumCard("var(--c-workout)", "workout", "運動", ...durBig(wMin), `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日`),
+      sumCard("var(--c-study)", "study", "勉強", ...durBig(stMin), `${sts.length} 回・${new Set(sts.map((x) => x.date)).size} 日`, false,
+        topList(bySub, subColor, durText)),
+      sumCard("var(--c-weight)", "weight", "体重", wLast ? fmtKg(wLast.kg) : "—", wLast ? "kg" : null,
+        !wLast ? "まだ記録がありません" : wts.length > 1
+          ? `はじめ（${fmtMD(wFirst.id)}）の ${fmtKg(wFirst.kg)} kg から ${signed(num(wLast.kg) - num(wFirst.kg))} kg・${wts.length} 回`
+          : `${fmtMD(wLast.id)}の記録`),
+      sumCard("var(--c-money)", "money", "家計簿", Math.round(out).toLocaleString("ja-JP"), "円 支出", `収入 ${fmtYen(inn)}・収支 ${net > 0 ? "+" : ""}${fmtYen(net)}`, false,
+        topList(byCat, () => "var(--c-money)", fmtYen)));
   }
 
   // ---------- 記録の書き出し・読み込み ----------
