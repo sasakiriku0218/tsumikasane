@@ -473,15 +473,6 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .tile ul li::before { content: "・"; color: var(--tile-c); }
 /* today's events: a dot in each event's label colour */
 .tile ul.ev li::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline: 4px 8px; border-radius: 50%; background: var(--dot); vertical-align: 1px; }
-.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); padding: 12px var(--space-2) var(--space-1); }
-.day { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--t-foot); line-height: 1.2; color: var(--muted); }
-.day .n { font-size: var(--t-body); font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
-.day.today .n { color: var(--accent); }
-.day .cells { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
-.day .cell { display: block; width: 24px; height: 8px; border-radius: 4px; background: var(--fill); }
-.day .cell.on { background: var(--cell-c); }
-.legend { display: flex; flex-wrap: wrap; gap: 4px var(--space-2); padding: 0 var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.35; color: var(--muted); }
-.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; background: var(--lc); vertical-align: 1px; }
 
 /* calendar: a Sunday-first month grid of thin gray lines (between weeks and between days, as the user asked) with each
    day's plans written in coloured bars, after the iPhone Calendar's month view the user showed. Today's date is in the
@@ -726,18 +717,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             <button type="button" class="link-btn" id="nudgeLater">あとで</button>
           </div>
         </div>
+        <!-- the tiles end the page: no 「この7日間のつみかさね」 card under them (the user's call) -->
         <div class="grid" id="homeTiles"></div>
-        <div class="card">
-          <div class="card-head">この7日間のつみかさね</div>
-          <div class="week" id="week"></div>
-          <div class="legend">
-            <span style="--lc: var(--c-journal)">日記</span>
-            <span style="--lc: var(--c-meal)">食事</span>
-            <span style="--lc: var(--c-workout)">運動</span>
-            <span style="--lc: var(--c-study)">勉強</span>
-            <span style="--lc: var(--c-weight)">体重</span>
-          </div>
-        </div>
       </section>
 
       <!-- カレンダー -->
@@ -2427,23 +2408,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         `達成 ${doneG} 件` + (nearest ? `・「${nearest.title}」まで${daysUntil(nearest.deadline) < 0 ? "期限切れ" : "あと " + daysUntil(nearest.deadline) + " 日"}` : ""),
         null, "goal")
     );
-    renderWeek();
-  }
-  function renderWeek() {
-    const w = $("week");
-    w.replaceChildren();
-    const colors = ["var(--c-journal)", "var(--c-meal)", "var(--c-workout)", "var(--c-study)", "var(--c-weight)"];
-    const names = ["日記", "食事", "運動", "勉強", "体重"];
-    for (let i = 6; i >= 0; i--) {
-      const d = addDays(todayKey, -i);
-      const dt = parseYmd(d);
-      const has = [!!journal.get(d), meals.items.some((x) => x.date === d), workouts.items.some((x) => x.date === d), study.items.some((x) => x.date === d), !!weights.get(d)];
-      w.append(el("div", { class: "day" + (d === todayKey ? " today" : ""), title: fmtShort(d) },
-        el("span", {}, WD[dt.getDay()]),
-        el("span", { class: "n" }, dt.getDate()),
-        el("div", { class: "cells" }, has.map((h, k) => el("i", { class: "cell" + (h ? " on" : ""), style: `--cell-c:${colors[k]}`, title: `${names[k]}：${h ? "あり" : "なし"}` })))
-      ));
-    }
   }
 
   // ---------- 記録: これまでの積み重ね (the user's call: everything so far in one view; no weeks, months or years, no charts) ----------
