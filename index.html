@@ -280,7 +280,7 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
    icon lined up with the cards' right edge */
 .icon-btn { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -6px -11px -6px auto; padding: 0; background: transparent; border: 0; border-radius: 50%; color: var(--accent); cursor: pointer; }
 .icon-btn .icon { width: 22px; height: 22px; }
-/* a large title with a button at its trailing end (勉強's gear for its subjects) */
+/* a large title with a button at its trailing end (勉強's gear for its subjects, 目標's ＋) */
 .title-row { align-self: stretch; display: flex; align-items: center; gap: var(--space-1); }
 @media (hover: none), (pointer: coarse) {
   .monthbar .navbtn:not(:focus-visible) { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
@@ -376,6 +376,7 @@ ul.list li.dayhead::before, ul.list li.dayhead + li::before { display: none; }
   ul.list > li:has(> .chip, > .datecell, > .num, > .amount) > .del { margin-inline-start: auto; }
 }
 .empty { display: block; padding: var(--space-3) var(--space-2); text-align: center; color: var(--muted); }
+.empty .phrase { display: inline-block; }  /* a sentence kept whole, so the line breaks between sentences */
 .note { padding: var(--space-1) var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 /* delete: × first, then a red 削除する capsule to confirm (destructive role) */
 .del { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 44px; margin-inline-end: -10px; padding: 0 10px; background: transparent; border: 0; border-radius: 999px; color: var(--muted); cursor: pointer; line-height: 1; }
@@ -574,6 +575,7 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .32); animation: sheet-fade .
 .sheet-btn { grid-row: 1; min-height: 44px; padding: 0 8px; background: transparent; border: 0; color: var(--accent); line-height: 1.2; white-space: nowrap; cursor: pointer; }  /* kept whole: the title gives way */
 .sheet-btn.start { grid-column: 1; justify-self: start; }
 .sheet-btn.end { grid-column: 3; justify-self: end; font-weight: 600; }
+.sheet-btn:disabled { color: var(--muted); opacity: .6; cursor: default; }  /* 追加 before the new goal has a name */
 .sheet-body { padding: 4px var(--space-2) max(var(--space-3), env(safe-area-inset-bottom, 0px)); container-type: inline-size; }
 .sheet-view { display: flex; flex-direction: column; gap: var(--space-2); }
 .sheet-del { display: block; width: 100%; min-height: 50px; padding: 0 var(--space-2); text-align: center; }
@@ -954,30 +956,27 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
       </section>
 
-      <!-- 目標 -->
+      <!-- 目標: the goals, and a ＋ at the trailing end of the title that opens a new goal's form in the sheet (the user's call:
+           no counts under the title, and adding from ＋ rather than a form on the page) -->
       <section id="sec-goal" style="--sec-c: var(--c-goal)" hidden>
-        <div class="sec-head"><h2>目標</h2><span class="muted small" id="goalCount"></span></div>
-        <form class="add" id="goalForm" autocomplete="off">
-          <input type="text" id="goalTitle" class="full" placeholder="目標（例：本を読む）" aria-label="目標" maxlength="200" required>
-          <label class="flabel" for="goalTarget">目標値 <span class="opt">任意</span></label>
-          <div class="ffield"><input type="number" id="goalTarget" placeholder="10" min="1" max="999999" inputmode="numeric"><input type="text" id="goalUnit" class="unit-field" placeholder="単位（冊など）" aria-label="単位（任意）" maxlength="10"></div>
-          <label class="flabel" for="goalDeadline">期限 <span class="opt">任意</span></label>
-          <div class="ffield"><input type="date" id="goalDeadline"></div>
-          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
-        </form>
+        <div class="sec-head">
+          <div class="title-row"><h2>目標</h2><button type="button" class="icon-btn" id="goalAdd" aria-label="目標を追加" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button></div>
+        </div>
         <div class="card" id="goalList"></div>
       </section>
     </div>
   </main>
 </div>
 
-<!-- a day's plans in an iOS-style sheet: a tap on a day in the month opens it, and they are added, changed and deleted here -->
+<!-- a day's plans in an iOS-style sheet: a tap on a day in the month opens it, and they are added, changed and deleted here.
+     The gears open their settings in it, and 目標's ＋ a new goal's form -->
 <dialog class="sheet" id="daySheet" aria-labelledby="sheetTitle">
   <div class="sheet-head" id="sheetHead">
     <button type="button" class="sheet-btn start" id="sheetCancel" hidden>キャンセル</button>
     <h2 class="sheet-title" id="sheetTitle" tabindex="-1" autofocus></h2>
     <button type="button" class="sheet-btn end" id="sheetDone">完了</button>
     <button type="submit" class="sheet-btn end" id="sheetSave" form="evEdit" hidden>保存</button>
+    <button type="submit" class="sheet-btn end" id="goalSave" form="goalForm" hidden disabled>追加</button>
   </div>
   <div class="sheet-body">
     <div class="sheet-view" id="dayView">
@@ -1022,6 +1021,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
         <p class="group-foot">勉強の記録に付けて色分けできます。科目を消すと、付いていた記録は「科目なし」になります。</p>
       </div>
+    </div>
+    <!-- a new goal, from the ＋ on 目標: キャンセル and 追加 on the bar, as iOS sheets for a new item have -->
+    <div class="sheet-view" id="goalView" hidden>
+      <form class="add" id="goalForm" autocomplete="off">
+        <input type="text" id="goalTitle" class="full" placeholder="目標（例：本を読む）" aria-label="目標" maxlength="200" required>
+        <label class="flabel" for="goalTarget">目標値 <span class="opt">任意</span></label>
+        <div class="ffield"><input type="number" id="goalTarget" placeholder="10" min="1" max="999999" inputmode="numeric"><input type="text" id="goalUnit" class="unit-field" placeholder="単位（冊など）" aria-label="単位（任意）" maxlength="10"></div>
+        <label class="flabel" for="goalDeadline">期限 <span class="opt">任意</span></label>
+        <div class="ffield"><input type="date" id="goalDeadline"></div>
+      </form>
+      <p class="group-foot">数で追える目標なら、目標値と単位も入れると進み具合が見えます。</p>
     </div>
   </div>
   <div class="toast" id="sheetStatus" role="status"></div>
@@ -1880,6 +1890,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
 
   // ---------- 目標 ----------
+  // a new goal is made in the sheet the ＋ opens (openNewGoal); 追加 there stays grey until the goal has a name
+  const syncGoalSave = () => { $("goalSave").disabled = !$("goalTitle").value.trim(); };
+  $("goalTitle").addEventListener("input", syncGoalSave);
+  function clearGoalForm() { $("goalForm").reset(); syncGoalSave(); }
+  $("goalAdd").addEventListener("click", (ev) => openNewGoal(ev.detail === 0));
   $("goalForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const title = $("goalTitle").value.trim();
@@ -1892,7 +1907,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const deadline = $("goalDeadline").value;
     if (deadline) item.deadline = deadline;
     act(() => goals.add(item));
-    $("goalTitle").value = ""; $("goalTarget").value = ""; $("goalUnit").value = ""; $("goalDeadline").value = ""; $("goalTitle").focus();
+    clearGoalForm();
+    closeSheet(); // the new goal shows in the list as the sheet goes down
   });
   function setGoalCurrent(g, v) {
     v = Math.max(0, Math.round(num(v)));
@@ -1912,10 +1928,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function renderGoals() {
     const active = goals.items.filter((g) => !g.done).sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999") || num(a.createdAt) - num(b.createdAt));
     const done = goals.items.filter((g) => g.done).sort((a, b) => num(b.doneAt) - num(a.doneAt));
-    $("goalCount").textContent = `進行中 ${active.length} 件・達成 ${done.length} 件`;
     const list = $("goalList");
     list.replaceChildren();
-    if (!goals.items.length) { list.append(el("div", { class: "empty" }, "まだ目標がありません。数で追える目標なら、目標値と単位も入れると進み具合が見えます。")); return; }
+    if (!goals.items.length) { list.append(el("div", { class: "empty" }, el("span", { class: "phrase" }, "まだ目標がありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。"))); return; }
     for (const g of [...active, ...done]) {
       const hasTarget = num(g.target) > 0;
       const cur = num(g.current), tgt = num(g.target);
@@ -2104,18 +2119,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
   let editingId = null, edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
   let settingsFrom = null; // the settings showing: "gear" when opened from the month bar, "day" when from a day's sheet
-  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or 勉強's
+  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear, 勉強's or 目標's ＋
   let settingsScope = "calendar"; // whose settings: the calendar's labels or 勉強's subjects
+  let goalNew = false; // the sheet holds a new goal's form, opened from 目標's ＋
   // the bar on top: 完了 over the day's list and the settings; キャンセル and 保存 over an event's edit form, as iOS edit
-  // sheets have; 戻る over the settings when a day's sheet led to them
+  // sheets have, and キャンセル and 追加 over a new goal; 戻る over the settings when a day's sheet led to them
   function syncSheetHead() {
-    const settings = !!settingsFrom, editing = !settings && !!editingId, rel = relLabel(calDay);
-    $("dayView").hidden = settings || editing; $("editView").hidden = !editing; $("settingsView").hidden = !settings;
+    const goal = goalNew, settings = !goal && !!settingsFrom, editing = !goal && !settings && !!editingId, rel = relLabel(calDay);
+    $("dayView").hidden = goal || settings || editing; $("editView").hidden = !editing; $("settingsView").hidden = !settings; $("goalView").hidden = !goal;
     $("labelsGroup").hidden = settingsScope !== "calendar"; $("subjectsGroup").hidden = settingsScope !== "study";
-    $("sheetDone").hidden = editing; $("sheetSave").hidden = !editing;
-    $("sheetCancel").hidden = !editing && settingsFrom !== "day";
-    $("sheetCancel").textContent = editing ? "キャンセル" : "戻る";
-    $("sheetTitle").textContent = settings ? "設定" : editing ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
+    $("sheetDone").hidden = editing || goal; $("sheetSave").hidden = !editing; $("goalSave").hidden = !goal;
+    $("sheetCancel").hidden = !editing && !goal && settingsFrom !== "day";
+    $("sheetCancel").textContent = editing || goal ? "キャンセル" : "戻る";
+    $("sheetTitle").textContent = goal ? "新しい目標" : settings ? "設定" : editing ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
   }
   // a closed sheet's starting state: no animation or drag left over, the day's list showing
   function resetSheet() {
@@ -2123,7 +2139,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     clearTimeout(closeTimer);
     sheetAnims = []; sheetClosing = false; drag = null;
     sheetEl.style.transform = "";
-    editingId = null; settingsFrom = null; disarmDelete(); syncSheetHead();
+    editingId = null; settingsFrom = null; goalNew = false; disarmDelete(); syncSheetHead();
   }
   function openDay(d, byKey) {
     if (sheetEl.open) return;
@@ -2143,6 +2159,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     resetSheet();
     settingsFrom = "gear"; syncSheetHead();
     presentSheet(byKey, scope === "study" ? "study" : "gear");
+  }
+  // a new goal: the form takes the sheet, its name field ready to type in (what was typed stays if the sheet is pulled away)
+  function openNewGoal(byKey) {
+    if (sheetEl.open) return;
+    resetSheet();
+    goalNew = true; syncSheetHead(); syncGoalSave();
+    presentSheet(byKey, "goal");
+    $("goalTitle").focus();
   }
   // the sheet slides up from the bottom (fades in on wide screens)
   function presentSheet(byKey, opener) {
@@ -2170,7 +2194,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (sheetEl.open) return; // opened again before this arrived
     resetSheet();
     // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
-    if (sheetByKey) ({ gear: $("calSettings"), study: $("studySettings") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
+    if (sheetByKey) ({ gear: $("calSettings"), study: $("studySettings"), goal: $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
   // Esc: from an edit form (or settings reached from a day) back to the day's list, otherwise out of the sheet
   sheetEl.addEventListener("cancel", (ev) => { ev.preventDefault(); if (editingId || settingsFrom === "day") showDayView(); else closeSheet(); });
@@ -2181,7 +2205,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (ev.clientY < r.top || ev.clientY > r.bottom || ev.clientX < r.left || ev.clientX > r.right) closeSheet();
   });
   $("sheetDone").addEventListener("click", () => closeSheet());
-  $("sheetCancel").addEventListener("click", () => showDayView());
+  // キャンセル: a new goal is dropped; an edit form, or settings reached from a day, go back to the day's list
+  $("sheetCancel").addEventListener("click", () => { if (goalNew) { clearGoalForm(); closeSheet(); } else showDayView(); });
   $("calSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0));
   // iPhone: the bar on top can be pulled down to put the sheet away, as iOS sheets can
   sheetHead.addEventListener("pointerdown", (ev) => {
