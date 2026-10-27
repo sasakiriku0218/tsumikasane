@@ -3,10 +3,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
 <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17a24f"/><stop offset="1" stop-color="#007d2e"/></linearGradient></defs>
 <rect width="1024" height="1024" fill="url(#bg)"/>
-<rect x="642.0" y="151.8" width="185.7" height="185.7" rx="52.0" fill="#ffcc00"/>
-<rect x="396.9" y="396.9" width="185.7" height="185.7" rx="52.0" fill="#ffffff"/>
-<rect x="642.0" y="396.9" width="185.7" height="185.7" rx="52.0" fill="#ffffff"/>
-<rect x="151.8" y="642.0" width="185.7" height="185.7" rx="52.0" fill="#ffffff"/>
-<rect x="396.9" y="642.0" width="185.7" height="185.7" rx="52.0" fill="#ffffff"/>
-<rect x="642.0" y="642.0" width="185.7" height="185.7" rx="52.0" fill="#ffffff"/>
+<rect x="689.1" y="149.6" width="136.3" height="136.3" rx="38.2" fill="#ffcc00"/>
+<rect x="509.3" y="329.4" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
+<rect x="689.1" y="329.4" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
+<rect x="329.4" y="509.3" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
+<rect x="509.3" y="509.3" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
+<rect x="689.1" y="509.3" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
+<rect x="149.6" y="689.1" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
+<rect x="329.4" y="689.1" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
+<rect x="509.3" y="689.1" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
+<rect x="689.1" y="689.1" width="136.3" height="136.3" rx="38.2" fill="#ffffff"/>
 </svg>
