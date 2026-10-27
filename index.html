@@ -54,6 +54,7 @@
   --c-journal: #956d51;     /* brown */
   --c-meal: #c55300;        /* orange */
   --c-workout: #007eae;     /* cyan */
+  --c-study: #e7124d;       /* pink */
   --c-weight: #564ade;      /* indigo */
   --c-money: #a16a00;       /* yellow */
   --c-goal: #008575;        /* mint */
@@ -61,7 +62,7 @@
   /* behind white glyphs and text (icon squares, selected chips): the same in both modes, each 4.5:1 with white */
   --f-home: #007d2e; --f-records: #6c6c70;
   --f-todo: #1e6ef4; --f-cal: #b02fc2; --f-journal: #956d51; --f-meal: #c55300;
-  --f-workout: #007eae; --f-weight: #564ade; --f-money: #a16a00; --f-goal: #008575;
+  --f-workout: #007eae; --f-study: #e7124d; --f-weight: #564ade; --f-money: #a16a00; --f-goal: #008575;
   /* event label hues, the user's pick among iOS system colours: --lc-* for dots and light tints (follows dark mode),
      --lf-* behind white text (the same in both modes, 4.5:1 with white) */
   --lc-red: #e9152d; --lc-orange: #c55300; --lc-yellow: #a16a00; --lc-green: #008932; --lc-cyan: #007eae;
@@ -98,7 +99,7 @@
     --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
     --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
     --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --sat: #5cb8ff;
+    --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-study: #ff375f; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --sat: #5cb8ff;
     --lc-red: #ff4245; --lc-orange: #ff9230; --lc-yellow: #ffd600; --lc-green: #30d158; --lc-cyan: #3cd3fe; --lc-blue: #0091ff; --lc-purple: #db34f2; --lc-pink: #ff375f; --lc-brown: #b78a66; --lc-gray: #8e8e93;
     color-scheme: dark;
   }
@@ -110,7 +111,7 @@
   --thumb: #636366; --glass: rgba(30, 30, 32, .78); --glass-solid: #1c1c1e; --glass-edge: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .14);
   --shadow: 0 6px 24px rgba(0, 0, 0, .5); --toast-bg: rgba(58, 58, 60, .96);
   --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 4.5 6 2l2.5 2.5M3.5 7.5 6 10l2.5-2.5' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --sat: #5cb8ff;
+  --c-todo: #0091ff; --c-cal: #db34f2; --c-journal: #b78a66; --c-meal: #ff9230; --c-workout: #3cd3fe; --c-study: #ff375f; --c-weight: #6d7cff; --c-money: #ffd600; --c-goal: #00dac3; --sat: #5cb8ff;
   --lc-red: #ff4245; --lc-orange: #ff9230; --lc-yellow: #ffd600; --lc-green: #30d158; --lc-cyan: #3cd3fe; --lc-blue: #0091ff; --lc-purple: #db34f2; --lc-pink: #ff375f; --lc-brown: #b78a66; --lc-gray: #8e8e93;
   color-scheme: dark;
 }
@@ -122,7 +123,7 @@
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --muted: #c7c7cc; --line: #aeaeb2; --accent: #4ad968;
-    --c-todo: #5cb8ff; --c-cal: #ea8dff; --c-journal: #dba679; --c-meal: #ffa056; --c-workout: #6dd9ff; --c-weight: #a7aaff; --c-money: #fedf43; --c-goal: #54dfcb;
+    --c-todo: #5cb8ff; --c-cal: #ea8dff; --c-journal: #dba679; --c-meal: #ffa056; --c-workout: #6dd9ff; --c-study: #ff8aa9; --c-weight: #a7aaff; --c-money: #fedf43; --c-goal: #54dfcb;
   }
 }
 
@@ -279,6 +280,8 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
    icon lined up with the cards' right edge */
 .icon-btn { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -6px -11px -6px auto; padding: 0; background: transparent; border: 0; border-radius: 50%; color: var(--accent); cursor: pointer; }
 .icon-btn .icon { width: 22px; height: 22px; }
+/* a large title with a button at its trailing end (勉強's gear for its subjects) */
+.title-row { align-self: stretch; display: flex; align-items: center; gap: var(--space-1); }
 @media (hover: none), (pointer: coarse) {
   .monthbar .navbtn:not(:focus-visible) { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
 }
@@ -516,7 +519,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* event labels: the user's own categories. Wherever a label is picked or listed its name sits next to the colour, so colour
    is never the only cue (HIG); the month grid writes each plan's title in it and has no legend (the user's call). In the
    forms they are one-tap chips; a chosen chip fills with its colour and white text. */
-#evLabelLabel, #edLabelLabel { align-self: start; margin-top: 4px; }  /* the chips can wrap, so the label stays with their first row */
+#evLabelLabel, #edLabelLabel, #stSubjectLabel { align-self: start; margin-top: 4px; }  /* the chips can wrap, so the label stays with their first row */
 .label-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .label-chips label { position: relative; display: grid; cursor: pointer; }
 .label-chips input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
@@ -670,6 +673,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-journal" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7.5 2.5h10.75c.69 0 1.25.56 1.25 1.25v12.5c0 .69-.56 1.25-1.25 1.25H7.5a1.25 1.25 0 0 0 0 2.5h11.25a.75.75 0 0 1 0 1.5H7.5a2.75 2.75 0 0 1-2.75-2.75V5.25A2.75 2.75 0 0 1 7.5 2.5Zm2 3.5a.75.75 0 0 0 0 1.5h6a.75.75 0 0 0 0-1.5h-6Z"/></symbol>
   <symbol id="i-meal" viewBox="0 0 24 24"><path d="M5.25 2.75a.75.75 0 0 1 .75.75V8h1V3.5a.75.75 0 0 1 1.5 0V8h1V3.5a.75.75 0 0 1 1.5 0V9a3 3 0 0 1-2.25 2.9v8.6a1 1 0 1 1-2 0v-8.6A3 3 0 0 1 4.5 9V3.5a.75.75 0 0 1 .75-.75ZM17 2.75c1.79 0 3 2.46 3 6.25 0 1.69-.63 2.86-1.75 3.4v8.1a1 1 0 1 1-2 0V3.6c0-.47.33-.85.75-.85Z"/></symbol>
   <symbol id="i-workout" viewBox="0 0 24 24"><path d="M5.25 6h1A1.75 1.75 0 0 1 8 7.75V11h8V7.75A1.75 1.75 0 0 1 17.75 6h1a1.75 1.75 0 0 1 1.75 1.75V9h.25a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-.25v1.25A1.75 1.75 0 0 1 18.75 18h-1A1.75 1.75 0 0 1 16 16.25V13H8v3.25A1.75 1.75 0 0 1 6.25 18h-1a1.75 1.75 0 0 1-1.75-1.75V15h-.25a1.5 1.5 0 0 1-1.5-1.5v-3A1.5 1.5 0 0 1 3.25 9h.25V7.75A1.75 1.75 0 0 1 5.25 6Z"/></symbol>
+  <symbol id="i-study" viewBox="0 0 24 24"><path d="M3.4 20.6 4.5 15.9 15 5.4 18.6 9 8.1 19.5Z"/><path d="M16.1 4.3 17.3 3.1A1.7 1.7 0 0 1 19.7 3.1L20.9 4.3A1.7 1.7 0 0 1 20.9 6.7L19.7 7.9Z"/></symbol>
   <symbol id="i-weight" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm1.25 7.5h7.5a3.75 3.75 0 0 0-7.5 0Z"/><path d="m11.4 10.1 1.6-2.75a.6.6 0 0 1 1.04.6l-1.6 2.75a.6.6 0 0 1-1.04-.6Z"/></symbol>
   <symbol id="i-money" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19ZM8.3 6.9l1.3-.9 2.4 3.5 2.4-3.5 1.3.9-2.6 3.8H15v1.5h-2.25v1.2H15v1.5h-2.25V18h-1.5v-3.1H9v-1.5h2.25v-1.2H9v-1.5h1.9L8.3 6.9Z"/></symbol>
   <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .53.22l3.25 3.25a.75.75 0 0 1-1.06 1.06l-1.97-1.97v9.44a.75.75 0 0 1-1.5 0V4.81L9.28 6.78a.75.75 0 0 1-1.06-1.06l3.25-3.25A.75.75 0 0 1 12 2.25ZM6.5 9.5h2a.75.75 0 0 1 0 1.5h-2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.75.75 0 0 1 0-1.5h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/></symbol>
@@ -732,6 +736,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             <span style="--lc: var(--c-journal)">日記</span>
             <span style="--lc: var(--c-meal)">食事</span>
             <span style="--lc: var(--c-workout)">運動</span>
+            <span style="--lc: var(--c-study)">勉強</span>
             <span style="--lc: var(--c-weight)">体重</span>
           </div>
         </div>
@@ -856,6 +861,26 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </form>
         <ul class="list card" id="workoutList"></ul>
         <div class="muted small" id="workoutTotal"></div>
+      </section>
+
+      <!-- 勉強: time by subject, entered after studying (the user's call: no timer). The subjects are the user's own, each with
+           a colour, set up under the gear like the calendar's labels -->
+      <section id="sec-study" style="--sec-c: var(--c-study)" hidden>
+        <div class="sec-head">
+          <div class="title-row"><h2>勉強</h2><button type="button" class="icon-btn" id="studySettings" aria-label="科目の設定" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-gear"/></svg></button></div>
+          <div class="datenav"></div>
+        </div>
+        <form class="add" id="studyForm" autocomplete="off">
+          <span class="flabel" id="stSubjectLabel">科目</span>
+          <div class="ffield" id="stSubjects"></div>
+          <label class="flabel" for="stMin">時間<span class="sr-only">（分）</span></label>
+          <div class="ffield"><input type="number" id="stMin" placeholder="30" min="1" max="1440" inputmode="numeric" required><span class="unit">分</span></div>
+          <label class="flabel" for="stNote">メモ <span class="opt">任意</span></label>
+          <div class="ffield"><input type="text" id="stNote" maxlength="200" placeholder="問題集 p.20〜35"></div>
+          <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
+        </form>
+        <ul class="list card" id="studyList"></ul>
+        <div class="muted small" id="studyTotal"></div>
       </section>
 
       <!-- 体重 -->
@@ -993,12 +1018,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     </div>
     <!-- the calendar's settings, opened from the gear on the month bar (or from a day when there are no labels yet) -->
     <div class="sheet-view" id="settingsView" hidden>
-      <h3 class="group-head">ラベル</h3>
-      <div class="card">
-        <ul class="list" id="labelList"></ul>
-        <div class="label-tools"><button type="button" class="link-btn" id="labelAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>ラベルを追加</button></div>
+      <!-- one group shows at a time: the calendar's labels, or 勉強's subjects -->
+      <div class="sheet-view" id="labelsGroup">
+        <h3 class="group-head">ラベル</h3>
+        <div class="card">
+          <ul class="list" id="labelList"></ul>
+          <div class="label-tools"><button type="button" class="link-btn" id="labelAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>ラベルを追加</button></div>
+        </div>
+        <p class="group-foot">予定に付けて色分けできます。ラベルを消すと、付いていた予定は「ラベルなし」になります。</p>
       </div>
-      <p class="group-foot">予定に付けて色分けできます。ラベルを消すと、付いていた予定は「ラベルなし」になります。</p>
+      <div class="sheet-view" id="subjectsGroup" hidden>
+        <h3 class="group-head">科目</h3>
+        <div class="card">
+          <ul class="list" id="subjectList"></ul>
+          <div class="label-tools"><button type="button" class="link-btn" id="subjectAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>科目を追加</button></div>
+        </div>
+        <p class="group-foot">勉強の記録に付けて色分けできます。科目を消すと、付いていた記録は「科目なし」になります。</p>
+      </div>
     </div>
   </div>
   <div class="toast" id="sheetStatus" role="status"></div>
@@ -1088,6 +1124,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     { key: "journal", label: "日記", icon: "journal", fill: "var(--f-journal)" },
     { key: "meal", label: "食事", icon: "meal", fill: "var(--f-meal)" },
     { key: "workout", label: "運動", icon: "workout", fill: "var(--f-workout)" },
+    { key: "study", label: "勉強", icon: "study", fill: "var(--f-study)" },
     { key: "weight", label: "体重", icon: "weight", fill: "var(--f-weight)" },
     { key: "money", label: "家計簿", icon: "money", fill: "var(--f-money)" },
   ];
@@ -1139,7 +1176,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const settings = new Store("settings");
   const events = new Store("events");
   const labels = new Store("labels"); // the user's categories for events
-  const ALL_STORES = [todos, journal, meals, workouts, weights, expenses, goals, settings, events, labels];
+  const study = new Store("study"); // time studied: {date, minutes, subjectId?, note?}
+  const subjects = new Store("subjects"); // the user's subjects for study, with a colour each, like the labels
+  const ALL_STORES = [todos, journal, meals, workouts, weights, expenses, goals, settings, events, labels, study, subjects];
 
   const statusEl = $("status");
   let statusTimer = null;
@@ -1483,6 +1522,51 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const wk = weekMinutes();
     $("workoutTotal").textContent = (items.length ? `この日 ${total} 分（${items.length} 件）・` : "") + `この7日間 ${wk.minutes} 分、${wk.days} 日`;
   }
+
+  // ---------- 勉強 ----------
+  // time by subject, entered after studying (the user's call: no timer); the subjects are the user's own, with a colour each
+  const sortedSubjects = () => [...subjects.items].sort((a, b) => num(a.createdAt) - num(b.createdAt));
+  const subjectOf = (x) => (x && x.subjectId && subjects.get(x.subjectId)) || null;
+  const subjectStyle = (s) => (s ? labelStyle(s) : "--lc:var(--c-study);--lf:var(--f-study)");
+  let stSubjectChoice = ""; // the subject picked in the form; it stays picked for the next entry
+  function makeFirstSubject() { openSettings(false, "study"); addTag(subjects, $("subjectList"), "新しい科目"); }
+  $("studyForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const minutes = Math.round(Number($("stMin").value));
+    if (!(minutes > 0)) return;
+    const item = { date: viewDate, minutes, createdAt: Date.now() };
+    if (stSubjectChoice && subjects.get(stSubjectChoice)) item.subjectId = stSubjectChoice;
+    const note = $("stNote").value.trim();
+    if (note) item.note = note;
+    act(() => study.add(item));
+    $("stMin").value = ""; $("stNote").value = ""; $("stMin").focus();
+  });
+  function studyWeek() {
+    const start = addDays(todayKey, -6);
+    const inWeek = study.items.filter((x) => x.date >= start && x.date <= todayKey);
+    return { minutes: sum(inWeek, (x) => x.minutes), days: new Set(inWeek.map((x) => x.date)).size };
+  }
+  function renderStudy() {
+    if (stSubjectChoice && !subjects.get(stSubjectChoice)) stSubjectChoice = "";
+    setChildren($("stSubjects"), tagPicker(sortedSubjects(), makeFirstSubject, "科目を作る", "stSubject", stSubjectChoice, (v) => { stSubjectChoice = v; }, "stSubjectLabel", subjectStyle));
+    renderTagEditor(subjects, $("subjectList"), "科目");
+    const items = study.items.filter((x) => x.date === viewDate).sort((a, b) => num(a.createdAt) - num(b.createdAt));
+    const list = $("studyList");
+    list.replaceChildren();
+    if (!items.length) list.append(el("li", { class: "empty" }, "この日の勉強はまだ記録していません。"));
+    for (const x of items) {
+      const sub = subjectOf(x);
+      list.append(el("li", { style: subjectStyle(sub) },
+        el("span", { class: "chip", style: "--chip-c: var(--lc)" }, `${num(x.minutes)} 分`),
+        el("span", { class: "body" }, el("span", { class: "text" }, sub ? sub.name : "科目なし"), x.note ? el("span", { class: "sub" }, x.note) : null),
+        delButton(() => act(() => study.remove(x.id)))
+      ));
+    }
+    const total = sum(items, (x) => x.minutes), wk = studyWeek();
+    $("studyTotal").textContent = (items.length ? `この日 ${total} 分（${items.length} 件）・` : "") + `この7日間 ${wk.minutes} 分、${wk.days} 日`;
+  }
+  $("studySettings").addEventListener("click", (ev) => openSettings(ev.detail === 0, "study"));
+  $("subjectAdd").addEventListener("click", () => addTag(subjects, $("subjectList"), "新しい科目"));
 
   // ---------- 体重 ----------
   let wtRange = 30, wtHover = -1, wtPts = [], wtOverlay = null;
@@ -1896,12 +1980,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const labelHue = (l) => (l ? `var(--lc-${colorKey(l.color)})` : "var(--c-cal)");
   const labelStyle = (l) => (l ? `--lc:var(--lc-${colorKey(l.color)});--lf:var(--lf-${colorKey(l.color)})` : "--lc:var(--c-cal);--lf:var(--f-cal)");
   let evLabelChoice = ""; // the label picked in the add form; it stays picked for the next event
-  let labelEditorStale = false;
-  // one tap picks a label (chips, a radio group of their own in each form), or a way to make the first one
+  // one tap picks a label or a subject (chips, a radio group of their own in each form), or a way to make the first one
   function labelPicker(name, current, onPick, labelledBy) {
-    const items = sortedLabels();
-    if (!items.length) return el("button", { type: "button", class: "link-btn", onclick: makeFirstLabel }, "ラベルを作る");
-    const chip = (value, text, l) => el("label", { class: value ? "" : "none", style: labelStyle(l) },
+    return tagPicker(sortedLabels(), makeFirstLabel, "ラベルを作る", name, current, onPick, labelledBy);
+  }
+  function tagPicker(items, makeFirst, makeText, name, current, onPick, labelledBy, styleOf = labelStyle) {
+    if (!items.length) return el("button", { type: "button", class: "link-btn", onclick: makeFirst }, makeText);
+    const chip = (value, text, l) => el("label", { class: value ? "" : "none", style: styleOf(l) },
       el("input", { type: "radio", name, value, checked: value === current, onchange: () => onPick(value) }),
       el("span", {}, text));
     return el("div", { class: "label-chips", role: "radiogroup", "aria-labelledby": labelledBy },
@@ -1914,39 +1999,43 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     setChildren($("evLabels"), labelPicker("evLabel", evLabelChoice, (v) => { evLabelChoice = v; }, "evLabelLabel"));
     renderLabelEditor();
   }
-  function renderLabelEditor() {
-    const list = $("labelList");
-    // don't swap out a name or colour field while it is in use; catch up once focus leaves the list
+  function renderLabelEditor() { renderTagEditor(labels, $("labelList"), "ラベル"); }
+  // the editor for the user's own categories (calendar labels, study subjects): a name and a colour per row and a
+  // two-press delete. A field in use is never swapped out; the list catches up once focus leaves it
+  function renderTagEditor(store, list, what) {
     const a = document.activeElement;
-    if (list.contains(a) && a.matches("input, select")) { labelEditorStale = true; return; }
-    labelEditorStale = false;
-    const items = sortedLabels();
-    if (!items.length) { setChildren(list, el("li", { class: "empty" }, "ラベルはまだありません。下の「ラベルを追加」から作れます。")); return; }
+    if (list.contains(a) && a.matches("input, select")) { list.dataset.stale = "1"; return; }
+    delete list.dataset.stale;
+    const items = [...store.items].sort((x, y) => num(x.createdAt) - num(y.createdAt));
+    if (!items.length) { setChildren(list, el("li", { class: "empty" }, `${what}はまだありません。下の「${what}を追加」から作れます。`)); return; }
     setChildren(list, items.map((l) => el("li", { class: "label-row", "data-id": l.id, style: labelStyle(l) },
       el("span", { class: "dot", "aria-hidden": "true" }),
       el("input", { type: "text", value: l.name, maxlength: 20, "aria-label": `「${l.name}」の名前`, onchange: (ev) => {
         const v = ev.target.value.trim();
         if (!v) { ev.target.value = l.name; return; }
-        if (v !== l.name) act(() => labels.update(l.id, { name: v }));
+        if (v !== l.name) act(() => store.update(l.id, { name: v }));
       } }),
       el("select", { "aria-label": `「${l.name}」の色`, onchange: (ev) => {
         ev.target.closest("li").style.cssText = labelStyle({ color: ev.target.value });
-        act(() => labels.update(l.id, { color: ev.target.value }));
+        act(() => store.update(l.id, { color: ev.target.value }));
       } }, LABEL_COLORS.map(([k, name]) => el("option", { value: k, selected: k === colorKey(l.color) }, name))),
-      delButton(() => act(() => labels.remove(l.id))))));
+      delButton(() => act(() => store.remove(l.id))))));
   }
-  $("labelList").addEventListener("focusout", (ev) => {
-    if (labelEditorStale && !$("labelList").contains(ev.relatedTarget)) renderLabelEditor();
-  });
-  // a new label gets the first colour not in use yet, and its name is ready to type over
-  async function addLabel() {
-    const used = new Set(labels.items.map((l) => l.color));
+  for (const [store, id, what] of [[labels, "labelList", "ラベル"], [subjects, "subjectList", "科目"]]) {
+    $(id).addEventListener("focusout", (ev) => {
+      if ($(id).dataset.stale && !$(id).contains(ev.relatedTarget)) renderTagEditor(store, $(id), what);
+    });
+  }
+  // a new one gets the first colour not in use yet, and its name is ready to type over
+  async function addTag(store, list, name) {
+    const used = new Set(store.items.map((l) => l.color));
     const color = (LABEL_COLORS.find(([k]) => !used.has(k)) || LABEL_COLORS[0])[0];
     let id = null;
-    await act(async () => { id = await labels.add({ name: "新しいラベル", color, createdAt: Date.now() }); });
-    const input = id && $("labelList").querySelector(`li[data-id="${id}"] input`);
+    await act(async () => { id = await store.add({ name, color, createdAt: Date.now() }); });
+    const input = id && list.querySelector(`li[data-id="${id}"] input`);
     if (input) { input.focus(); input.select(); }
   }
+  function addLabel() { return addTag(labels, $("labelList"), "新しいラベル"); }
   $("labelAdd").addEventListener("click", () => addLabel());
   $("evForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -2028,12 +2117,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
   let editingId = null, edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
   let settingsFrom = null; // the settings showing: "gear" when opened from the month bar, "day" when from a day's sheet
-  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day or the gear
+  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or 勉強's
+  let settingsScope = "calendar"; // whose settings: the calendar's labels or 勉強's subjects
   // the bar on top: 完了 over the day's list and the settings; キャンセル and 保存 over an event's edit form, as iOS edit
   // sheets have; 戻る over the settings when a day's sheet led to them
   function syncSheetHead() {
     const settings = !!settingsFrom, editing = !settings && !!editingId, rel = relLabel(calDay);
     $("dayView").hidden = settings || editing; $("editView").hidden = !editing; $("settingsView").hidden = !settings;
+    $("labelsGroup").hidden = settingsScope !== "calendar"; $("subjectsGroup").hidden = settingsScope !== "study";
     $("sheetDone").hidden = editing; $("sheetSave").hidden = !editing;
     $("sheetCancel").hidden = !editing && settingsFrom !== "day";
     $("sheetCancel").textContent = editing ? "キャンセル" : "戻る";
@@ -2054,7 +2145,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     presentSheet(byKey, "day");
   }
   // the calendar's settings (the labels for now) open in the same sheet: from the gear, or from a day's sheet
-  function openSettings(byKey) {
+  function openSettings(byKey, scope = "calendar") {
+    settingsScope = scope;
     if (sheetEl.open) {
       settingsFrom = "day"; editingId = null; disarmDelete(); syncSheetHead();
       sheetEl.scrollTop = 0;
@@ -2063,7 +2155,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     resetSheet();
     settingsFrom = "gear"; syncSheetHead();
-    presentSheet(byKey, "gear");
+    presentSheet(byKey, scope === "study" ? "study" : "gear");
   }
   // the sheet slides up from the bottom (fades in on wide screens)
   function presentSheet(byKey, opener) {
@@ -2091,7 +2183,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (sheetEl.open) return; // opened again before this arrived
     resetSheet();
     // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
-    if (sheetByKey) (sheetOpener === "gear" ? $("calSettings") : $("calGrid").querySelector(".cal-day.sel"))?.focus();
+    if (sheetByKey) ({ gear: $("calSettings"), study: $("studySettings") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
   // Esc: from an edit form (or settings reached from a day) back to the day's list, otherwise out of the sheet
   sheetEl.addEventListener("cancel", (ev) => { ev.preventDefault(); if (editingId || settingsFrom === "day") showDayView(); else closeSheet(); });
@@ -2278,6 +2370,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const ws = workouts.items.filter((w) => w.date === todayKey);
     const mins = sum(ws, (w) => w.minutes);
     const wk = weekMinutes();
+    const sts = study.items.filter((x) => x.date === todayKey), stMins = sum(sts, (x) => x.minutes), stWk = studyWeek();
     const wts = sortedWeights();
     const wLast = wts[wts.length - 1], wPrev = wts[wts.length - 2];
     const mon = monthSummary(monthOf(todayKey));
@@ -2302,6 +2395,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだ記録がありません", null, "meal"),
       tile("var(--c-workout)", "運動", String(mins), "分",
         `きょう ${ws.length} 件・この7日間 ${wk.minutes} 分（${wk.days} 日）`, null, "workout"),
+      tile("var(--c-study)", "勉強", String(stMins), "分",
+        `きょう ${sts.length} 件・この7日間 ${stWk.minutes} 分（${stWk.days} 日）`, null, "study"),
       tile("var(--c-weight)", "体重", wLast ? fmtKg(wLast.kg) : "未記録", wLast ? "kg" : null,
         wLast
           ? (wLast.id === todayKey ? "きょう記録済み" : `${relLabel(wLast.id) || fmtMD(wLast.id)}の記録`) + (wPrev ? `・前回比 ${signed(num(wLast.kg) - num(wPrev.kg))} kg` : "")
@@ -2318,12 +2413,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function renderWeek() {
     const w = $("week");
     w.replaceChildren();
-    const colors = ["var(--c-journal)", "var(--c-meal)", "var(--c-workout)", "var(--c-weight)"];
-    const names = ["日記", "食事", "運動", "体重"];
+    const colors = ["var(--c-journal)", "var(--c-meal)", "var(--c-workout)", "var(--c-study)", "var(--c-weight)"];
+    const names = ["日記", "食事", "運動", "勉強", "体重"];
     for (let i = 6; i >= 0; i--) {
       const d = addDays(todayKey, -i);
       const dt = parseYmd(d);
-      const has = [!!journal.get(d), meals.items.some((x) => x.date === d), workouts.items.some((x) => x.date === d), !!weights.get(d)];
+      const has = [!!journal.get(d), meals.items.some((x) => x.date === d), workouts.items.some((x) => x.date === d), study.items.some((x) => x.date === d), !!weights.get(d)];
       w.append(el("div", { class: "day" + (d === todayKey ? " today" : ""), title: fmtShort(d) },
         el("span", {}, WD[dt.getDay()]),
         el("span", { class: "n" }, dt.getDate()),
@@ -2423,12 +2518,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       chart);
     return { card, chart };
   }
-  // a day counts as recorded when it has any record: a journal entry, a meal, a workout, a weight or money in or out
+  // a day counts as recorded when it has any record: a journal entry, a meal, a workout, study, a weight or money in or out
   function recordedDays() {
     const s = new Set();
     for (const j of journal.items) s.add(j.date || j.id);
     for (const x of meals.items) s.add(x.date);
     for (const x of workouts.items) s.add(x.date);
+    for (const x of study.items) s.add(x.date);
     for (const w of sortedWeights()) s.add(w.id);
     for (const x of expenses.items) s.add(x.date);
     return s;
@@ -2489,6 +2585,25 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const c4 = sumCard("var(--c-workout)", "workout", "運動", wMin.toLocaleString("ja-JP"), "分", `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日`);
     cards.push(c4.card);
     draws.push(() => sumBars(c4.chart, buckets, perBucket(ws, (w) => w.date, (w) => w.minutes), "var(--c-workout)", (v) => String(v), `${name}の運動時間の棒グラフ。合計${wMin}分。`));
+
+    // 勉強: time as bars, then the three subjects with the most time in their colours
+    const sts = study.items.filter((x) => inP(x.date));
+    const stMin = sum(sts, (x) => x.minutes);
+    const c7 = sumCard("var(--c-study)", "study", "勉強", stMin.toLocaleString("ja-JP"), "分", `${sts.length} 回・${new Set(sts.map((x) => x.date)).size} 日`);
+    cards.push(c7.card);
+    draws.push(() => {
+      sumBars(c7.chart, buckets, perBucket(sts, (x) => x.date, (x) => x.minutes), "var(--c-study)", (v) => String(v), `${name}の勉強時間の棒グラフ。合計${stMin}分。`);
+      const bySub = new Map();
+      for (const x of sts) { const k = subjectOf(x)?.id || ""; bySub.set(k, (bySub.get(k) || 0) + num(x.minutes)); }
+      const top = [...bySub.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+      if (top.length) c7.chart.append(el("div", { style: "margin-top:8px" }, top.map(([id, m]) => {
+        const sub = subjects.get(id);
+        return el("div", { class: "cat-row", style: "padding-inline:0" },
+          el("span", { class: "cat" }, sub ? sub.name : "科目なし"),
+          el("div", { class: "cat-track" }, el("div", { class: "cat-bar", style: `width:${Math.max(1, (m / top[0][1]) * 100)}%;background:${sub ? labelHue(sub) : "var(--c-study)"}` })),
+          el("span", { class: "amount" }, `${m.toLocaleString("ja-JP")} 分`));
+      })));
+    });
 
     // 体重
     const wts = sortedWeights().filter((w) => inP(w.id));
@@ -2706,10 +2821,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup(); renderSummary();
+    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderStudy(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup(); renderSummary();
   }
   const initial = (location.hash || "").slice(1);
-  showTab(PAGES.some((p) => p.key === initial) ? initial : "home");
+  setTab(PAGES.some((p) => p.key === initial) ? initial : "home"); // straight there: no slide in from きょう as the app opens
   loadJournalForm();
   renderAll();
   showMode();
