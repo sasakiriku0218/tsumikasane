@@ -275,6 +275,10 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
 .monthbar .cur { font-weight: 600; font-variant-numeric: tabular-nums; }
 .monthbar .navbtn { min-width: 44px; justify-content: center; padding: 0; }
 .monthbar .navbtn:first-child { margin-inline-start: -13px; }  /* its chevron lines up with the cards */
+/* the gear at the right of the month bar opens the calendar's settings: 44px to tap without making the bar taller, its
+   icon lined up with the cards' right edge */
+.icon-btn { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -6px -11px -6px auto; padding: 0; background: transparent; border: 0; border-radius: 50%; color: var(--accent); cursor: pointer; }
+.icon-btn .icon { width: 22px; height: 22px; }
 @media (hover: none), (pointer: coarse) {
   .monthbar .navbtn:not(:focus-visible) { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
 }
@@ -523,17 +527,20 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .label-chips input:checked + span::before { background: #ffffff; }
 .label-chips input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
 .label-chips label::after { content: ""; position: absolute; inset: 0; margin: auto; height: 44px; }
-/* the label editor: a disclosure row at the foot of the calendar, opened only when needed (HIG: progressive disclosure) */
-.label-editor > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); min-height: 52px; padding: 0 var(--space-2); border-radius: var(--radius); font-weight: 600; cursor: pointer; list-style: none; }
-.label-editor > summary::-webkit-details-marker { display: none; }
-.label-editor > summary::after { content: ""; flex: none; width: 8px; height: 8px; margin-inline-end: 4px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .2s; }
-.label-editor[open] > summary::after { transform: rotate(45deg); }
-.label-editor[open] > summary { border-radius: var(--radius) var(--radius) 0 0; }
-.label-editor > ul.list { border-top: .5px solid var(--separator); }
+/* the label editor is the calendar's settings (the gear on the month bar), shown in the sheet: one row per label with its
+   name and colour, and ラベルを追加 as the last row, as iOS Settings lists go (the user wanted it there, not under the month) */
 .label-row .dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--lc); }
 .label-row input { flex: 1 1 auto; }
 .label-row select { flex: none; }
 .label-tools { padding: 0 var(--space-2) 6px; }
+#settingsView .label-tools { margin-inline-start: var(--space-2); padding-inline-start: 0; border-top: .5px solid var(--separator); }
+/* large text: the name keeps the first line to itself and the colour and × move under it, so the name stays readable */
+@container (max-width: 17.5em) {
+  .label-row { flex-wrap: wrap; row-gap: var(--space-1); }
+  .label-row input { flex: 1 1 calc(100% - 26px); }
+  .label-row select { margin-inline-start: 26px; }
+  .label-row .del { margin-inline-start: auto; }
+}
 .label-tools .link-btn { display: inline-flex; align-items: center; gap: 4px; }
 
 /* the day sheet (HIG sheets): a tap on a day in the month slides that day's plans up in a sheet, where they are added,
@@ -628,7 +635,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 </head>
 <body>
 
-<!-- icons: chevrons, close and plus come from the Digital Agency's example components (MIT) and minus is drawn to match;
+<!-- icons: chevrons, close and plus come from the Digital Agency's example components (MIT); minus and the gear are drawn to match;
      the tab and record icons are drawn for this app in the filled style HIG asks for in tab bars (SF Symbols may only
      be used inside apps on Apple platforms, so a web page can't borrow them) -->
 <svg class="sprite" aria-hidden="true" focusable="false">
@@ -637,6 +644,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.4 18.6-1-1 5.5-5.6-5.6-5.6 1.1-1 5.6 5.5 5.6-5.6 1 1.1L13 12l5.6 5.6-1 1L12 13l-5.6 5.6Z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M21 11H13V3H11V11H3V13H11V21H13V13H21V11Z"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M21 11H3V13H21V11Z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M9.93 4.27 L10.34 1.53 L13.66 1.53 L14.07 4.27 L16.00 5.07 L18.23 3.42 L20.58 5.77 L18.93 8.00 L19.73 9.93 L22.47 10.34 L22.47 13.66 L19.73 14.07 L18.93 16.00 L20.58 18.23 L18.23 20.58 L16.00 18.93 L14.07 19.73 L13.66 22.47 L10.34 22.47 L9.93 19.73 L8.00 18.93 L5.77 20.58 L3.42 18.23 L5.07 16.00 L4.27 14.07 L1.53 13.66 L1.53 10.34 L4.27 9.93 L5.07 8.00 L3.42 5.77 L5.77 3.42 L8.00 5.07ZM15.40 12A3.4 3.4 0 1 0 8.60 12A3.4 3.4 0 1 0 15.40 12Z"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M12.65 3.27a1 1 0 0 0-1.3 0l-8.5 7.3a1 1 0 0 0 1.3 1.52l.85-.73v8.14c0 .83.67 1.5 1.5 1.5H10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5h3.5c.83 0 1.5-.67 1.5-1.5v-8.14l.85.73a1 1 0 0 0 1.3-1.52l-8.5-7.3Z"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M8 2.5a1 1 0 0 1 1 1V4h6v-.5a1 1 0 1 1 2 0V4h1.5A2.5 2.5 0 0 1 21 6.5v12a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5v-12A2.5 2.5 0 0 1 5.5 4H7v-.5a1 1 0 0 1 1-1ZM5 9v9.5c0 .28.22.5.5.5h13a.5.5 0 0 0 .5-.5V9H5Zm2 2.5h2.5V14H7v-2.5Zm3.75 0h2.5V14h-2.5v-2.5Zm3.75 0H17V14h-2.5v-2.5ZM7 15.5h2.5v2H7v-2Zm3.75 0h2.5v2h-2.5v-2Z"/></symbol>
   <symbol id="i-todo" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19Zm4.6 6.65a.85.85 0 0 0-1.2 0l-4.65 4.65-2.15-2.15a.85.85 0 1 0-1.2 1.2l2.75 2.75a.85.85 0 0 0 1.2 0l5.25-5.25a.85.85 0 0 0 0-1.2Z"/></symbol>
@@ -716,23 +724,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <section id="sec-calendar" style="--sec-c: var(--c-cal)" hidden>
         <!-- no large title here (the user wanted the calendar itself higher up); the heading stays for screen readers -->
         <div class="sec-head"><h2 class="sr-only">カレンダー</h2>
-          <!-- the month's name only; a sideways swipe on the calendar turns it, and the ‹ › buttons are for a mouse,
-               a keyboard or VoiceOver (see .monthbar) -->
+          <!-- the month's name and, at the right, the gear for the calendar's settings; a sideways swipe on the calendar
+               turns the month, and the ‹ › buttons are for a mouse, a keyboard or VoiceOver (see .monthbar) -->
           <div class="monthbar">
             <button type="button" class="navbtn" id="calPrev" aria-label="前の月"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
             <span class="cur" id="calMonthName" aria-live="polite"></span>
             <button type="button" class="navbtn" id="calNext" aria-label="次の月"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></button>
+            <button type="button" class="icon-btn" id="calSettings" aria-label="設定" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-gear"/></svg></button>
           </div>
         </div>
         <div class="card cal">
           <div class="cal-week" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
           <div class="cal-grid" id="calGrid"></div>
         </div>
-        <details class="card label-editor" id="labelEditor">
-          <summary>ラベルの編集</summary>
-          <ul class="list" id="labelList"></ul>
-          <div class="label-tools"><button type="button" class="link-btn" id="labelAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>ラベルを追加</button></div>
-        </details>
       </section>
 
       <!-- ToDo -->
@@ -958,6 +962,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="ffield" id="edLabels"></div>
       </form>
       <div class="card"><button type="button" class="link-btn danger sheet-del" id="edDelete">この予定を削除</button></div>
+    </div>
+    <!-- the calendar's settings, opened from the gear on the month bar (or from a day when there are no labels yet) -->
+    <div class="sheet-view" id="settingsView" hidden>
+      <h3 class="group-head">ラベル</h3>
+      <div class="card">
+        <ul class="list" id="labelList"></ul>
+        <div class="label-tools"><button type="button" class="link-btn" id="labelAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>ラベルを追加</button></div>
+      </div>
+      <p class="group-foot">予定に付けて色分けできます。ラベルを消すと、付いていた予定は「ラベルなし」になります。</p>
     </div>
   </div>
   <div class="toast" id="sheetStatus" role="status"></div>
@@ -1864,8 +1877,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     return el("div", { class: "label-chips", role: "radiogroup", "aria-labelledby": labelledBy },
       chip("", "なし", null), items.map((l) => chip(l.id, l.name, l)));
   }
-  // the label editor is on the page under the sheet, so the sheet gets out of the way first
-  function makeFirstLabel() { closeSheet(true); $("labelEditor").open = true; addLabel(); }
+  // the label editor is the calendar's settings, in this same sheet: the add form hands over to it
+  function makeFirstLabel() { openSettings(false); addLabel(); }
   function renderLabels() {
     if (evLabelChoice && !labels.get(evLabelChoice)) evLabelChoice = "";
     setChildren($("evLabels"), labelPicker("evLabel", evLabelChoice, (v) => { evLabelChoice = v; }, "evLabelLabel"));
@@ -1984,12 +1997,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // ---------- the day sheet: a tap on a day opens its plans, to add, change and delete them there ----------
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
   let editingId = null, edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
-  // the bar on top: 完了 over the day's list; キャンセル and 保存 over an event's edit form, as iOS edit sheets have
+  let settingsFrom = null; // the settings showing: "gear" when opened from the month bar, "day" when from a day's sheet
+  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day or the gear
+  // the bar on top: 完了 over the day's list and the settings; キャンセル and 保存 over an event's edit form, as iOS edit
+  // sheets have; 戻る over the settings when a day's sheet led to them
   function syncSheetHead() {
-    const editing = !!editingId, rel = relLabel(calDay);
-    $("dayView").hidden = editing; $("editView").hidden = !editing;
-    $("sheetDone").hidden = editing; $("sheetCancel").hidden = !editing; $("sheetSave").hidden = !editing;
-    $("sheetTitle").textContent = editing ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
+    const settings = !!settingsFrom, editing = !settings && !!editingId, rel = relLabel(calDay);
+    $("dayView").hidden = settings || editing; $("editView").hidden = !editing; $("settingsView").hidden = !settings;
+    $("sheetDone").hidden = editing; $("sheetSave").hidden = !editing;
+    $("sheetCancel").hidden = !editing && settingsFrom !== "day";
+    $("sheetCancel").textContent = editing ? "キャンセル" : "戻る";
+    $("sheetTitle").textContent = settings ? "設定" : editing ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
   }
   // a closed sheet's starting state: no animation or drag left over, the day's list showing
   function resetSheet() {
@@ -1997,13 +2015,29 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     clearTimeout(closeTimer);
     sheetAnims = []; sheetClosing = false; drag = null;
     sheetEl.style.transform = "";
-    editingId = null; disarmDelete(); syncSheetHead();
+    editingId = null; settingsFrom = null; disarmDelete(); syncSheetHead();
   }
   function openDay(d, byKey) {
     if (sheetEl.open) return;
     resetSheet(); // also here: a browser may hold the close event back until it next draws
     setCalDay(d); // draws the grid and the sheet's list for that day
-    sheetByKey = byKey;
+    presentSheet(byKey, "day");
+  }
+  // the calendar's settings (the labels for now) open in the same sheet: from the gear, or from a day's sheet
+  function openSettings(byKey) {
+    if (sheetEl.open) {
+      settingsFrom = "day"; editingId = null; disarmDelete(); syncSheetHead();
+      sheetEl.scrollTop = 0;
+      $("sheetTitle").focus();
+      return;
+    }
+    resetSheet();
+    settingsFrom = "gear"; syncSheetHead();
+    presentSheet(byKey, "gear");
+  }
+  // the sheet slides up from the bottom (fades in on wide screens)
+  function presentSheet(byKey, opener) {
+    sheetByKey = byKey; sheetOpener = opener;
     sheetEl.showModal();
     sheetEl.scrollTop = 0;
     if (!reduceMotion.matches) sheetEl.animate(wideScreen.matches
@@ -2026,11 +2060,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   sheetEl.addEventListener("close", () => {
     if (sheetEl.open) return; // opened again before this arrived
     resetSheet();
-    // keyboard users land back on the day they opened (the grid has been redrawn since)
-    if (sheetByKey) $("calGrid").querySelector(".cal-day.sel")?.focus();
+    // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
+    if (sheetByKey) (sheetOpener === "gear" ? $("calSettings") : $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
-  // Esc: from an edit form back to the day's list, from the list out of the sheet
-  sheetEl.addEventListener("cancel", (ev) => { ev.preventDefault(); if (editingId) showDayView(); else closeSheet(); });
+  // Esc: from an edit form (or settings reached from a day) back to the day's list, otherwise out of the sheet
+  sheetEl.addEventListener("cancel", (ev) => { ev.preventDefault(); if (editingId || settingsFrom === "day") showDayView(); else closeSheet(); });
   // a tap on the dimmed page above the sheet puts it away
   sheetEl.addEventListener("click", (ev) => {
     if (ev.target !== sheetEl) return;
@@ -2039,6 +2073,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   });
   $("sheetDone").addEventListener("click", () => closeSheet());
   $("sheetCancel").addEventListener("click", () => showDayView());
+  $("calSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0));
   // iPhone: the bar on top can be pulled down to put the sheet away, as iOS sheets can
   sheetHead.addEventListener("pointerdown", (ev) => {
     if (wideScreen.matches || sheetClosing || ev.button !== 0 || ev.target.closest("button")) return;
@@ -2079,7 +2114,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("sheetTitle").focus();
   }
   function showDayView() {
-    editingId = null;
+    editingId = null; settingsFrom = null;
     disarmDelete();
     syncSheetHead();
     $("sheetTitle").focus();
