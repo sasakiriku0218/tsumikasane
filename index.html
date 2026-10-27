@@ -259,7 +259,6 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
 /* the large title (HIG): bold, left-aligned under the top bar */
 .sec-head h2 { margin: 0; font-size: var(--t-large); line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
 .sec-head .small { font-size: var(--t-sub); }
-.kicker { margin: 0; font-size: var(--t-sub); font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* date / month navigation: plain tint buttons, as in iOS */
 .datenav, .monthnav { display: flex; align-items: center; gap: 4px var(--space-1); flex-wrap: wrap; margin-inline-start: -8px; }
@@ -688,7 +687,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
       <!-- ホーム -->
       <section id="sec-home" style="--sec-c: var(--accent)">
-        <div class="sec-head"><p class="kicker" id="homeDate"></p><h2>きょう</h2></div>
+        <!-- the large title is today's date itself (the user's call), not the word きょう with a small date above it; the tab
+             still says きょう. The year is left out so the date stays on one line on a phone -->
+        <div class="sec-head"><h2 id="homeDate"></h2></div>
         <!-- a quiet reminder when it has been a while since the last backup -->
         <div class="card backup-nudge" id="backupNudge" hidden>
           <strong>記録のバックアップ</strong>
@@ -973,7 +974,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const parseYmd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
   const WD = ["日", "月", "火", "水", "木", "金", "土"];
-  const fmtLong = (s) => { const d = parseYmd(s); return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${WD[d.getDay()]}）`; };
   const fmtShort = (s) => { const d = parseYmd(s); return `${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）`; };
   const fmtMD = (s) => { const d = parseYmd(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
   const fmtMDW = (s) => { const d = parseYmd(s); return `${d.getMonth() + 1}月${d.getDate()}日（${WD[d.getDay()]}）`; };
@@ -1031,6 +1031,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
 
   const todayKey = ymd(new Date());
+  // set before the first page shows, so the top bar can take it up as the title once it scrolls under
+  $("homeDate").textContent = fmtMDW(todayKey);
 
   // HIG: an iPhone tab bar holds five tabs at most, so the five record pages sit under 記録, the way iOS Health's Browse
   // tab lists its categories; on wide screens the tabs turn into a sidebar that lists those pages too
@@ -1311,6 +1313,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // phones often skip beforeunload; switching away from the app hides the page first
   // (and once the journal is saved, today's protective copy catches up)
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushJournal().then(() => saveCopy()); });
+  // every page counts from todayKey, fixed when the page loads; brought back on a later day, the app loads again so the date
+  // on top and everything else move on to the new day
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && ymd(new Date()) !== todayKey) location.reload(); });
   function markJournalDirty() {
     journalDirty = true;
     journalState.textContent = "未保存";
@@ -2196,7 +2201,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       extra);
   }
   function renderHome() {
-    $("homeDate").textContent = fmtLong(todayKey);
     const rank = (t) => (t.due && t.due < todayKey ? 0 : t.due === todayKey ? 1 : t.due ? 2 : 3);
     const undone = todos.items.filter((t) => !t.done);
     const dueToday = undone.filter((t) => t.due === todayKey).length;
