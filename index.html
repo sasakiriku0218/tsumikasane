@@ -855,7 +855,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <section id="sec-meal" style="--sec-c: var(--c-meal)" hidden>
         <div class="sec-head"><h2>食事</h2><div class="datenav"></div></div>
         <form class="add" id="mealForm" autocomplete="off">
-          <input type="text" id="mealText" class="full" placeholder="食べたもの（例：鮭定食）" aria-label="食べたもの" maxlength="200" required>
+          <input type="text" id="mealText" class="full" list="mealHints" placeholder="食べたもの（例：鮭定食）" aria-label="食べたもの" maxlength="200" required>
+          <datalist id="mealHints"></datalist>
           <span class="flabel" id="mealSlotLabel">区分</span>
           <div class="ffield">
             <div class="seg seg-radio" role="radiogroup" aria-labelledby="mealSlotLabel">
@@ -894,7 +895,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           </div>
           <div class="wo-group" id="woStrength" hidden>
             <label class="flabel" for="woExercise">種目</label>
-            <div class="ffield"><input type="text" id="woExercise" maxlength="40" required></div>
+            <div class="ffield"><input type="text" id="woExercise" list="woExerciseHints" maxlength="40" required><datalist id="woExerciseHints"></datalist></div>
             <label class="flabel" for="woWeight">重さ <span class="opt">任意</span></label>
             <div class="ffield"><input type="number" id="woWeight" min="0.1" max="999" step="any" inputmode="decimal"><span class="unit">kg</span></div>
             <label class="flabel" for="woReps">回数</label>
@@ -1579,7 +1580,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(() => meals.add(item));
     $("mealText").value = ""; $("mealKcal").value = ""; $("mealText").focus();
   });
+  // what was typed before comes back as suggestions under the field (the user's call): the foods eaten and the 筋トレ moves
+  // done, the most often typed first, then the latest; up to 30
+  function fillHints(listId, items, pick) {
+    const count = new Map(), latest = new Map();
+    for (const x of items) {
+      const t = (pick(x) || "").trim();
+      if (!t) continue;
+      count.set(t, (count.get(t) || 0) + 1);
+      latest.set(t, Math.max(latest.get(t) || 0, num(x.createdAt)));
+    }
+    const top = [...count.keys()].sort((a, b) => count.get(b) - count.get(a) || latest.get(b) - latest.get(a)).slice(0, 30);
+    setChildren($(listId), top.map((t) => el("option", { value: t })));
+  }
   function renderMeals() {
+    fillHints("mealHints", meals.items, (m) => m.text);
     const items = meals.items.filter((m) => m.date === viewDate)
       .sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || num(a.createdAt) - num(b.createdAt));
     const list = $("mealList");
@@ -1645,6 +1660,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     return { minutes: sum(inWeek, (w) => w.minutes), days: new Set(inWeek.map((w) => w.date)).size };
   }
   function renderWorkouts() {
+    fillHints("woExerciseHints", workouts.items, (w) => w.exercise);
     const items = workouts.items.filter((w) => w.date === viewDate).sort((a, b) => num(a.createdAt) - num(b.createdAt));
     const list = $("workoutList");
     list.replaceChildren();
