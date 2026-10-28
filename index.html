@@ -394,6 +394,17 @@ li.done .check path { fill: #ffffff; }
 li.done .text { color: var(--muted); text-decoration: line-through; }
 /* ルーティーン: a done item fills its check in the record's colour; no strike-through, it's a habit kept, not a task gone */
 #rtList li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
+/* ルーティーン on きょう: the day's items, each a row that checks or unchecks it right there (the user's call). The rows sit
+   above the tile's own tap area, which still opens the page from the rest of the card (and from 「ほか N 項目」) */
+.tile ul.rt-tile { display: flex; flex-direction: column; margin: 2px 0 0; }
+.tile ul.rt-tile li { position: relative; z-index: 1; overflow: visible; white-space: normal; line-height: 1.3; }
+.tile ul.rt-tile li::before { content: none; }
+.tile ul.rt-tile li.rt-more { z-index: auto; display: flex; align-items: center; min-height: 32px; font-size: var(--t-sub); color: var(--muted); }
+.rt-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 0; background: transparent; border: 0; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.rt-label { min-width: 0; overflow-wrap: anywhere; }
+.rt-tile li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
+.rt-tile li.done .check path { fill: #ffffff; }
+.rt-tile li.done .rt-label { color: var(--muted); }
 /* 運動: the fields for the kind picked sit in the form's grid as if loose; the other kind's are hidden (and switched off) */
 .wo-group { display: contents; }
 .wo-group[hidden] { display: none; }
@@ -1734,8 +1745,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (let d = doneOn(date) ? date : date === todayKey ? addDays(date, -1) : null; d && doneOn(d); d = addDays(d, -1)) n++;
     return n;
   }
-  function toggleRoutine(id) {
-    const date = viewDate, done = new Set(routineDays.get(date)?.done || []);
+  function toggleRoutine(id, date = viewDate) {
+    const done = new Set(routineDays.get(date)?.done || []);
     if (done.has(id)) done.delete(id); else done.add(id);
     act(() => (done.size ? routineDays.set(date, { date, done: [...done], updatedAt: Date.now() }) : routineDays.remove(date)));
   }
@@ -1745,6 +1756,20 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const name = input.value.trim();
     if (!name) { input.value = r.name; return; }
     if (name !== r.name) act(() => routines.update(r.id, { name }));
+  }
+  // on きょう's tile: the day's items, each checked right there with a tap (the user's call); the tile's head still opens
+  // the page. Up to eight; any more are on the page
+  const RT_TILE_MAX = 8;
+  function routineTileList(items, done) {
+    if (!items.length) return null;
+    return el("ul", { class: "rt-tile" },
+      items.slice(0, RT_TILE_MAX).map((r) => {
+        const on = done.has(r.id);
+        return el("li", { class: on ? "done" : "" },
+          el("button", { type: "button", class: "rt-row", "data-rt": r.id, "aria-label": on ? `「${r.name}」のチェックを外す` : `「${r.name}」をやった`, onclick: () => toggleRoutine(r.id, todayKey) },
+            el("span", { class: "check", "aria-hidden": "true" }, checkMark()), el("span", { class: "rt-label" }, r.name)));
+      }),
+      items.length > RT_TILE_MAX ? el("li", { class: "rt-more" }, `ほか ${items.length - RT_TILE_MAX} 項目`) : null);
   }
   $("rtForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -2791,6 +2816,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       extra);
   }
   function renderHome() {
+    const rtFocus = document.activeElement?.dataset?.rt; // a ルーティーン row on the tile, pressed from the keyboard
     const rank = (t) => (t.due && t.due < todayKey ? 0 : t.due === todayKey ? 1 : t.due ? 2 : 3);
     const undone = todos.items.filter((t) => !t.done);
     const dueToday = undone.filter((t) => t.due === todayKey).length;
@@ -2830,8 +2856,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       tile("var(--c-study)", "勉強", String(stMins), "分",
         `きょう ${sts.length} 件・この7日間 ${stWk.minutes} 分（${stWk.days} 日）`, null, "study"),
       tile("var(--c-routine)", "ルーティーン", rts.length ? String(rts.length - rtLeft.length) : "まだ", rts.length ? `/ ${rts.length} できた` : null,
-        !rts.length ? "毎日やることを登録して、チェックしていきましょう。"
-          : rtLeft.length ? `残り：${rtLeft.slice(0, 3).map((r) => r.name).join("・")}${rtLeft.length > 3 ? " ほか" : ""}` : "全部できました", null, "routine"),
+        rts.length ? null : "毎日やることを登録して、チェックしていきましょう。", routineTileList(rts, rtDone), "routine"),
       tile("var(--c-weight)", "体重", wLast ? fmtKg(wLast.kg) : "未記録", wLast ? "kg" : null,
         wLast
           ? (wLast.id === todayKey ? "きょう記録済み" : `${relLabel(wLast.id) || fmtMD(wLast.id)}の記録`) + (wPrev ? `・前回比 ${signed(num(wLast.kg) - num(wPrev.kg))} kg` : "")
@@ -2843,6 +2868,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         `達成 ${doneG} 件` + (nearest ? `・「${nearest.title}」まで${daysUntil(nearest.deadline) < 0 ? "期限切れ" : "あと " + daysUntil(nearest.deadline) + " 日"}` : ""),
         null, "goal")
     );
+    if (rtFocus) $("homeTiles").querySelector(`[data-rt="${rtFocus}"]`)?.focus();
   }
 
   // ---------- 記録: これまでの積み重ね (the user's call: everything so far in one view; no weeks, months or years, no charts) ----------
