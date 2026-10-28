@@ -302,6 +302,7 @@ form.add > .full, form.add > .actions { grid-column: 1 / -1; }
 .ffield > .seg { max-width: 22em; }
 .ffield input[type="number"] { flex: 0 1 7em; text-align: right; font-variant-numeric: tabular-nums; }
 .ffield input[type="date"], .ffield input[type="time"] { flex: 0 1 10em; }
+.ffield > select { flex: 1 1 auto; min-width: 0; }
 form.add .actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
 form.add .actions .link-btn { margin-inline-end: auto; }
 @container (max-width: 19.5em) {
@@ -1017,15 +1018,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           </div>
           <label class="flabel" for="exAmount">金額<span class="sr-only">（円）</span></label>
           <div class="ffield"><input type="number" id="exAmount" placeholder="0" min="1" max="99999999" step="1" inputmode="numeric" required><span class="unit">円</span></div>
+          <!-- 費目 from a menu (the user's call), its choices following 支出 or 収入 -->
           <label class="flabel" for="exCat">費目</label>
-          <div class="ffield"><input type="text" id="exCat" list="catOut" placeholder="食費・交通など" maxlength="20"></div>
-          <datalist id="catOut">
-            <option value="食費"><option value="外食"><option value="日用品"><option value="交通"><option value="住居"><option value="光熱費">
-            <option value="通信"><option value="交際"><option value="趣味"><option value="医療"><option value="衣服"><option value="教育"><option value="その他">
-          </datalist>
-          <datalist id="catIn">
-            <option value="給与"><option value="副収入"><option value="おこづかい"><option value="その他">
-          </datalist>
+          <div class="ffield"><select id="exCat"></select></div>
           <label class="flabel" for="exDate">日付</label>
           <div class="ffield"><input type="date" id="exDate" required></div>
           <input type="text" id="exMemo" class="full" placeholder="メモ（例：スーパーで買い物）" aria-label="メモ" maxlength="200">
@@ -2021,17 +2016,31 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const exDate = $("exDate"), exCat = $("exCat"), budgetInput = $("budgetInput");
   const exKind = () => (checkedValue("exKind") === "in" ? "in" : "out");
   exDate.value = todayKey;
-  document.querySelectorAll('input[name="exKind"]').forEach((r) => r.addEventListener("change", () => exCat.setAttribute("list", exKind() === "in" ? "catIn" : "catOut")));
+  // 費目 picked from a menu (the user's call): these eleven for spending; for income the four it had before. The one last
+  // picked for each kind is picked again; entries from before keep whatever 費目 they were given
+  const EX_CATS = {
+    out: ["食費", "日用品", "衣服", "美容", "交際費", "医療費", "教育費", "水道光熱費", "交通費", "通信費", "雑費"],
+    in: ["給与", "副収入", "おこづかい", "その他"],
+  };
+  const exCatPick = { out: EX_CATS.out[0], in: EX_CATS.in[0] };
+  function syncExCats() {
+    const kind = exKind();
+    setChildren(exCat, EX_CATS[kind].map((c) => el("option", { value: c }, c)));
+    exCat.value = exCatPick[kind];
+  }
+  exCat.addEventListener("change", () => { exCatPick[exKind()] = exCat.value; });
+  document.querySelectorAll('input[name="exKind"]').forEach((r) => r.addEventListener("change", syncExCats));
+  syncExCats();
   $("exForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const date = exDate.value;
     const amount = Math.round(Number($("exAmount").value));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !(amount > 0)) return;
-    const item = { date, kind: exKind(), category: exCat.value.trim() || "未分類", amount, createdAt: Date.now() };
+    const item = { date, kind: exKind(), category: exCat.value || "未分類", amount, createdAt: Date.now() };
     const memo = $("exMemo").value.trim();
     if (memo) item.memo = memo;
     act(() => expenses.add(item));
-    exCat.value = ""; $("exAmount").value = ""; $("exMemo").value = "";
+    $("exAmount").value = ""; $("exMemo").value = "";
     if (monthOf(date) !== viewMonth) { viewMonth = monthOf(date); renderMoney(); }
     $("exAmount").focus();
   });
