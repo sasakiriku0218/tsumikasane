@@ -811,7 +811,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <section id="sec-todo" style="--sec-c: var(--c-todo)" hidden>
         <div class="sec-head"><h2>ToDo</h2><span class="muted small" id="todoCount"></span></div>
         <form class="add" id="todoForm" autocomplete="off">
-          <input type="text" id="todoText" class="full" placeholder="やること（例：牛乳を買う）" aria-label="やること" maxlength="200" required>
+          <input type="text" id="todoText" class="full" placeholder="やること" aria-label="やること" maxlength="200" required>
           <label class="flabel" for="todoDue">期限 <span class="opt">任意</span></label>
           <div class="ffield"><input type="date" id="todoDue"></div>
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
@@ -867,7 +867,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <section id="sec-meal" style="--sec-c: var(--c-meal)" hidden>
         <div class="sec-head"><h2>食事</h2><div class="datenav"></div></div>
         <form class="add" id="mealForm" autocomplete="off">
-          <input type="text" id="mealText" class="full" list="mealHints" placeholder="食べたもの（例：鮭定食）" aria-label="食べたもの" maxlength="200" required>
+          <input type="text" id="mealText" class="full" list="mealHints" placeholder="食べたもの" aria-label="食べたもの" maxlength="200" required>
           <datalist id="mealHints"></datalist>
           <span class="flabel" id="mealSlotLabel">区分</span>
           <div class="ffield">
@@ -936,7 +936,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <label class="flabel" for="stMin">時間<span class="sr-only">（分）</span></label>
           <div class="ffield"><input type="number" id="stMin" placeholder="30" min="1" max="1440" inputmode="numeric" required><span class="unit">分</span></div>
           <label class="flabel" for="stNote">メモ <span class="opt">任意</span></label>
-          <div class="ffield"><input type="text" id="stNote" maxlength="200" placeholder="問題集 p.20〜35"></div>
+          <div class="ffield"><input type="text" id="stNote" maxlength="200"></div>
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <ul class="list card" id="studyList"></ul>
@@ -1023,7 +1023,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <div class="ffield"><select id="exCat"></select></div>
           <label class="flabel" for="exDate">日付</label>
           <div class="ffield"><input type="date" id="exDate" required></div>
-          <input type="text" id="exMemo" class="full" placeholder="メモ（例：スーパーで買い物）" aria-label="メモ" maxlength="200">
+          <input type="text" id="exMemo" class="full" placeholder="メモ" aria-label="メモ" maxlength="200">
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <div class="card" id="catCard">
@@ -1061,7 +1061,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <div class="sheet-body">
     <div class="sheet-view" id="dayView">
       <form class="add" id="evForm" autocomplete="off">
-        <input type="text" id="evTitle" class="full" placeholder="この日の予定（例：歯医者）" aria-label="予定の内容" maxlength="100" required>
+        <input type="text" id="evTitle" class="full" placeholder="この日の予定" aria-label="予定の内容" maxlength="100" required>
         <label class="flabel" for="evTime">時間 <span class="opt">任意</span></label>
         <div class="ffield"><input type="time" id="evTime"></div>
         <span class="flabel" id="evLabelLabel">ラベル</span>
@@ -2017,12 +2017,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const exKind = () => (checkedValue("exKind") === "in" ? "in" : "out");
   exDate.value = todayKey;
   // 費目 picked from a menu (the user's call): these eleven for spending; for income the four it had before. The one last
-  // picked for each kind is picked again; entries from before keep whatever 費目 they were given
+  // picked for each kind is picked again
   const EX_CATS = {
     out: ["食費", "日用品", "衣服", "美容", "交際費", "医療費", "教育費", "水道光熱費", "交通費", "通信費", "雑費"],
     in: ["給与", "副収入", "おこづかい", "その他"],
   };
   const exCatPick = { out: EX_CATS.out[0], in: EX_CATS.in[0] };
+  // spending typed in freely before the menu is shown and counted under the menu's names, so 交通 and 交通費 make one line
+  // (the user's call); the records themselves keep what was written
+  const OLD_OUT_CATS = new Map([["外食", "食費"], ["交通", "交通費"], ["住居", "雑費"], ["光熱費", "水道光熱費"], ["通信", "通信費"],
+    ["交際", "交際費"], ["趣味", "雑費"], ["医療", "医療費"], ["教育", "教育費"], ["その他", "雑費"]]);
+  const expenseCat = (e) => (e.kind !== "in" && OLD_OUT_CATS.get(e.category)) || e.category;
   function syncExCats() {
     const kind = exKind();
     setChildren(exCat, EX_CATS[kind].map((c) => el("option", { value: c }, c)));
@@ -2091,7 +2096,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     // category breakdown (expenses only)
     const byCat = new Map();
-    for (const e of m.outs) byCat.set(e.category || "未分類", (byCat.get(e.category || "未分類") || 0) + num(e.amount));
+    for (const e of m.outs) { const c = expenseCat(e) || "未分類"; byCat.set(c, (byCat.get(c) || 0) + num(e.amount)); }
     const cats = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
     const catList = $("catList");
     catList.replaceChildren();
@@ -2104,7 +2109,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("span", { class: "amount" }, fmtYen(amt), el("small", {}, `${Math.round((amt / m.out) * 100)}%`))
       ));
     }
-    if (cats.length) catList.append(el("div", { class: "note" }, "費目は入力した名前ごとにまとめています。"));
     // entries grouped by date
     const list = $("exList");
     list.replaceChildren();
@@ -2122,7 +2126,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       }
       const isIn = e.kind === "in";
       list.append(el("li", {},
-        el("span", { class: "chip", style: `--chip-c: ${isIn ? "var(--accent)" : "var(--c-money)"}`, title: e.category || "" }, e.category || (isIn ? "収入" : "支出")),
+        el("span", { class: "chip", style: `--chip-c: ${isIn ? "var(--accent)" : "var(--c-money)"}`, title: expenseCat(e) || "" }, expenseCat(e) || (isIn ? "収入" : "支出")),
         el("span", { class: "body" }, el("span", { class: "text" }, e.memo || (isIn ? "収入" : "支出"))),
         el("span", { class: "amount" + (isIn ? " in" : "") }, (isIn ? "+" : "") + fmtYen(e.amount)),
         delButton(() => act(() => expenses.remove(e.id)))
@@ -2814,11 +2818,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
 
   // ---------- ホーム ----------
+  // a tile shows today, so the page it opens starts at today too: a record page left on another day comes back to today
+  // and the calendar to this month, so today's entry can't slip into another day unnoticed
+  function openFromHome(key) {
+    if (isRecord(key)) setViewDate(todayKey);
+    if (key === "calendar") setCalDay(todayKey);
+    showTab(key);
+  }
   // a Health-style summary card: the coloured head with its chevron opens the page, and its hit area covers the card
   function tile(color, label, big, unit, sub, extra, tabKey, wide) {
     const page = PAGES.find((p) => p.key === tabKey);
     return el("div", { class: "card tile" + (wide ? " wide" : ""), style: `--tile-c:${color}` },
-      el("button", { type: "button", class: "tile-head", "aria-label": label + "を開く", onclick: () => showTab(tabKey) },
+      el("button", { type: "button", class: "tile-head", "aria-label": label + "を開く", onclick: () => openFromHome(tabKey) },
         icon(page.icon, 18), el("span", { class: "lbl" }, label), el("span", { class: "chev" }, icon("next", 16))),
       el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
       sub ? el("div", { class: "sub" }, sub) : null,
@@ -2837,16 +2848,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const slotsDone = SLOTS.filter((s) => ms.some((m) => m.slot === s));
     const ws = workouts.items.filter((w) => w.date === todayKey);
     const mins = sum(ws, (w) => w.minutes);
-    const sts = study.items.filter((x) => x.date === todayKey), stMins = sum(sts, (x) => x.minutes), stWk = studyWeek();
+    const stMins = sum(study.items.filter((x) => x.date === todayKey), (x) => x.minutes);
     const rts = sortedRoutines(), rtDone = routineDone(todayKey), rtLeft = rts.filter((r) => !rtDone.has(r.id));
     const wts = sortedWeights();
     const wLast = wts[wts.length - 1], wPrev = wts[wts.length - 2];
     const mon = monthSummary(monthOf(todayKey));
     const budget = monthlyBudget();
     const todayOut = sum(mon.outs.filter((e) => e.date === todayKey), (e) => e.amount);
+    // the goal due soonest; one made before 期限 was needed may have none, so those come last
     const active = goals.items.filter((g) => !g.done);
-    const doneG = goals.items.length - active.length;
-    const nearest = active.filter((g) => g.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
+    const nearest = [...active].sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999"))[0];
+    const left = nearest?.deadline ? daysUntil(nearest.deadline) : null;
     const evToday = events.items.filter((e) => e.date === todayKey).sort(byTime);
     const nextEv = events.items.filter((e) => e.date > todayKey).sort((a, b) => a.date.localeCompare(b.date) || byTime(a, b))[0];
 
@@ -2862,8 +2874,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       tile("var(--c-meal)", "食事", String(ms.length), "回",
         ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだ記録がありません", null, "meal"),
       tile("var(--c-workout)", "運動", ws.length && !mins ? String(ws.length) : String(mins), ws.length && !mins ? "件" : "分", null, null, "workout"),
-      tile("var(--c-study)", "勉強", String(stMins), "分",
-        `きょう ${sts.length} 件・この7日間 ${stWk.minutes} 分（${stWk.days} 日）`, null, "study"),
+      // 勉強 like 運動: today's time only (the user's call: no line about the last 7 days)
+      tile("var(--c-study)", "勉強", String(stMins), "分", null, null, "study"),
       tile("var(--c-routine)", "ルーティーン", rts.length ? String(rts.length - rtLeft.length) : "まだ", rts.length ? `/ ${rts.length} できた` : null,
         rts.length ? null : "毎日やることを登録して、チェックしていきましょう。", routineTileList(rts, rtDone), "routine"),
       tile("var(--c-weight)", "体重", wLast ? fmtKg(wLast.kg) : "未記録", wLast ? "kg" : null,
@@ -2873,8 +2885,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       tile("var(--c-money)", "家計簿", Math.round(mon.out).toLocaleString("ja-JP"), "円 今月の支出",
         (budget > 0 ? (budget - mon.out >= 0 ? `予算の残り ${fmtYen(budget - mon.out)}` : `予算を ${fmtYen(mon.out - budget)} 超過`) : `収入 ${fmtYen(mon.inn)}`) + `・きょう ${fmtYen(todayOut)}`,
         null, "money"),
-      tile("var(--c-goal)", "目標", String(active.length), "件 進行中",
-        `達成 ${doneG} 件` + (nearest ? `・「${nearest.title}」まで${daysUntil(nearest.deadline) < 0 ? "期限切れ" : "あと " + daysUntil(nearest.deadline) + " 日"}` : ""),
+      // 目標: no counts, as on its page (the user's call); the goal due soonest and the days left to it
+      tile("var(--c-goal)", "目標",
+        !nearest ? (goals.items.length ? "すべて達成" : "まだ") : left === null ? "期限なし" : left < 0 ? "期限切れ" : left === 0 ? "きょう" : String(left),
+        left > 0 ? "日" : null,
+        !nearest ? (goals.items.length ? "新しい目標を立ててみましょう。" : "目標を立ててみましょう。")
+          : `「${nearest.title}」` + (left > 0 ? "の期限まで" : left === 0 ? "の期限です" : ""),
         null, "goal")
     );
     if (rtFocus) $("homeTiles").querySelector(`[data-rt="${rtFocus}"]`)?.focus();
@@ -2955,7 +2971,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const outs = ex.filter((e) => e.kind !== "in"), ins = ex.filter((e) => e.kind === "in");
     const out = sum(outs, (e) => e.amount), inn = sum(ins, (e) => e.amount), net = inn - out;
     const byCat = new Map();
-    for (const e of outs) byCat.set(e.category || "未分類", (byCat.get(e.category || "未分類") || 0) + num(e.amount));
+    for (const e of outs) { const c = expenseCat(e) || "未分類"; byCat.set(c, (byCat.get(c) || 0) + num(e.amount)); }
 
     // ルーティーン: every check so far, on how many days, and the items done most
     const rtDays = routineDays.items.filter((x) => x.date <= todayKey && x.done?.length);
@@ -3002,7 +3018,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     weight: { label: "体重", items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
       lines: (xs) => xs.map((w) => recLine(null, `${fmtKg(w.kg)} kg`)) },
     money: { label: "家計簿", items: () => expenses.items,
-      lines: (xs) => byCreated(xs).map((e) => recLine(e.category || (e.kind === "in" ? "収入" : "支出"), e.memo, (e.kind === "in" ? "+" : "") + fmtYen(e.amount), null, e.kind === "in")) },
+      lines: (xs) => byCreated(xs).map((e) => recLine(expenseCat(e) || (e.kind === "in" ? "収入" : "支出"), e.memo, (e.kind === "in" ? "+" : "") + fmtYen(e.amount), null, e.kind === "in")) },
   };
   // drawn before the page slides in, so it arrives whole
   function openRecList(kind) {
