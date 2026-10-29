@@ -646,7 +646,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .cal-grid .cal-day { min-height: 0; overflow: hidden; }
 .cal-day { padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: transparent; border: 0; border-bottom: .5px solid var(--separator); border-radius: 0; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
 .cal-day:not(:nth-child(7n)) { border-inline-end: .5px solid var(--separator); }
-.cal-day:nth-last-child(-n + 7) { border-bottom: 0; }  /* the card's edge closes the last week */
+.cal-day.lastweek { border-bottom: 0; }  /* the card's edge closes the last week */
 .cal-day:focus-visible { outline-offset: -3px !important; }  /* inside the square, so the next one can't cover it */
 @media (hover: hover) { .cal-day:hover { background: var(--fill); } }
 .cal-day .n { font-size: var(--t-callout); line-height: 1.2; }
@@ -669,6 +669,16 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .cal-day .bar.plain { border-inline-start-color: transparent; }
 .cal-day .bar.due { background: var(--surface); box-shadow: inset 0 0 0 1px var(--bc); }
 .cal-day .hol { padding-block: 0; color: var(--warn); }
+/* a plan over several days: one bar across its days in each week (the user's call), drawn over the squares, which keep
+   a line for it at the same height (.lane), above a holiday's name and the day's other plans; a run that goes on from
+   the week before or into the next is open at that end. Taps go through to the day under it */
+.cal-grid { position: relative; }
+.cal-runs { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); pointer-events: none; }
+.cal-day .lane, .cal-runs .run { display: block; height: calc((1rem - 6px) * 1.3 + 2px); }
+.cal-runs .run { align-self: start; min-width: 0; margin: 0 2px; padding: 1px 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-radius: 4px; border-inline-start: 3px solid var(--bc); background: color-mix(in srgb, var(--bc) 20%, var(--surface)); color: var(--fg); font-size: calc(1rem - 6px); line-height: 1.3; font-weight: 600; text-align: start; }
+.cal-runs .run.plain { border-inline-start-color: transparent; }
+.cal-runs .run.from { margin-inline-start: 0; border-start-start-radius: 0; border-end-start-radius: 0; border-inline-start-color: transparent; }
+.cal-runs .run.on { margin-inline-end: 0; border-start-end-radius: 0; border-end-end-radius: 0; }
 .cal-day.out .hol { color: var(--muted); }
 .cal-day .more { font-size: calc(1rem - 6px); line-height: 1.2; color: var(--muted); }
 
@@ -1281,9 +1291,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     </div>
     <div class="sheet-view" id="editView" hidden>
       <form class="add" id="evEdit" autocomplete="off">
-        <!-- a repeating plan: whether 保存 and 削除 change this turn alone or every one -->
+        <!-- a repeating plan: whether 保存 and 削除 change this turn alone, this one and the ones after it (the turns past
+             stay as they were), or every one -->
         <div class="seg full" role="group" aria-label="変える範囲" id="edScope" hidden>
           <button type="button" data-scope="one" aria-pressed="true">この回だけ</button>
+          <button type="button" data-scope="after" aria-pressed="false">この回以降</button>
           <button type="button" data-scope="all" aria-pressed="false">すべての回</button>
         </div>
         <input type="text" id="edTitle" class="full" aria-label="予定の内容" maxlength="100" required>
@@ -2619,6 +2631,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     return out;
   }
+  const RUN_LANES = 2; // runs of days drawn as one bar over the same days in a week, at most; more go back to a bar a day
   // a turn's own time on this day: its start, on its first day only (the days after count as all day)
   const turnTime = (t) => (t.day === 0 ? t.e.time || "" : "");
   // all day first, a longer run before a shorter one, then by time
@@ -2780,28 +2793,40 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // that still don't fit make way for +N. Measured on the drawn month, in a few passes for all the squares at once;
   // while the calendar isn't on screen it waits, and the ResizeObserver fits it as it comes on
   function fitBars() {
-    const days = [...calGrid.querySelectorAll(".cal-day")].filter((c) => c.querySelector(".bar"));
-    if (!days.length || !days[0].clientHeight) return;
+    const cells = [...calGrid.querySelectorAll(".cal-day")];
+    if (!cells.length || !cells[0].clientHeight) return;
+    const days = cells.filter((c) => c.querySelector(".bar"));
     const bottom = (c) => c.getBoundingClientRect().bottom - parseFloat(getComputedStyle(c).paddingBottom);
     const over = (c) => c.querySelector(".bars").lastElementChild.getBoundingClientRect().bottom > bottom(c) + .5;
     const busy = days.filter(over);
     for (const c of busy) c.classList.add("tight");
     const full = busy.filter(over);
-    if (!full.length) return;
-    // the +N line, with the gap above it
-    const box = full[0].querySelector(".bars"), probe = el("span", { class: "more" }, "+9");
-    box.append(probe);
-    const moreH = probe.getBoundingClientRect().height + (parseFloat(getComputedStyle(box).rowGap) || 0);
-    probe.remove();
-    const cuts = full.map((c) => {
-      const items = [...c.querySelectorAll(".bars > *")], end = bottom(c) - moreH, first = items[0].classList.contains("hol") ? 1 : 0;
-      let keep = items.length;
-      while (keep > first && items[keep - 1].getBoundingClientRect().bottom > end + .5) keep--;
-      return [c, items.slice(keep)];
-    });
-    for (const [c, gone] of cuts) {
-      for (const x of gone) x.remove();
-      c.querySelector(".bars").append(el("span", { class: "more" }, `+${gone.length}`));
+    if (full.length) {
+      // the +N line, with the gap above it
+      const box = full[0].querySelector(".bars"), probe = el("span", { class: "more" }, "+9");
+      box.append(probe);
+      const moreH = probe.getBoundingClientRect().height + (parseFloat(getComputedStyle(box).rowGap) || 0);
+      probe.remove();
+      const cuts = full.map((c) => {
+        // the runs' lines and a holiday's name stay; the day's own plans give way from the last
+        const items = [...c.querySelectorAll(".bars > *")], end = bottom(c) - moreH, first = items.filter((x) => x.matches(".lane, .hol")).length;
+        let keep = items.length;
+        while (keep > first && items[keep - 1].getBoundingClientRect().bottom > end + .5) keep--;
+        return [c, items.slice(keep)];
+      });
+      for (const [c, gone] of cuts) {
+        for (const x of gone) x.remove();
+        c.querySelector(".bars").append(el("span", { class: "more" }, `+${gone.length}`));
+      }
+    }
+    // each run's bar at the height of the line its first square keeps for it; one with no room (a tiny square, very large
+    // text) is left out, its plan still in the day's list
+    for (const r of calGrid.querySelectorAll(".cal-runs .run")) {
+      const cell = cells[Number(r.dataset.cell)], lane = cell?.querySelector(`.lane[data-lane="${r.dataset.lane}"]`);
+      if (!lane) { r.hidden = true; continue; }
+      const top = lane.getBoundingClientRect().top - cell.getBoundingClientRect().top;
+      r.style.marginTop = top + "px";
+      r.hidden = top + lane.offsetHeight > cell.clientHeight + .5;
     }
   }
   // a new size (the calendar coming on screen, the phone turned) fits the squares again
@@ -2873,7 +2898,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- the day sheet: a tap on a day opens its plans, to add, change and delete them there ----------
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
-  let editingId = null, editingStart = null, editScope = "one", edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
+  let editingId = null, editingStart = null, editScope = "one", editBase = "", editDays = "", edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
   let settingsFrom = null; // the settings showing: "gear" when opened from the month bar, "day" when from a day's sheet
   let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or ＋, 勉強's or きょう's gear, ToDo's or 目標's ＋
   let settingsScope = "calendar"; // whose settings: the calendar's labels, 勉強's subjects or きょう's tiles ("home")
@@ -3326,7 +3351,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // an event's edit form: its text, days, times, repeat and label, and a delete that asks for a second press. For a
   // repeating plan, opened from one of its turns (start), the form changes that turn alone (この回だけ, the first choice:
-  // it is taken out of the plan and kept as a plan of its own) or every turn (すべての回, the plan itself)
+  // it is taken out of the plan and kept as a plan of its own), that turn and the ones after it (この回以降: the plan
+  // ends the day before and a new one carries on, so the turns past stay as they were) or every turn (すべての回, the
+  // plan itself). 保存 with nothing changed only goes back to the list
+  const editFields = () => [$("edTitle").value.trim(), $("edTime").value, $("edEndTime").value, $("edRepeat").value, $("edUntil").value, edLabelChoice].join("\n");
   function editEvent(id, start) {
     const e = events.get(id);
     if (!e) return;
@@ -3339,25 +3367,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     fillEditDays();
     edLabelChoice = labelOf(e) ? e.labelId : "";
     setChildren($("edLabels"), labelPicker("edLabel", edLabelChoice, (v) => { edLabelChoice = v; }, "edLabelLabel"));
+    editBase = editFields(); // the form as it opened, to tell whether anything was changed
     syncSheetHead();
     sheetEl.scrollTop = 0;
     $("sheetTitle").focus();
   }
-  // the form's days: this turn's alone, or the plan's first (開始日) with its repeat
+  // the form's days: this turn's alone; this turn's as the start (開始日) of what carries on from it; or the plan's first
+  // (開始日). The last two show the repeat
   function fillEditDays() {
     const e = events.get(editingId);
     if (!e) return;
-    const all = !e.repeat || editScope === "all", start = all ? e.date : editingStart, extra = extraDays(e);
+    const whole = !e.repeat || editScope !== "one", start = !e.repeat || editScope === "all" ? e.date : editingStart, extra = extraDays(e);
     $("edDate").value = start;
     $("edEndDate").value = extra ? addDays(start, extra) : "";
-    $("edDateLabel").textContent = e.repeat && all ? "開始日" : "日付";
-    $("edRepeatRows").hidden = !all;
+    $("edDateLabel").textContent = e.repeat && whole ? "開始日" : "日付";
+    $("edRepeatRows").hidden = !whole;
     for (const b of $("edScope").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.scope === editScope));
     disarmDelete(); // its words follow the choice
     syncPlanRows("ed");
     // the repeat's fields left out of one turn's change are switched off, so the browser doesn't check them
-    if (!all) $("edUntil").disabled = true;
-    $("edRepeat").disabled = !all;
+    if (!whole) $("edUntil").disabled = true;
+    $("edRepeat").disabled = !whole;
+    editDays = $("edDate").value + "\n" + $("edEndDate").value; // what the days say for this choice before any change
   }
   $("edScope").addEventListener("click", (ev) => {
     const b = ev.target.closest("button[data-scope]");
@@ -3376,6 +3407,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const title = $("edTitle").value.trim(), date = $("edDate").value, time = $("edTime").value;
     if (!title) { $("edTitle").value = ""; $("edTitle").focus(); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { $("edDate").focus(); return; }
+    // nothing changed: back to the list, the plan as it was (a repeating one isn't split for nothing)
+    if (editFields() === editBase && date + "\n" + $("edEndDate").value === editDays) { showDayView(); return; }
     const labelId = edLabelChoice && labels.get(edLabelChoice) ? edLabelChoice : undefined;
     const { repeat, repeatUntil, ...rest } = planExtras("ed", date, time);
     const fields = { title, date, time: time || undefined, labelId, endDate: undefined, endTime: undefined, ...rest };
@@ -3385,6 +3418,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       showDayView();
       act(async () => { await events.update(e.id, { skip }); await events.add({ ...fields, createdAt: Date.now() }); });
       if (moved) flash(`${fmtMDW(date)}に移しました`);
+      return;
+    }
+    if (e.repeat && editScope === "after" && editingStart > e.date) {
+      // this turn and the ones after it: the plan ends the day before, and a new one carries on from here with what the
+      // form says (from its first turn, この回以降 is the whole plan)
+      const skips = e.skip || [], next = { ...fields, createdAt: Date.now() };
+      if (repeat) Object.assign(next, { repeat, repeatUntil, skip: skips.filter((d) => d >= editingStart) });
+      showDayView();
+      act(async () => {
+        await events.update(e.id, { repeatUntil: addDays(editingStart, -1), skip: skips.filter((d) => d < editingStart) });
+        await events.add(next);
+      });
       return;
     }
     const moved = !e.repeat && !repeat && date !== e.date; // read before the update, which changes e in place
@@ -3402,17 +3447,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   });
   // opening another event starts the delete over, so one press can never delete the wrong event
   function disarmDelete() { clearTimeout(delTimer); edDelete.classList.remove("armed"); edDelete.textContent = deleteWords(); }
-  function deleteWords() { return events.get(editingId)?.repeat ? (editScope === "all" ? "すべての回を削除" : "この回を削除") : "この予定を削除"; }
+  function deleteWords() {
+    if (!events.get(editingId)?.repeat) return "この予定を削除";
+    return editScope === "all" ? "すべての回を削除" : editScope === "after" ? "この回以降を削除" : "この回を削除";
+  }
   edDelete.addEventListener("click", () => {
     if (!edDelete.classList.contains("armed")) {
       edDelete.classList.add("armed"); edDelete.textContent = "もう一度押すと削除します";
       delTimer = setTimeout(disarmDelete, 4000);
       return;
     }
-    const id = editingId, e = events.get(id), start = editingStart, one = e?.repeat && editScope === "one";
+    const id = editingId, e = events.get(id), start = editingStart;
     showDayView();
-    // a repeating plan's turn alone is taken out of it; otherwise the plan goes
-    act(() => (one ? events.update(id, { skip: [...new Set([...(e.skip || []), start])] }) : events.remove(id)));
+    // a repeating plan's turn alone is taken out of it; this turn and the ones after it end the plan the day before (the
+    // turns past stay); otherwise the plan goes
+    if (e?.repeat && editScope === "one") act(() => events.update(id, { skip: [...new Set([...(e.skip || []), start])] }));
+    else if (e?.repeat && editScope === "after" && start > e.date) act(() => events.update(id, { repeatUntil: addDays(start, -1), skip: (e.skip || []).filter((d) => d < start) }));
+    else act(() => events.remove(id));
   });
 
   // ---------- an entry's edit form: ToDo, 食事, 運動, 勉強 and 家計簿, and from 記録's lists 日記, 体重 and a day's ルーティーン ----------
@@ -3687,16 +3738,41 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const first = calMonth + "-01";
     const lead = parseYmd(first).getDay();
     const start = addDays(first, -lead), count = Math.ceil((lead + daysInMonth(calMonth)) / 7) * 7;
-    const turnsBy = turnsByDay(start, addDays(start, count - 1));
+    const turnsBy = turnsByDay(start, addDays(start, count - 1)), weeks = count / 7;
+    // runs of days: in each week, one bar across the days a run covers there, in a lane (a line the squares keep for it),
+    // the earliest and longest first; a third run over the same days goes back to a bar a day
+    const runs = [], lanesAt = new Map(), drawn = new Set();
+    for (let w = 0; w < weeks; w++) {
+      const ws = addDays(start, w * 7), we = addDays(ws, 6), segs = [], seen = new Set();
+      for (let c = 0; c < 7; c++) for (const t of turnsBy.get(addDays(ws, c)) || []) {
+        const key = t.e.id + "|" + t.start;
+        if (t.days < 2 || seen.has(key)) continue;
+        seen.add(key);
+        const end = addDays(t.start, t.days - 1), a = t.start > ws ? t.start : ws, b = end < we ? end : we;
+        segs.push({ t, key, c0: daysBetween(ws, a), n: daysBetween(a, b) + 1, from: t.start < ws, on: end > we });
+      }
+      segs.sort((x, y) => x.c0 - y.c0 || y.n - x.n || num(x.t.e.createdAt) - num(y.t.e.createdAt));
+      const lanes = []; // each lane's last column taken
+      for (const sg of segs) {
+        let lane = lanes.findIndex((last) => last < sg.c0);
+        if (lane < 0) lane = lanes.length;
+        if (lane >= RUN_LANES) continue;
+        lanes[lane] = sg.c0 + sg.n - 1;
+        runs.push({ ...sg, w, lane });
+        drawn.add(w + "|" + sg.key);
+        for (let c = sg.c0; c < sg.c0 + sg.n; c++) { const d = addDays(ws, c); lanesAt.set(d, Math.max(lanesAt.get(d) || 0, lane + 1)); }
+      }
+    }
     const cells = [];
     for (let i = 0; i < count; i++) {
-      const d = addDays(start, i), dt = parseYmd(d), wd = dt.getDay();
-      const evs = turnsBy.get(d) || [];
+      const d = addDays(start, i), dt = parseYmd(d), wd = dt.getDay(), w = Math.floor(i / 7);
+      const evs = turnsBy.get(d) || [], laneCount = lanesAt.get(d) || 0;
+      const own = evs.filter((t) => !drawn.has(w + "|" + t.e.id + "|" + t.start)); // the ones not drawn as a run's bar
       const todosDue = (todoBy.get(d) || []).filter((t) => !t.done);
       const goalsDue = (goalBy.get(d) || []).filter((g) => !g.done);
       // the day's plans as bars: events by time in their label's colour, then ToDo and goal deadlines; the day's name lists the labels too
       const plans = [
-        ...evs.map(({ e }) => ({ text: e.title, hue: labelHue(labelOf(e)), plain: !labelOf(e) })),
+        ...own.map(({ e }) => ({ text: e.title, hue: labelHue(labelOf(e)), plain: !labelOf(e) })),
         ...todosDue.map((t) => ({ text: t.text, hue: "var(--c-todo)", due: true })),
         ...goalsDue.map((g) => ({ text: g.title, hue: "var(--c-goal)", due: true })),
       ];
@@ -3705,19 +3781,24 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const notes = [evs.length ? `予定 ${evs.length} 件` + (evNames.length ? `（${evNames.join("、")}）` : "") : "", todosDue.length ? `ToDo の期限 ${todosDue.length} 件` : "", goalsDue.length ? `目標の期限 ${goalsDue.length} 件` : ""];
       cells.push(el("button", {
         type: "button",
-        class: "cal-day" + (monthOf(d) !== calMonth ? " out" : "") + (wd === 0 ? " sun" : wd === 6 ? " sat" : "") + (hol ? " hol" : "") + (d === todayKey ? " today" : "") + (d === calDay ? " sel" : ""),
+        class: "cal-day" + (monthOf(d) !== calMonth ? " out" : "") + (wd === 0 ? " sun" : wd === 6 ? " sat" : "") + (hol ? " hol" : "") + (d === todayKey ? " today" : "") + (d === calDay ? " sel" : "") + (i >= count - 7 ? " lastweek" : ""),
         "aria-haspopup": "dialog",
         "aria-current": d === todayKey ? "date" : null,
         "aria-label": [fmtMDW(d), hol, ...notes].filter(Boolean).join("、"),
         onclick: (ev) => openDay(d, ev.detail === 0),
       },
         el("span", { class: "n" }, dt.getDate()),
-        hol || plans.length ? el("span", { class: "bars", "aria-hidden": "true" },
+        laneCount || hol || plans.length ? el("span", { class: "bars", "aria-hidden": "true" },
+          Array.from({ length: laneCount }, (_, k) => el("span", { class: "lane", "data-lane": k })),
           hol ? el("span", { class: "hol" }, hol) : null,
           plans.map((x) => el("span", { class: "bar" + (x.due ? " due" : x.plain ? " plain" : ""), style: `--bc:${x.hue}` }, x.text))) : null
       ));
     }
-    setChildren($("calGrid"), cells);
+    // the runs' bars, over the squares in a grid of their own (not one of the squares, so their order and lines stay)
+    const runLayer = el("div", { class: "cal-runs", "aria-hidden": "true", style: `grid-template-rows: repeat(${weeks}, minmax(0, 1fr))` },
+      runs.map((r) => el("span", { class: "run" + (r.from ? " from" : "") + (r.on ? " on" : "") + (labelOf(r.t.e) ? "" : " plain"), "data-cell": r.w * 7 + r.c0, "data-lane": r.lane,
+        style: `grid-row: ${r.w + 1}; grid-column: ${r.c0 + 1} / span ${r.n}; --bc: ${labelHue(labelOf(r.t.e))}` }, r.t.e.title)));
+    setChildren($("calGrid"), cells, runLayer);
     fitBars();
 
     // the chosen day, in its sheet: its events (a tap opens one to change or delete it), then whatever falls due on it
