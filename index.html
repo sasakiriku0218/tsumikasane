@@ -585,7 +585,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .tile .sub .line { display: flex; column-gap: 0.3em; white-space: nowrap; }  /* 運動's and 勉強's: one to a line */
 .tile .sub .line .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }  /* cut short before the amount is */
 /* a part of a line breaks only at a space inside it, so 予算の残り and 63,800 円 stay whole */
-.tile .sub .part { display: inline-block; word-break: keep-all; overflow-wrap: anywhere; }
+.tile .sub .part, .sum-card .sub .part { display: inline-block; word-break: keep-all; overflow-wrap: anywhere; }
 /* 日記's tile: the day's words, three lines at most, or a field to write them in (above the head's hit area, so a tap
    writes rather than opens the page) */
 .jt-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; overflow-wrap: anywhere; }
@@ -803,6 +803,10 @@ ul.list.rec-list > li.one { justify-content: space-between; column-gap: 12px; }
 .rt-edit .rt-row[aria-checked="true"] .check path { fill: #ffffff; }
 .rec-num.in { color: var(--accent); font-weight: 600; }
 @media (min-width: 480px) { .sum-card.wide { grid-column: 1 / -1; } }
+/* 記録's cards go two to a row on iPhone too, as きょう's tiles (the user's call): 日記 and 食事, 運動 and 体重. 続けた日 keeps
+   a row, and so on a phone do the cards with a list of three (勉強, ルーティーン, 家計簿), which share one on wider screens */
+@container (min-width: 20em) { #sumCards { grid-template-columns: repeat(2, minmax(0, 1fr)); } #sumCards > .sum-card.wide { grid-column: 1 / -1; } }
+@container (min-width: 20em) and (max-width: 33.99em) { #sumCards > .sum-card.list { grid-column: 1 / -1; } }
 .group-head { margin: var(--space-1) 0 -8px; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); }
 .group-foot { margin: -8px 0 0; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 
@@ -3510,15 +3514,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   const homeHidden = () => new Set(homePrefs().hidden || []);
   const saveHomePrefs = (patch) => act(() => settings.set("home", { ...homePrefs(), ...patch, updatedAt: Date.now() }));
-  // a Health-style summary card: the coloured head with its chevron opens the page, and its hit area covers the card
-  // half a row on a phone is narrow, so a word in the big place (まだ, 未記録) is a step smaller than a number, and a line of
-  // parts (合計 1150 kcal・朝食・昼食) breaks between its parts rather than inside one. A tile without a big one (日記) has none
+  // half a row on a phone is narrow (きょう's tiles, 記録's cards), so a line of parts (合計 1150 kcal・朝食・昼食) breaks
+  // between its parts rather than inside one, and a number keeps its unit on its line (63,800 円, −0.2 kg)
+  const subParts = (sub) => (typeof sub === "string" && sub.includes("・")
+    ? sub.split("・").map((s, i, all) => el("span", { class: "part" }, s.replace(/ (?=円|kcal|kg|分|件|回)/g, "\u00a0") + (i < all.length - 1 ? "・" : ""))) : sub);
+  // a Health-style summary card: the coloured head with its chevron opens the page, and its hit area covers the card.
+  // A word in the big place (まだ, 未記録) is a step smaller than a number. A tile without a big one (日記) has none
   function tile(key, big, unit, sub, extra) {
-    const { label, color } = homeTile(key), page = PAGES.find((p) => p.key === key);
-    // a number keeps its unit on its line (63,800 円, −0.2 kg)
-    const keep = (s) => s.replace(/ (?=円|kcal|kg|分|件|回)/g, " ");
-    const parts = typeof sub === "string" && sub.includes("・")
-      ? sub.split("・").map((s, i, all) => el("span", { class: "part" }, keep(s) + (i < all.length - 1 ? "・" : ""))) : sub;
+    const { label, color } = homeTile(key), page = PAGES.find((p) => p.key === key), parts = subParts(sub);
     return el("div", { class: "card tile", "data-tile": key, style: `--tile-c:${color}` },
       el("button", { type: "button", class: "tile-head", "aria-label": label + "を開く", onclick: () => openFromHome(key) },
         icon(page.icon, 18), el("span", { class: "lbl" }, label), el("span", { class: "chev" }, icon("next", 16))),
@@ -3759,15 +3762,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // minutes as hours once they add up: 53 時間 20 分
   const durBig = (min) => (min >= 60 ? [String(Math.floor(min / 60)), `時間 ${min % 60} 分`] : [String(min), "分"]);
   const durText = (min) => durBig(min).join(" ");
-  // kind: the record whose entries the card opens (続けた日 has none)
-  function sumCard(color, iconName, title, big, unit, sub, wide, extra, kind) {
-    return el("div", { class: "card sum-card" + (wide ? " wide" : ""), style: `--sum-c:${color}` },
+  // size: "wide" takes a row, "list" (a card with a list of three) a row on a phone, otherwise half a row; kind: the record
+  // whose entries the card opens (続けた日 has none)
+  function sumCard(color, iconName, title, big, unit, sub, size, extra, kind) {
+    return el("div", { class: "card sum-card" + (size ? " " + size : ""), style: `--sum-c:${color}` },
       el("h3", { class: "sum-head" }, kind
         ? el("button", { type: "button", class: "sum-open", "data-kind": kind, "aria-label": `${title}の記録を見る`, onclick: () => openRecList(kind) },
           icon(iconName, 18), el("span", { class: "lbl" }, title), el("span", { class: "chev" }, icon("next", 16)))
         : [icon(iconName, 18), el("span", {}, title)]),
       el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
-      sub ? el("div", { class: "sub" }, sub) : null,
+      sub ? el("div", { class: "sub" }, subParts(sub)) : null,
       extra);
   }
   // the three largest of a total, as a short list with a dot in each one's colour (where the study time or the money went)
@@ -3810,7 +3814,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const x of sts) { const k = subjectOf(x)?.name || "科目なし"; bySub.set(k, (bySub.get(k) || 0) + num(x.minutes)); }
     const subColor = (n) => { const sub = subjects.items.find((x) => x.name === n); return sub ? labelHue(sub) : "var(--c-study)"; };
 
-    // 体重: where it started, where it is now
+    // 体重: where it is now, and how far it has come since the first one
     const wts = sortedWeights().filter((w) => w.id <= todayKey);
     const wFirst = wts[0], wLast = wts[wts.length - 1];
 
@@ -3826,21 +3830,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const x of rtDays) for (const id of x.done) { const r = routines.get(id); if (r) byRoutine.set(r.name, (byRoutine.get(r.name) || 0) + 1); }
 
     setChildren($("sumCards"),
-      sumCard("var(--accent)", "records", "続けた日", String(rec.length), "日 記録した日", `いまの連続 ${streak} 日・いちばん長い連続 ${longest} 日`, true),
-      sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日", js.length ? null : "まだ書いていません", false, null, "journal"),
+      sumCard("var(--accent)", "records", "続けた日", String(rec.length), "日 記録した日", `いまの連続 ${streak} 日・いちばん長い連続 ${longest} 日`, "wide"),
+      sumCard("var(--c-journal)", "journal", "日記", String(js.length), "日 書いた日", js.length ? null : "まだ書いていません", null, null, "journal"),
       sumCard("var(--c-meal)", "meal", "食事", ms.length.toLocaleString("ja-JP"), "回",
-        `${new Set(ms.map((m) => m.date)).size} 日記録` + (kcalDays.size ? `・1日平均 ${Math.round(avgKcal).toLocaleString("ja-JP")} kcal` : ""), false, null, "meal"),
+        `${new Set(ms.map((m) => m.date)).size} 日記録` + (kcalDays.size ? `・1日平均 ${Math.round(avgKcal).toLocaleString("ja-JP")} kcal` : ""), null, null, "meal"),
       sumCard("var(--c-workout)", "workout", "運動", ...durBig(wMin),
-        `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日` + (wKm > 0 ? `・${Math.round(wKm * 10) / 10} km` : ""), false, null, "workout"),
-      sumCard("var(--c-study)", "study", "勉強", ...durBig(stMin), `${sts.length} 回・${new Set(sts.map((x) => x.date)).size} 日`, false,
-        topList(bySub, subColor, durText), "study"),
-      sumCard("var(--c-routine)", "routine", "ルーティーン", sum(rtDays, (x) => x.done.length).toLocaleString("ja-JP"), "回 できた",
-        rtDays.length ? `${rtDays.length} 日チェック` : "まだチェックしていません", false, topList(byRoutine, () => "var(--c-routine)", (n) => `${n} 回`), "routine"),
+        `${ws.length} 回・${new Set(ws.map((w) => w.date)).size} 日` + (wKm > 0 ? `・${Math.round(wKm * 10) / 10} km` : ""), null, null, "workout"),
+      // 体重 beside 運動, so on a phone the four short cards make two rows
       sumCard("var(--c-weight)", "weight", "体重", wLast ? fmtKg(wLast.kg) : "—", wLast ? "kg" : null,
         !wLast ? "まだ記録がありません" : wts.length > 1
-          ? `はじめ（${fmtMD(wFirst.id)}）の ${fmtKg(wFirst.kg)} kg から ${signed(num(wLast.kg) - num(wFirst.kg))} kg・${wts.length} 回`
-          : `${fmtMD(wLast.id)}の記録`, false, null, "weight"),
-      sumCard("var(--c-money)", "money", "家計簿", Math.round(out).toLocaleString("ja-JP"), "円 支出", `収入 ${fmtYen(inn)}・収支 ${net > 0 ? "+" : ""}${fmtYen(net)}`, false,
+          ? `${wts.length} 回・${fmtMD(wFirst.id)}から ${signed(num(wLast.kg) - num(wFirst.kg))} kg` // the count first, as 運動's and 勉強's
+          : `${fmtMD(wLast.id)}の記録`, null, null, "weight"),
+      sumCard("var(--c-study)", "study", "勉強", ...durBig(stMin), `${sts.length} 回・${new Set(sts.map((x) => x.date)).size} 日`, "list",
+        topList(bySub, subColor, durText), "study"),
+      sumCard("var(--c-routine)", "routine", "ルーティーン", sum(rtDays, (x) => x.done.length).toLocaleString("ja-JP"), "回 できた",
+        rtDays.length ? `${rtDays.length} 日チェック` : "まだチェックしていません", "list", topList(byRoutine, () => "var(--c-routine)", (n) => `${n} 回`), "routine"),
+      sumCard("var(--c-money)", "money", "家計簿", Math.round(out).toLocaleString("ja-JP"), "円 支出", `収入 ${fmtYen(inn)}・収支 ${net > 0 ? "+" : ""}${fmtYen(net)}`, "list",
         topList(byCat, () => "var(--c-money)", fmtYen), "money"));
   }
 
