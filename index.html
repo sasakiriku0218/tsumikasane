@@ -197,7 +197,8 @@ button:active:not(:disabled) { opacity: .5; transition: none; }
 .menu .lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 /* the selected tab: tint colour on a lighter bubble */
 .menu button.on, .menu button.in { color: var(--accent); background: var(--pill); box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
-@media (max-width: 359px) { .menu button { font-size: 11px; } }
+/* narrow screens (the smaller iPhones with Display Zoom): 10pt, as iOS's own tab bars have, so カレンダー stays whole */
+@media (max-width: 359px) { .menu button { font-size: 10px; } }
 
 /* the top bar: clear while the large title shows, glass with the page title once it has scrolled under */
 .navbar {
@@ -858,7 +859,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
         <ul class="list card" id="todoList"></ul>
         <!-- it acts on the list, so it sits right under it -->
-        <div class="list-foot"><button type="button" class="link-btn danger" id="clearDone">完了したものを削除</button></div>
+        <div class="list-foot" id="todoFoot"><button type="button" class="link-btn danger" id="clearDone">完了したものを削除</button></div>
       </section>
 
       <!-- 記録: これまでの積み重ね, everything recorded so far (the user's call: no weeks, months or years, and entries are made
@@ -1539,7 +1540,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!t.due) return null;
     const overdue = !t.done && t.due < todayKey;
     const label = t.due === todayKey ? "期限：きょう" : `期限：${fmtShort(t.due)}`;
-    return el("span", { class: "sub" + (overdue ? " warn" : "") }, label + (overdue ? "（過ぎています）" : ""));
+    // each part kept whole, so a narrow row breaks the line between them, not inside a word
+    return el("span", { class: "sub" + (overdue ? " warn" : "") }, el("span", { class: "phrase" }, label), overdue ? el("span", { class: "phrase" }, "（過ぎています）") : null);
   }
   // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): the 期限
   // soonest first, which puts those past it first and today's next, then those without one, each oldest first. Done
@@ -1552,7 +1554,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? t.done : !t.done));
     const remaining = items.filter((t) => !t.done).length;
     $("todoCount").textContent = `残り ${remaining} 件 ／ 全 ${items.length} 件`;
-    $("clearDone").disabled = !items.some((t) => t.done);
+    $("todoFoot").hidden = !items.some((t) => t.done); // only while there is something done to clear
     const list = $("todoList");
     list.replaceChildren();
     if (!shown.length) {
