@@ -282,6 +282,9 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
    icon lined up with the cards' right edge */
 .icon-btn { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -6px -11px -6px auto; padding: 0; background: transparent; border: 0; border-radius: 50%; color: var(--accent); cursor: pointer; }
 .icon-btn .icon { width: 22px; height: 22px; }
+/* the month bar has two: the gear, then ＋ for a new plan right beside it (the user's call), their 44px squares touching */
+.monthbar .icon-btn:has(+ .icon-btn) { margin-inline-end: 0; }
+.monthbar .icon-btn + .icon-btn { margin-inline-start: calc(-1 * var(--space-1)); }
 /* a large title with a button at its trailing end (勉強's gear for its subjects, 目標's ＋) */
 .title-row { align-self: stretch; display: flex; align-items: center; gap: var(--space-1); }
 @media (hover: none), (pointer: coarse) {
@@ -522,6 +525,15 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
    date bold (no circle, at the user's wish). */
 .cal { padding: 12px 0 0; overflow: hidden; }  /* no legend under the grid (the user's call): the last week ends the card */
 .cal { touch-action: pan-y pinch-zoom; }  /* a sideways drag turns the month (the script); up and down still scrolls */
+/* on iPhone the month runs from one edge of the screen to the other (the user's call, after a calendar app they showed):
+   no side margins or rounded corners, and the lines between the days go out to the edges. The days keep clear of the
+   notch when there is one at the side */
+@media (max-width: 767px) {
+  .cal {
+    margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+    padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px); border-radius: 0;
+  }
+}
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .cal-grid { border-top: .5px solid var(--separator); }
 .cal-week span { padding-bottom: 6px; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
@@ -552,7 +564,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* event labels: the user's own categories. Wherever a label is picked or listed its name sits next to the colour, so colour
    is never the only cue (HIG); the month grid writes each plan's title in it and has no legend (the user's call). In the
    forms they are one-tap chips; a chosen chip fills with its colour and white text. */
-#evLabelLabel, #edLabelLabel, #stSubjectLabel { align-self: start; margin-top: 4px; }  /* the chips can wrap, so the label stays with their first row */
+#evLabelLabel, #edLabelLabel, #planLabelLabel, #stSubjectLabel { align-self: start; margin-top: 4px; }  /* the chips can wrap, so the label stays with their first row */
 .label-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .label-chips label { position: relative; display: grid; cursor: pointer; }
 .label-chips input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
@@ -792,13 +804,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <section id="sec-calendar" style="--sec-c: var(--c-cal)" hidden>
         <!-- no large title here (the user wanted the calendar itself higher up); the heading stays for screen readers -->
         <div class="sec-head"><h2 class="sr-only">カレンダー</h2>
-          <!-- the month's name and, at the right, the gear for the calendar's settings; a sideways swipe on the calendar
-               turns the month, and the ‹ › buttons are for a mouse, a keyboard or VoiceOver (see .monthbar) -->
+          <!-- the month's name and, at the right, the gear for the calendar's settings and ＋ for a new plan; a sideways
+               swipe on the calendar turns the month, and the ‹ › buttons are for a mouse, a keyboard or VoiceOver (see .monthbar) -->
           <div class="monthbar">
             <button type="button" class="navbtn" id="calPrev" aria-label="前の月"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
             <span class="cur" id="calMonthName" aria-live="polite"></span>
             <button type="button" class="navbtn" id="calNext" aria-label="次の月"><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></button>
             <button type="button" class="icon-btn" id="calSettings" aria-label="設定" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-gear"/></svg></button>
+            <button type="button" class="icon-btn" id="calAdd" aria-label="予定を追加" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
           </div>
         </div>
         <div class="card cal">
@@ -1057,6 +1070,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     <button type="button" class="sheet-btn end" id="sheetDone">完了</button>
     <button type="submit" class="sheet-btn end" id="sheetSave" form="evEdit" hidden>保存</button>
     <button type="submit" class="sheet-btn end" id="goalSave" form="goalForm" hidden disabled>追加</button>
+    <button type="submit" class="sheet-btn end" id="planSave" form="planForm" hidden disabled>追加</button>
   </div>
   <div class="sheet-body">
     <div class="sheet-view" id="dayView">
@@ -1101,6 +1115,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
         <p class="group-foot">勉強の記録に付けて色分けできます。科目を消すと、付いていた記録は「科目なし」になります。</p>
       </div>
+    </div>
+    <!-- a new plan, from the ＋ beside the calendar's gear: キャンセル and 追加 on the bar, as for a new goal. Its day starts
+         as the one picked in the month on show, and can be any other -->
+    <div class="sheet-view" id="planView" hidden>
+      <form class="add" id="planForm" autocomplete="off">
+        <input type="text" id="planTitle" class="full" placeholder="新しい予定" aria-label="予定の内容" maxlength="100" required>
+        <label class="flabel" for="planDate">日付</label>
+        <div class="ffield"><input type="date" id="planDate" required></div>
+        <label class="flabel" for="planTime">時間 <span class="opt">任意</span></label>
+        <div class="ffield"><input type="time" id="planTime"></div>
+        <span class="flabel" id="planLabelLabel">ラベル</span>
+        <div class="ffield" id="planLabels"></div>
+      </form>
     </div>
     <!-- a new goal, from the ＋ on 目標: キャンセル and 追加 on the bar, as iOS sheets for a new item have -->
     <div class="sheet-view" id="goalView" hidden>
@@ -2234,6 +2261,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const labelHue = (l) => (l ? `var(--lc-${colorKey(l.color)})` : "var(--c-cal)");
   const labelStyle = (l) => (l ? `--lc:var(--lc-${colorKey(l.color)});--lf:var(--lf-${colorKey(l.color)})` : "--lc:var(--c-cal);--lf:var(--f-cal)");
   let evLabelChoice = ""; // the label picked in the add form; it stays picked for the next event
+  let planLabelChoice = ""; // the same for the new plan's form, from the ＋ beside the gear
   // one tap picks a label or a subject (chips, a radio group of their own in each form), or a way to make the first one
   function labelPicker(name, current, onPick, labelledBy) {
     return tagPicker(sortedLabels(), makeFirstLabel, "ラベルを作る", name, current, onPick, labelledBy);
@@ -2251,7 +2279,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function renderLabels() {
     if (evLabelChoice && !labels.get(evLabelChoice)) evLabelChoice = "";
     setChildren($("evLabels"), labelPicker("evLabel", evLabelChoice, (v) => { evLabelChoice = v; }, "evLabelLabel"));
+    renderPlanLabels();
     renderLabelEditor();
+  }
+  // left alone while a chip there has focus; it is drawn again as the form opens
+  function renderPlanLabels() {
+    if (planLabelChoice && !labels.get(planLabelChoice)) planLabelChoice = "";
+    if ($("planLabels").contains(document.activeElement)) return;
+    setChildren($("planLabels"), labelPicker("planLabel", planLabelChoice, (v) => { planLabelChoice = v; }, "planLabelLabel"));
   }
   function renderLabelEditor() { renderTagEditor(labels, $("labelList"), "ラベル"); }
   // the editor for the user's own categories (calendar labels, study subjects): a name and a colour per row and a
@@ -2303,6 +2338,26 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("evTitle").value = ""; $("evTime").value = ""; $("evTitle").focus();
   });
   function setCalDay(d) { calDay = d; calMonth = monthOf(d); renderCalendar(); }
+
+  // a new plan from the ＋ beside the gear (openNewPlan): any day, 追加 grey until it has its text and a day
+  const syncPlanSave = () => { $("planSave").disabled = !$("planTitle").value.trim() || !$("planDate").value; };
+  for (const id of ["planTitle", "planDate"]) for (const type of ["input", "change"]) $(id).addEventListener(type, syncPlanSave);
+  function clearPlanForm() { $("planForm").reset(); syncPlanSave(); }
+  // the day a fresh form starts on: the day picked in the month on show, else today if it is that month, else the 1st
+  const planDay = () => (monthOf(calDay) === calMonth ? calDay : monthOf(todayKey) === calMonth ? todayKey : calMonth + "-01");
+  $("calAdd").addEventListener("click", (ev) => openNewPlan(ev.detail === 0));
+  $("planForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const title = $("planTitle").value.trim(), date = $("planDate").value, time = $("planTime").value;
+    if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const item = { date, title, createdAt: Date.now() };
+    if (time) item.time = time;
+    if (planLabelChoice && labels.get(planLabelChoice)) item.labelId = planLabelChoice;
+    act(() => events.add(item));
+    clearPlanForm();
+    setCalDay(date); // the month turns to the plan's day and picks it, so it shows where the plan went
+    closeSheet();
+  });
 
   // ---------- turning the month: a sideways swipe on the calendar (the user's call), or the ‹ › buttons ----------
   const calCard = document.querySelector("#sec-calendar .cal"), calGrid = $("calGrid");
@@ -2371,26 +2426,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
   let editingId = null, edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
   let settingsFrom = null; // the settings showing: "gear" when opened from the month bar, "day" when from a day's sheet
-  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear, 勉強's or 目標's ＋
+  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or ＋, 勉強's gear, 目標's ＋
   let settingsScope = "calendar"; // whose settings: the calendar's labels or 勉強's subjects
   let goalNew = false; // the sheet holds a new goal's form, opened from 目標's ＋
+  let planNew = false; // the sheet holds a new plan's form, opened from the ＋ beside the calendar's gear
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
   let chartDraft = null, composing = false, mDelTimer = null; // a cell's text not saved yet; a kana conversion under way
-  // what the sheet holds, one view at a time: a new goal, a goal's chart, the settings, an event's edit form, or (by
-  // default) a day's plans
-  const SHEET_VIEWS = { goal: "goalView", chart: "mandalaView", settings: "settingsView", edit: "editView", day: "dayView" };
-  const sheetMode = () => (goalNew ? "goal" : mandalaGoal ? "chart" : settingsFrom ? "settings" : editingId ? "edit" : "day");
-  // the bar on top: 完了 over the day's list, the settings and a chart; キャンセル and 保存 over an event's edit form, as iOS edit sheets have, and キャンセル and 追加 over a new goal; 戻る over the settings when a day's
+  // what the sheet holds, one view at a time: a new goal, a goal's chart, the settings, a new plan, an event's edit form,
+  // or (by default) a day's plans. The settings come before a new plan, which can lead to them to make its first label
+  const SHEET_VIEWS = { goal: "goalView", chart: "mandalaView", settings: "settingsView", plan: "planView", edit: "editView", day: "dayView" };
+  const sheetMode = () => (goalNew ? "goal" : mandalaGoal ? "chart" : settingsFrom ? "settings" : planNew ? "plan" : editingId ? "edit" : "day");
+  // the bar on top: 完了 over the day's list, the settings and a chart; キャンセル and 保存 over an event's edit form, as iOS edit sheets have, and キャンセル and 追加 over a new goal or plan; 戻る over the settings when a day's
   // sheet led to them, and over a chart's cell to go back out of it
   function syncSheetHead() {
-    const mode = sheetMode();
+    const mode = sheetMode(), adding = mode === "goal" || mode === "plan";
     for (const [m, id] of Object.entries(SHEET_VIEWS)) $(id).hidden = m !== mode;
     $("labelsGroup").hidden = settingsScope !== "calendar"; $("subjectsGroup").hidden = settingsScope !== "study";
-    $("sheetDone").hidden = mode === "edit" || mode === "goal"; $("sheetSave").hidden = mode !== "edit"; $("goalSave").hidden = mode !== "goal";
-    $("sheetCancel").hidden = !(mode === "edit" || mode === "goal" || (mode === "chart" && mPath.length) || (mode === "settings" && settingsFrom === "day"));
-    $("sheetCancel").textContent = mode === "edit" || mode === "goal" ? "キャンセル" : "戻る";
+    $("sheetDone").hidden = mode === "edit" || adding; $("sheetSave").hidden = mode !== "edit";
+    $("goalSave").hidden = mode !== "goal"; $("planSave").hidden = mode !== "plan";
+    $("sheetCancel").hidden = !(mode === "edit" || adding || (mode === "chart" && mPath.length) || (mode === "settings" && settingsFrom === "day"));
+    $("sheetCancel").textContent = mode === "edit" || adding ? "キャンセル" : "戻る";
     const rel = mode === "day" ? relLabel(calDay) : "";
-    $("sheetTitle").textContent = mode === "goal" ? "新しい目標" : mode === "chart" ? chartTitle()
+    $("sheetTitle").textContent = mode === "goal" ? "新しい目標" : mode === "plan" ? "新しい予定" : mode === "chart" ? chartTitle()
       : mode === "settings" ? "設定" : mode === "edit" ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay);
   }
   // a closed sheet's starting state: no animation or drag left over, the day's list showing
@@ -2400,7 +2457,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     sheetAnims = []; sheetClosing = false; drag = null;
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; mandalaGoal = null; mPath = [];
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; mandalaGoal = null; mPath = [];
     disarmDelete(); disarmGoalDelete(); syncSheetHead();
   }
   function openDay(d, byKey) {
@@ -2428,6 +2485,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     resetSheet();
     goalNew = true; syncSheetHead(); syncGoalSave();
     presentSheet(byKey, "goal", $("goalTitle"));
+  }
+  // a new plan: its text ready to type in. What was typed stays if the sheet is pulled away; a fresh form starts on the
+  // day picked in the month on show
+  function openNewPlan(byKey) {
+    if (sheetEl.open) return;
+    resetSheet();
+    if (!$("planTitle").value.trim()) { clearPlanForm(); $("planDate").value = planDay(); }
+    planNew = true; renderPlanLabels(); syncSheetHead(); syncPlanSave();
+    presentSheet(byKey, "plan", $("planTitle"));
   }
   // a goal's chart: from its row in the list, at the goal's own eight
   function openChart(id, byKey) {
@@ -2476,7 +2542,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (sheetEl.open) return; // opened again before this arrived
     resetSheet();
     // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
-    if (sheetByKey) ({ gear: $("calSettings"), study: $("studySettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
+    if (sheetByKey) ({ gear: $("calSettings"), plan: $("calAdd"), study: $("studySettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
   // Esc: from an edit form (or settings reached from a day) back to the day's list, from a chart's cell back out of it,
   // otherwise out of the sheet
@@ -2491,8 +2557,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (ev.clientY < r.top || ev.clientY > r.bottom || ev.clientX < r.left || ev.clientX > r.right) closeSheet();
   });
   $("sheetDone").addEventListener("click", () => closeSheet());
-  // キャンセル: a new goal is dropped; 戻る: out of a chart's cell, or from an edit form or settings back to the day's list
-  $("sheetCancel").addEventListener("click", () => { if (goalNew) { clearGoalForm(); closeSheet(); } else if (mandalaGoal) chartUp(); else showDayView(); });
+  // キャンセル: a new goal or plan is dropped; 戻る: out of a chart's cell, or from an edit form or settings back to the
+  // day's list (or to the new plan that led to them)
+  $("sheetCancel").addEventListener("click", () => {
+    const mode = sheetMode();
+    if (mode === "goal") { clearGoalForm(); closeSheet(); } else if (mode === "plan") { clearPlanForm(); closeSheet(); }
+    else if (mode === "chart") chartUp(); else showDayView();
+  });
   $("calSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0));
   // iPhone: the bar on top can be pulled down to put the sheet away, as iOS sheets can
   sheetHead.addEventListener("pointerdown", (ev) => {
