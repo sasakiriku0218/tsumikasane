@@ -526,6 +526,10 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* 16px at least, or iPhone zooms the page in on a tap */
 .m-cell textarea { flex: 1 1 auto; width: 100%; min-height: 0; padding: 2px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; font-size: max(16px, var(--t-sub)); line-height: 1.3; text-align: center; resize: none; overflow: hidden; }
 .m-cell textarea:focus-visible { outline-offset: 0 !important; }
+/* an empty cell: a faint ＋ in its middle, gone while it is being written in; taps go through it to the cell */
+.m-cell[data-k] { position: relative; cursor: text; }
+.m-plus { position: absolute; inset: 0; display: none; place-items: center; color: var(--muted); opacity: .6; pointer-events: none; }
+.m-cell:has(textarea:placeholder-shown):not(:focus-within) .m-plus { display: grid; }
 .m-tools { flex: none; display: flex; align-items: center; justify-content: space-between; min-height: 30px; }
 .m-count { padding-inline-start: 2px; font-size: var(--t-foot); color: var(--muted); font-variant-numeric: tabular-nums; }
 .m-cell.done .m-count { color: var(--fg); }
@@ -2813,9 +2817,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const word = CELL_WORDS[mPath.length];
     mGrid.replaceChildren(...GRID_ORDER.map((k) => k < 0
       ? el("div", { class: "m-cell m-center" }, el("span", { class: "m-title" }), el("span", { class: "m-pct" }), el("span", { class: "m-tools" }))
+      // an empty cell shows only a faint ＋ (the user's call: the written ones stand out); the placeholder is a blank, there
+      // only so CSS can tell the cell is empty. Its name for screen readers stays 要素 1 and so on
       : el("div", { class: "m-cell", "data-k": k },
-        el("textarea", { "data-k": k, rows: 3, maxlength: 40, placeholder: word, "aria-label": `${word} ${k + 1}` }),
-        el("span", { class: "m-tools" }))));
+        el("textarea", { "data-k": k, rows: 3, maxlength: 40, placeholder: " ", "aria-label": `${word} ${k + 1}` }),
+        el("span", { class: "m-tools" }),
+        el("span", { class: "m-plus", "aria-hidden": "true" }, icon("plus", 22)))));
     paintChart();
   }
   // the check of a cell with nothing written inside it (and of the middle while nothing is written around it)
@@ -3003,6 +3010,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     chartDraft = { k, text: ta.value, timer: setTimeout(later, 700) };
   });
   mGrid.addEventListener("change", (ev) => { if (ev.target.closest("textarea")) commitChartText(); });
+  // a tap anywhere on a cell, its foot too, starts writing in it (on an empty one, where the ＋ is)
+  mGrid.addEventListener("click", (ev) => {
+    const box = ev.target.closest(".m-cell[data-k]");
+    if (box && !ev.target.closest("button, textarea")) box.querySelector("textarea")?.focus();
+  });
   mGrid.addEventListener("compositionstart", () => { composing = true; });
   mGrid.addEventListener("compositionend", () => { composing = false; });
   for (const r of document.querySelectorAll('input[name="chartSplit"]')) r.addEventListener("change", () => {
