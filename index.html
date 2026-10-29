@@ -557,7 +557,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
    day's plans written in coloured bars, after the iPhone Calendar's month view the user showed. Today's date is in the
    tint. Tapping a day opens its sheet (the day sheet, further down); the day last opened stays lightly tinted with its
    date bold (no circle, at the user's wish). */
-.cal { padding: 12px 0 0; overflow: hidden; }  /* no legend under the grid (the user's call): the last week ends the card */
+.cal { overflow: hidden; }  /* no legend under the grid (the user's call): the last week ends the card */
 .cal { touch-action: pan-y pinch-zoom; }  /* a sideways drag turns the month (the script); up and down still scrolls */
 /* on iPhone the month runs from one edge of the screen to the other (the user's call, after a calendar app they showed):
    no side margins or rounded corners, and the lines between the days go out to the edges. The days keep clear of the
@@ -567,25 +567,32 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
     margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
     padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px); border-radius: 0;
   }
-  /* and it fills the screen down to just above the tab bar (the user's call: no space left under a five-week month).
-     The page is the screen's height, and the weeks share what the month's name leaves (each 108px at least, so a
-     six-week month on a small phone still scrolls a little). The screen's height is the one with the browser's bars
-     showing, so nothing jumps as they come and go */
+  /* and it is the screen's height, down to just above the tab bar, and never more (the user's call: no space left
+     under a five-week month, and no scrolling up and down, not even the bounce). The weeks share what the month's name
+     leaves, however many weeks and whatever the text size, and a square shows as many lines of plans as fit in it (the
+     script counts them). The screen's height is the one with the browser's bars showing, so nothing jumps as they come
+     and go */
+  html[data-tab="calendar"] { overscroll-behavior-y: none; }
   html[data-tab="calendar"] .wrap { padding-bottom: calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + var(--space-1)); }
   #sec-calendar {
-    display: grid; grid-template-rows: auto 1fr;
-    min-height: calc(100vh - max(var(--space-1), env(safe-area-inset-top, 0px)) - var(--tabbar) - max(12px, env(safe-area-inset-bottom, 0px)) - var(--space-1));
-    min-height: calc(100svh - max(var(--space-1), env(safe-area-inset-top, 0px)) - var(--tabbar) - max(12px, env(safe-area-inset-bottom, 0px)) - var(--space-1));
+    display: grid; grid-template-rows: auto minmax(0, 1fr);
+    height: calc(100vh - max(var(--space-1), env(safe-area-inset-top, 0px)) - var(--tabbar) - max(12px, env(safe-area-inset-bottom, 0px)) - var(--space-1));
+    height: calc(100svh - max(var(--space-1), env(safe-area-inset-top, 0px)) - var(--tabbar) - max(12px, env(safe-area-inset-bottom, 0px)) - var(--space-1));
   }
-  .cal { display: grid; grid-template-rows: auto 1fr; }
-  .cal-grid { grid-auto-rows: minmax(108px, 1fr); }
+  .cal { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  .cal-grid { grid-auto-rows: minmax(0, 1fr); }
+  .cal-grid .cal-day { min-height: 0; overflow: hidden; }
+  .cal-week { border-top: .5px solid var(--separator); }  /* the card's edge is the screen's here, so the weekdays have a line on top */
 }
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .cal-grid { border-top: .5px solid var(--separator); }
-.cal-week span { padding-bottom: 6px; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
+/* the weekdays boxed in by lines like the days under them (the user's call, after a calendar app they showed) */
+.cal-week span { padding: 6px 0; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
+.cal-week span:not(:last-child) { border-inline-end: .5px solid var(--separator); }
 .cal-week span:first-child, .cal-day.sun .n { color: var(--warn); }
 .cal-week span:last-child, .cal-day.sat .n { color: var(--sat); }
-/* tall squares (the user wanted a portrait calendar with more plans showing): room for the date and four lines */
+/* tall squares (the user wanted a portrait calendar with more plans showing): room for the date and four lines. On
+   iPhone the squares share the screen's height instead (see the max-width: 767px block above) */
 .cal-day { min-height: 108px; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: transparent; border: 0; border-bottom: .5px solid var(--separator); border-radius: 0; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
 .cal-day:not(:nth-child(7n)) { border-inline-end: .5px solid var(--separator); }
 .cal-day:nth-last-child(-n + 7) { border-bottom: 0; }  /* the card's edge closes the last week */
@@ -2440,6 +2447,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- turning the month: a sideways swipe on the calendar (the user's call), or the ‹ › buttons ----------
   const calCard = document.querySelector("#sec-calendar .cal"), calGrid = $("calGrid");
+  // how many lines of plans a day's square has room for: four on wide screens; on iPhone the squares share the screen's
+  // height (the user's call: the month never scrolls), so a six-week month, a small phone or large text leave fewer.
+  // Counted on a drawn square, with two bars put in out of sight; while the calendar isn't on screen the last count stands
+  let calLines = 4;
+  function calRoom() {
+    const cell = calGrid.querySelector(".cal-day");
+    if (!cell || !cell.clientHeight) return calLines;
+    const probe = el("span", { class: "bars", "aria-hidden": "true", style: "position: absolute; visibility: hidden" }, el("span", { class: "bar" }, "予定"), el("span", { class: "bar" }, "予定"));
+    cell.append(probe);
+    const bar = probe.firstChild.offsetHeight, line = probe.lastChild.offsetTop - probe.firstChild.offsetTop; // a bar, and a bar with the gap under it
+    probe.remove();
+    const cs = getComputedStyle(cell);
+    const room = cell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - cell.querySelector(".n").offsetHeight - (parseFloat(cs.rowGap) || 0);
+    return line > 0 ? Math.max(1, Math.min(4, Math.floor((room + line - bar) / line))) : calLines;
+  }
+  // a new size (the calendar coming on screen, the phone turned, another text size) may fit another count
+  if ("ResizeObserver" in window) new ResizeObserver(() => { const n = calRoom(); if (n !== calLines) { calLines = n; renderCalendar(); } }).observe(calGrid);
   let monthBusy = false, swipe = null, swiped = false;
   const swipeFade = (dx) => 1 - Math.min(Math.abs(dx) / calGrid.offsetWidth, 1) * .6;
   // the month slides out the way the finger went and the next one slides in behind it
@@ -3138,8 +3162,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         ...todosDue.map((t) => ({ text: t.text, hue: "var(--c-todo)", due: true })),
         ...goalsDue.map((g) => ({ text: g.title, hue: "var(--c-goal)", due: true })),
       ];
-      // four lines fit a square: four bars, or three and "+N"
-      const shownPlans = plans.length > 4 ? plans.slice(0, 3) : plans;
+      // as many lines as fit the square (calLines, four at most): that many bars, or one fewer and "+N"
+      const shownPlans = plans.length > calLines ? plans.slice(0, calLines - 1) : plans;
       const evNames = [...new Set(evs.map((e) => (labelOf(e) || {}).name).filter(Boolean))];
       const notes = [evs.length ? `予定 ${evs.length} 件` + (evNames.length ? `（${evNames.join("、")}）` : "") : "", todosDue.length ? `ToDo の期限 ${todosDue.length} 件` : "", goalsDue.length ? `目標の期限 ${goalsDue.length} 件` : ""];
       cells.push(el("button", {
@@ -3157,6 +3181,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       ));
     }
     setChildren($("calGrid"), cells);
+    // on iPhone a square's height is its share of the screen, so once drawn the month says how many lines fit; another
+    // count (a month with more or fewer weeks) draws it again with that many
+    const fit = calRoom();
+    if (fit !== calLines) { calLines = fit; renderCalendar(); return; }
 
     // the chosen day, in its sheet: its events (a tap opens one to change or delete it), then whatever falls due on it
     const evs = [...(evBy.get(calDay) || [])].sort(byTime);
