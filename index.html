@@ -2467,6 +2467,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let planNew = false; // the sheet holds a new plan's form, opened from the ＋ beside the calendar's gear
   let recEdit = null, recReturnId = null; // the entry being changed in the sheet ({ kind, id }), and its row for focus after
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
+  let chartFromDay = false; // the chart was opened from a day's list (its goal falls due that day), which 戻る goes back to
   let chartDraft = null, composing = false, mDelTimer = null; // a cell's text not saved yet; a kana conversion under way
   // what the sheet holds, one view at a time: a new goal, a goal's chart, the settings, a new plan, an entry of a record
   // page, an event's edit form, or (by default) a day's plans. The settings come before a new plan, which can lead to
@@ -2481,7 +2482,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("labelsGroup").hidden = settingsScope !== "calendar"; $("subjectsGroup").hidden = settingsScope !== "study";
     $("sheetDone").hidden = changing || adding; $("sheetSave").hidden = mode !== "edit"; $("recSave").hidden = mode !== "rec";
     $("goalSave").hidden = mode !== "goal"; $("planSave").hidden = mode !== "plan";
-    $("sheetCancel").hidden = !(changing || adding || (mode === "chart" && mPath.length) || (mode === "settings" && settingsFrom === "day"));
+    $("sheetCancel").hidden = !(changing || adding || (mode === "chart" && (mPath.length || chartFromDay)) || (mode === "settings" && settingsFrom === "day"));
     $("sheetCancel").textContent = changing || adding ? "キャンセル" : "戻る";
     const rel = mode === "day" ? relLabel(calDay) : "";
     $("sheetTitle").textContent = mode === "goal" ? "新しい目標" : mode === "plan" ? "新しい予定" : mode === "chart" ? chartTitle()
@@ -2494,7 +2495,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     sheetAnims = []; sheetClosing = false; drag = null;
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; recEdit = null; mandalaGoal = null; mPath = [];
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; recEdit = null; mandalaGoal = null; mPath = []; chartFromDay = false;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   function openDay(d, byKey) {
@@ -2581,11 +2582,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
     if (sheetByKey) ({ gear: $("calSettings"), plan: $("calAdd"), rec: document.querySelector(`[data-edit="${recReturnId}"]`), study: $("studySettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
-  // Esc: from an edit form (or settings reached from a day) back to the day's list, from a chart's cell back out of it,
-  // otherwise out of the sheet
+  // Esc: from an edit form (or settings or a chart reached from a day) back to the day's list, from a chart's cell back
+  // out of it, otherwise out of the sheet
   sheetEl.addEventListener("cancel", (ev) => {
     ev.preventDefault();
-    if (mandalaGoal && mPath.length) chartUp(); else if (editingId || settingsFrom === "day") showDayView(); else closeSheet();
+    if (mandalaGoal && (mPath.length || chartFromDay)) chartBack(); else if (editingId || settingsFrom === "day") showDayView(); else closeSheet();
   });
   // a tap on the dimmed page above the sheet puts it away
   sheetEl.addEventListener("click", (ev) => {
@@ -2599,7 +2600,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("sheetCancel").addEventListener("click", () => {
     const mode = sheetMode();
     if (mode === "goal") { clearGoalForm(); closeSheet(); } else if (mode === "plan") { clearPlanForm(); closeSheet(); }
-    else if (mode === "rec") closeSheet(); else if (mode === "chart") chartUp(); else showDayView();
+    else if (mode === "rec") closeSheet(); else if (mode === "chart") chartBack(); else showDayView();
   });
   $("calSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0));
   // iPhone: the bar on top can be pulled down to put the sheet away, as iOS sheets can
@@ -2749,6 +2750,24 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     mPath = mPath.slice(0, -1);
     showChartLevel();
   }
+  // a goal falling due on the day opens its chart in place of the day's list (the user's call: straight to it, rather
+  // than to 目標's page); 戻る comes back to the list, as from settings reached from a day
+  function openChartFromDay(id) {
+    if (!goals.get(id)) return;
+    mandalaGoal = id; mPath = []; chartFromDay = true;
+    showChartLevel();
+  }
+  // 戻る over a chart: out of the cell walked into, or from the goal's own eight back to the day's list it came from
+  function chartBack() {
+    if (mPath.length) { chartUp(); return; }
+    if (!chartFromDay) return;
+    commitChartText(); saveGoalEdit(); // what was typed last goes in before the chart lets go
+    disarmGoalDelete();
+    mandalaGoal = null; chartFromDay = false;
+    syncSheetHead();
+    sheetEl.scrollTop = 0;
+    $("sheetTitle").focus();
+  }
   function showChartLevel() {
     buildChart(); syncSheetHead();
     sheetEl.scrollTop = 0;
@@ -2793,8 +2812,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     const id = mandalaGoal;
     disarmGoalDelete();
-    mandalaGoal = null; // the chart stops drawing; the sheet goes down and the goal with it
-    closeSheet();
+    // the chart stops drawing; the sheet goes down and the goal with it, or, opened from a day, the day's list comes back
+    mandalaGoal = null;
+    if (chartFromDay) { chartFromDay = false; syncSheetHead(); $("sheetTitle").focus(); } else closeSheet();
     act(() => goals.remove(id));
   });
 
@@ -3117,11 +3137,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("span", { class: "body" }, el("span", { class: "text" }, t.text), el("span", { class: "sub" }, "ToDo の期限"))
       ));
     }
+    // a goal falling due opens its chart right here, as an event opens its form
     for (const g of goalsDue) {
-      list.append(el("li", { class: "clickable" + (g.done ? " done" : ""), onclick: () => { closeSheet(true); showTab("goal"); } },
-        el("span", { class: "chip", style: "--chip-c: var(--c-goal)" }, g.done ? "達成" : "目標"),
-        el("span", { class: "body" }, el("span", { class: "text" }, g.title), el("span", { class: "sub" }, "目標の期限"))
-      ));
+      list.append(el("li", { class: "btn-row" + (g.done ? " done" : "") },
+        el("button", { type: "button", class: "row-btn nav", "aria-label": `「${g.title}」のマンダラチャートを開く（目標の期限${g.done ? "・達成" : ""}）`, onclick: () => openChartFromDay(g.id) },
+          el("span", { class: "chip", style: "--chip-c: var(--c-goal)" }, g.done ? "達成" : "目標"),
+          el("span", { class: "body" }, el("span", { class: "text" }, g.title), el("span", { class: "sub" }, "目標の期限")),
+          el("span", { class: "chev" }, icon("next", 16)))));
     }
   }
 
