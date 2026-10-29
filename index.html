@@ -782,8 +782,14 @@ ul.list > li.btn-row { padding: 0; }
 /* the entries, a row per day under its month: the date level with the first line, then each entry as written, its kind
    in grey at the start and its number kept to the right */
 .rec-groups { display: flex; flex-direction: column; gap: var(--space-2); }
-ul.list.rec-list > li { align-items: baseline; }
-ul.list.rec-list > li > .body { order: 0; }  /* with large text the date stays above its entries, not under them */
+/* a day to a row: its date on a line of its own on top, the day's entries under it at the row's full width (the user's
+   call: beside the date they had a third of it less, and words broke a character at a time). 体重, one number a day,
+   keeps it on the date's line, at the end */
+ul.list.rec-list { line-break: strict; }  /* no line starts with ー or a small kana (トーストとコーヒ／ー) */
+ul.list.rec-list > li { flex-direction: column; align-items: stretch; gap: 4px; }
+ul.list.rec-list > li.one { flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 12px; }
+ul.list.rec-list > li.one > .body { flex: none; }
+.rec-date { font-size: var(--t-sub); line-height: 1.35; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rec-list .body { gap: 6px; }
 .rec-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 .rec-line { display: flex; align-items: baseline; gap: 8px; }
@@ -3798,7 +3804,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
 
   // 記録 › a record's entries: a card opens them on a page that slides in from the right, read-only, newest first by
-  // month; a row per day with each entry as it was written (the user's call: the content too, not only how many days)
+  // month; a row per day with each entry as it was written (the user's call: the content too, not only how many days),
+  // under the day's date (きのう・10月28日（水）), so the entries have the row's whole width
   const recLine = (tag, words, n, dot, isIn) => el("span", { class: "rec-line" },
     el("span", { class: "rec-what" }, tag ? el("span", { class: "rec-tag" + (dot ? " dot" : ""), style: dot ? `--dot:${dot}` : null }, tag) : null, words || null),
     n ? el("span", { class: "rec-num" + (isIn ? " in" : "") }, n) : null);
@@ -3813,9 +3820,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       lines: (xs) => byCreated(xs).map((w) => recLine(w.type, [workoutDetail(w), w.note].filter(Boolean).join("・"))) },
     study: { label: "勉強", items: () => study.items,
       lines: (xs) => byCreated(xs).map((x) => { const sub = subjectOf(x); return recLine(sub ? sub.name : "科目なし", x.note, `${num(x.minutes)} 分`, sub ? labelHue(sub) : "var(--c-study)"); }) },
+    // the items done, each kept whole, so a line breaks between them (朝の散歩・ストレッチ・／日記を書く)
     routine: { label: "ルーティーン", items: () => routineDays.items.filter((x) => x.done?.length),
-      lines: (xs) => xs.map((x) => recLine(null, x.done.map((id) => routines.get(id)?.name).filter(Boolean).join("・") || "（消した項目）", `${x.done.length} 項目`)) },
-    weight: { label: "体重", items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
+      lines: (xs) => xs.map((x) => {
+        const names = x.done.map((id) => routines.get(id)?.name).filter(Boolean);
+        return recLine(null, names.length ? names.map((n, i) => el("span", { class: "phrase" }, n + (i < names.length - 1 ? "・" : ""))) : "（消した項目）", `${x.done.length} 項目`);
+      }) },
+    weight: { label: "体重", oneLine: true, items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
       lines: (xs) => xs.map((w) => recLine(null, `${fmtKg(w.kg)} kg`)) },
     money: { label: "家計簿", items: () => expenses.items,
       lines: (xs) => byCreated(xs).map((e) => recLine(expenseCat(e) || (e.kind === "in" ? "収入" : "支出"), e.memo, (e.kind === "in" ? "+" : "") + fmtYen(e.amount), null, e.kind === "in")) },
@@ -3841,7 +3852,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         month = d.slice(0, 7);
         parts.push(el("h3", { class: "group-head" }, fmtMonth(month)), ul = el("ul", { class: "list card rec-list" }));
       }
-      ul.append(el("li", {}, el("span", { class: "datecell" }, d === todayKey ? "きょう" : fmtShort(d)), el("span", { class: "body" }, spec.lines(byDay.get(d)))));
+      const rel = relLabel(d);
+      ul.append(el("li", { class: spec.oneLine ? "one" : null }, el("span", { class: "rec-date" }, (rel ? rel + "・" : "") + fmtMDW(d)), el("span", { class: "body" }, spec.lines(byDay.get(d)))));
     }
     setChildren($("recList"), parts.length ? parts : el("div", { class: "card empty" }, "まだ記録がありません。「きょう」から記録すると、ここに並びます。"));
   }
