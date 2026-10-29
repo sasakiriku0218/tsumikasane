@@ -91,6 +91,7 @@
   --space-8: 64px;
   --radius: 22px;           /* inset grouped cards */
   --tabbar: 62px;           /* the floating tab bar's height */
+  --pagebar: 52px;          /* a page's own bar over it (ToDo, 目標) */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -199,6 +200,24 @@ button:active:not(:disabled) { opacity: .5; transition: none; }
 .menu button.on, .menu button.in { color: var(--accent); background: var(--pill); box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
 /* narrow screens (the smaller iPhones with Display Zoom): 10pt, as iOS's own tab bars have, so カレンダー stays whole */
 @media (max-width: 359px) { .menu button { font-size: 10px; } }
+/* a page's own row of buttons (the user's call: ToDo and 目標 each have one, in a bar like the tab bar): it floats just
+   above the tab bar in the same glass, as iOS puts a bar over its tab bar; on wide screens, at the foot of the page's
+   column. Only the page showing has its bar, and the page leaves room under its last row for it. Its words stay one size,
+   as the tab bar's do, so the bar keeps its height */
+.pagebar {
+  position: fixed; z-index: 19;
+  left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + var(--tabbar) + var(--space-1));
+  display: none; max-width: 440px; height: var(--pagebar); margin-inline: auto; padding: 4px; border-radius: 999px;
+  background: var(--glass); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--shadow), inset 0 0 0 .5px var(--glass-edge);
+}
+html[data-tab="todo"] #todoFilters, html[data-tab="goal"] #goalFilters { display: flex; }
+.pagebar button { flex: 1 1 0; min-width: 0; padding: 0 8px; background: transparent; border: 0; border-radius: 999px; color: var(--fg); font-size: 14px; font-weight: 600; line-height: 1.2; cursor: pointer; }
+/* the one picked: tint on the lighter bubble, as the selected tab */
+.pagebar button[aria-pressed="true"] { color: var(--accent); background: var(--pill); box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
+html:is([data-tab="todo"], [data-tab="goal"]) .wrap { padding-bottom: calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + var(--space-1) + var(--pagebar) + var(--space-4)); }
+html:is([data-tab="todo"], [data-tab="goal"]) #status { bottom: calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + var(--space-1) + var(--pagebar) + 12px); }
 
 /* the top bar: clear while the large title shows, glass with the page title once it has scrolled under */
 .navbar {
@@ -227,7 +246,7 @@ html[data-tab="calendar"] .wrap { padding-top: max(var(--space-1), env(safe-area
 }
 .back .icon { width: 20px; height: 20px; margin-inline-end: 2px; }
 @media (prefers-reduced-transparency: reduce) {
-  .menu, .navbar.scrolled, .back { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .menu, .pagebar, .navbar.scrolled, .back { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 /* from 768px: a sidebar on the leading side, as iPad apps turn their tab bar into one */
@@ -252,6 +271,10 @@ html[data-tab="calendar"] .wrap { padding-top: max(var(--space-1), env(safe-area
   .menu button.on { background: var(--accent-fill); color: var(--accent-ink); font-weight: 600; box-shadow: none; }
   .menu button.on .mi { background: #ffffff; color: var(--item-f); }
   .wrap { max-width: 760px; padding: 0 var(--space-4) var(--space-8); }
+  /* no tab bar here: a page's own bar sits at the foot of its column, beside the sidebar */
+  .pagebar { left: 272px; right: 0; bottom: max(var(--space-2), env(safe-area-inset-bottom, 0px)); }
+  html:is([data-tab="todo"], [data-tab="goal"]) .wrap { padding-bottom: calc(max(var(--space-2), env(safe-area-inset-bottom, 0px)) + var(--pagebar) + var(--space-8)); }
+  html:is([data-tab="todo"], [data-tab="goal"]) #status { bottom: calc(max(var(--space-2), env(safe-area-inset-bottom, 0px)) + var(--pagebar) + 12px); }
   .navbar { padding-inline: var(--space-3); }
   .back { display: none; }
   html[data-tab="reclist"] .back { display: grid; }
@@ -852,11 +875,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <div class="ffield"><input type="date" id="todoDue"></div>
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
-        <div class="seg" role="group" aria-label="表示の切り替え" id="todoFilters">
-          <button type="button" data-filter="all" aria-pressed="true">すべて</button>
-          <button type="button" data-filter="active" aria-pressed="false">未完了</button>
-          <button type="button" data-filter="done" aria-pressed="false">完了</button>
-        </div>
+        <!-- すべて・未完了・完了 are in the page's own bar, over the tab bar (see .pagebar, after the pages) -->
         <ul class="list card" id="todoList"></ul>
         <!-- it acts on the list, so it sits right under it -->
         <div class="list-foot" id="todoFoot"><button type="button" class="link-btn danger" id="clearDone">完了したものを削除</button></div>
@@ -1080,6 +1099,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
         <div class="card" id="goalList"></div>
       </section>
+    </div>
+    <!-- a page's own row of buttons, in a bar like the tab bar (the user's call: ToDo and 目標 each have one): which of
+         its items show. Only the page showing has its bar (see .pagebar) -->
+    <div class="pagebar" role="group" aria-label="ToDo の表示の切り替え" id="todoFilters">
+      <button type="button" data-filter="all" aria-pressed="true">すべて</button>
+      <button type="button" data-filter="active" aria-pressed="false">未完了</button>
+      <button type="button" data-filter="done" aria-pressed="false">完了</button>
+    </div>
+    <div class="pagebar" role="group" aria-label="目標の表示の切り替え" id="goalFilters">
+      <button type="button" data-filter="all" aria-pressed="true">すべて</button>
+      <button type="button" data-filter="active" aria-pressed="false">進行中</button>
+      <button type="button" data-filter="done" aria-pressed="false">達成</button>
     </div>
   </main>
 </div>
@@ -2251,14 +2282,25 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (n === 0) return el("span", { class: "sub warn" }, "期限はきょうまで");
     return el("span", { class: "sub" }, `あと ${n} 日（${fmtShort(g.deadline)}）`);
   }
+  // which goals show, from the page's own bar: all of them, those still under way, or those achieved
+  let goalFilter = "all";
+  $("goalFilters").querySelectorAll("button").forEach((b) => {
+    b.addEventListener("click", () => {
+      goalFilter = b.dataset.filter;
+      $("goalFilters").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      renderGoals();
+    });
+  });
   function renderGoals() {
     const active = goals.items.filter((g) => !g.done).sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999") || num(a.createdAt) - num(b.createdAt));
     const done = goals.items.filter((g) => g.done).sort((a, b) => num(b.doneAt) - num(a.doneAt));
     const list = $("goalList");
     list.replaceChildren();
     if (!goals.items.length) { list.append(el("div", { class: "empty" }, el("span", { class: "phrase" }, "まだ目標がありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。"))); return; }
+    const shown = goalFilter === "active" ? active : goalFilter === "done" ? done : [...active, ...done];
+    if (!shown.length) { list.append(el("div", { class: "empty" }, goalFilter === "done" ? "達成した目標はまだありません。" : "進行中の目標はありません。")); return; }
     // a row per goal that opens its chart: how far the chart has got, and how many of the eight around the goal are done
-    for (const g of [...active, ...done]) {
+    for (const g of shown) {
       const depth = goalDepth(g), root = nodeAt(g, []), els = kidsOf(root, depth), crit = criterionText(g);
       const pct = g.done ? 100 : Math.floor(cellProgress(root, depth) * 100);
       list.append(el("div", { class: "goal" + (g.done ? " done" : "") },
