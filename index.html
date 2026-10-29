@@ -782,21 +782,24 @@ ul.list > li.btn-row { padding: 0; }
 /* the entries, a row per day under its month: the date level with the first line, then each entry as written, its kind
    in grey at the start and its number kept to the right */
 .rec-groups { display: flex; flex-direction: column; gap: var(--space-2); }
-/* a day to a row: its date on a line of its own on top, the day's entries under it at the row's full width (the user's
-   call: beside the date they had a third of it less, and words broke a character at a time). 体重, one number a day,
-   keeps it on the date's line, at the end */
+/* a day's date heads its entries, and each entry is a row of its own at the row's full width (the user's call: beside the
+   date they had a third of it less, and words broke a character at a time); a tap anywhere on the row opens it in the
+   sheet, as on the record pages. 体重, one number a day, has its date at the start of its row instead */
 ul.list.rec-list { line-break: strict; }  /* no line starts with ー or a small kana (トーストとコーヒ／ー) */
-ul.list.rec-list > li { flex-direction: column; align-items: stretch; gap: 4px; }
-ul.list.rec-list > li.one { flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 12px; }
-ul.list.rec-list > li.one > .body { flex: none; }
+ul.list.rec-list > li { align-items: baseline; gap: 8px; }
+ul.list.rec-list > li.dayhead { font-size: var(--t-sub); }
+ul.list.rec-list > li.one { justify-content: space-between; column-gap: 12px; }
 .rec-date { font-size: var(--t-sub); line-height: 1.35; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
-.rec-list .body { gap: 6px; }
 .rec-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
-.rec-line { display: flex; align-items: baseline; gap: 8px; }
 .rec-what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .rec-tag { margin-inline-end: 8px; color: var(--muted); font-size: var(--t-sub); }
-.rec-tag.dot::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 5px; border-radius: 50%; background: var(--dot); vertical-align: 1px; }
+.rec-dot { display: inline-block; width: 8px; height: 8px; margin-inline-end: 5px; border-radius: 50%; background: var(--dot); vertical-align: 1px; }
 .rec-num { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* a day's ルーティーン in the sheet: a row an item, its check filled in the record's colour while done */
+.rt-edit { display: flex; flex-direction: column; }
+.rt-edit .rt-row { min-height: 44px; }
+.rt-edit .rt-row[aria-checked="true"] .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
+.rt-edit .rt-row[aria-checked="true"] .check path { fill: #ffffff; }
 .rec-num.in { color: var(--accent); font-weight: 600; }
 @media (min-width: 480px) { .sum-card.wide { grid-column: 1 / -1; } }
 .group-head { margin: var(--space-1) 0 -8px; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); }
@@ -978,7 +981,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <input type="file" id="importFile" accept=".json,application/json" hidden>
       </section>
 
-      <!-- 記録 › a record's entries, read-only, newest first by month: opened from its card on 記録, sliding in from the right -->
+      <!-- 記録 › a record's entries, newest first by month, each opening in the sheet to put right: opened from its card on
+           記録, sliding in from the right -->
       <section id="sec-reclist" hidden>
         <div class="sec-head"><h2 id="recListTitle"></h2><p class="sum-since" id="recListNote"></p></div>
         <div class="rec-groups" id="recList"></div>
@@ -2820,8 +2824,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   sheetEl.addEventListener("close", () => {
     if (sheetEl.open) return; // opened again before this arrived
     resetSheet();
-    // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
-    if (sheetByKey) ({ gear: $("calSettings"), plan: $("calAdd"), todo: $("todoAdd"), rec: document.querySelector(`[data-edit="${recReturnId}"]`), study: $("studySettings"), home: $("homeSettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
+    // keyboard users land back on what they opened it from: the day (the grid has been redrawn since), the gear, or an
+    // entry's row on the page showing (記録's list and the record page can hold the same entry)
+    if (sheetByKey) ({ gear: $("calSettings"), plan: $("calAdd"), todo: $("todoAdd"), rec: $("sec-" + tab).querySelector(`[data-edit="${recReturnId}"]`), study: $("studySettings"), home: $("homeSettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
   // Esc: from an edit form (or settings or a chart reached from a day) back to the day's list, from a chart's cell back
   // out of it, otherwise out of the sheet
@@ -3158,12 +3163,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(() => events.remove(id));
   });
 
-  // ---------- an entry's edit form: ToDo, 食事, 運動, 勉強 and 家計簿 ----------
+  // ---------- an entry's edit form: ToDo, 食事, 運動, 勉強 and 家計簿, and from 記録's lists 日記, 体重 and a day's ルーティーン ----------
   // a tap on an entry's row opens it in the sheet (the user's call: what was put in can be put right, as plans and goals
   // can): the fields of its add form holding its values, 保存 on the bar, and a delete that asks for a second press. An
   // entry's day can change too (a ToDo's 期限); one moved to another day says where it went
   const recDelete = $("recDelete");
-  let recDelTimer = null, reSubject = "";
+  let recDelTimer = null, reSubject = "", reDone = null;
   // the entry's text as a button that opens it; .row-link stretches its hit area over the row
   function editLink(kind, id, text, name = text) {
     return el("button", { type: "button", class: "text row-link", "data-edit": id, "aria-label": `「${name}」を編集`, onclick: (ev) => openRecEdit(kind, id, ev.detail === 0) }, text);
@@ -3183,6 +3188,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const recNum = (id, value, attrs) => el("input", { type: "number", id, value: num(value) > 0 ? value : "", ...attrs });
   const recDate = (value) => el("input", { type: "date", id: "reDate", value, required: true });
   const recNote = (value) => el("input", { type: "text", id: "reNote", value: value || "", maxlength: 200 });
+  const recFixedDay = (day) => recRow("日付", el("output", { id: "reDay" }, fmtMDW(day))); // not to be changed (日記, 体重, ルーティーン)
   // a field that keeps the form from saving: focused, so it can be put right
   const recBad = (id) => { $(id).focus(); return null; };
   const recDay = () => (/^\d{4}-\d{2}-\d{2}$/.test($("reDate").value) ? $("reDate").value : null);
@@ -3319,6 +3325,40 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         return { kind: checkedValue("reKind") === "in" ? "in" : "out", category: $("reCat").value || "未分類", amount, date, memo: $("reMemo").value.trim() || undefined };
       },
     },
+    // 日記, 体重 and a day's ルーティーン are one to a day, kept under the day itself, so their day is shown but stays as it is
+    journal: {
+      store: journal, title: "日記を編集", del: "この日記を削除",
+      fields: (j) => [el("textarea", { id: "reText", class: "full", rows: 8, "aria-label": "日記", required: true }, j.text || ""), recFixedDay(j.date || j.id)],
+      read: () => {
+        const text = $("reText").value.trim();
+        return text ? { text, updatedAt: Date.now() } : recBad("reText");
+      },
+    },
+    weight: {
+      store: weights, title: "体重を編集", del: "この日の体重を削除",
+      fields: (w) => [recRow("体重", recNum("reKg", fmtKg(w.kg), { min: 20, max: 300, step: "any", inputmode: "decimal", required: true }), { unit: "kg" }), recFixedDay(w.id)],
+      read: () => {
+        const v = Number($("reKg").value);
+        return v >= 20 && v <= 300 ? { kg: Math.round(v * 10) / 10, updatedAt: Date.now() } : recBad("reKg");
+      },
+    },
+    // the items as they are now, each checked or not for that day; one deleted since stays done that day, unseen
+    routine: {
+      store: routineDays, title: "ルーティーンを編集", del: "この日のチェックをすべて外す",
+      fields: (x) => {
+        reDone = new Set(x.done || []);
+        const items = sortedRoutines();
+        return [el("div", { class: "full rt-edit" }, items.length ? items.map((r) => el("button", { type: "button", class: "rt-row", role: "checkbox", "aria-checked": String(reDone.has(r.id)),
+          onclick: (ev) => {
+            if (reDone.has(r.id)) reDone.delete(r.id); else reDone.add(r.id);
+            ev.currentTarget.setAttribute("aria-checked", String(reDone.has(r.id)));
+          } }, el("span", { class: "check", "aria-hidden": "true" }, checkMark()), el("span", { class: "rt-label" }, r.name)))
+          : el("p", { class: "empty" }, "この日にチェックした項目は、どれも消してあります。")), recFixedDay(x.date || x.id)];
+      },
+      read: () => ({ done: [...reDone], updatedAt: Date.now() }),
+      // every check taken off: the day goes, as on the ルーティーン page
+      save: (x, patch) => (patch.done.length ? routineDays.update(x.id, patch) : routineDays.remove(x.id)),
+    },
   };
   // 筋トレ takes 種目・回数・セット数; one recorded as 筋トレ before those fields came keeps its minutes instead
   const recStrength = (w, type) => type === "筋トレ" && !(w.type === "筋トレ" && !w.exercise);
@@ -3338,7 +3378,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const patch = spec.read(x);
     if (!patch) return;
     const moved = patch.date && patch.date !== x.date; // read before the update, which changes x in place
-    act(() => spec.store.update(x.id, patch));
+    act(() => (spec.save ? spec.save(x, patch) : spec.store.update(x.id, patch)));
     closeSheet();
     if (moved) flash(`${fmtMDW(patch.date)}に移しました`);
   });
@@ -3803,33 +3843,45 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         topList(byCat, () => "var(--c-money)", fmtYen), "money"));
   }
 
-  // 記録 › a record's entries: a card opens them on a page that slides in from the right, read-only, newest first by
-  // month; a row per day with each entry as it was written (the user's call: the content too, not only how many days),
-  // under the day's date (きのう・10月28日（水）), so the entries have the row's whole width
-  const recLine = (tag, words, n, dot, isIn) => el("span", { class: "rec-line" },
-    el("span", { class: "rec-what" }, tag ? el("span", { class: "rec-tag" + (dot ? " dot" : ""), style: dot ? `--dot:${dot}` : null }, tag) : null, words || null),
+  // 記録 › a record's entries: a card opens them on a page that slides in from the right, newest first by month, each as
+  // it was written (the user's call: the content too, not only how many days), under its day's date (きのう・10月28日（水）)
+  // at the row's whole width. A tap on one opens it in the sheet to put right, as on the record pages (the user's call)
+  const recOpen = (kind, id, label, content, cls = "") => el("button", { type: "button", class: "row-link " + cls, "data-edit": id, "aria-label": label,
+    onclick: (ev) => openRecEdit(kind, id, ev.detail === 0) }, content);
+  // an entry's row: its tag (朝食, a subject with its dot) and words, the number at the end. With no words of its own (no
+  // メモ), the tag is what it says
+  const recEntry = (kind, id, label, { tag = null, dot = null, words = null, n = null, isIn = false, text = false }) => el("li", {},
+    recOpen(kind, id, label, [dot ? el("span", { class: "rec-dot", style: `--dot:${dot}` }) : null,
+      words && tag ? el("span", { class: "rec-tag" }, tag) : null, words || tag].flat(), "rec-what" + (text ? " rec-text" : "")),
     n ? el("span", { class: "rec-num" + (isIn ? " in" : "") }, n) : null);
   const byCreated = (xs) => [...xs].sort((a, b) => num(a.createdAt) - num(b.createdAt));
   const RECORD_LISTS = {
     journal: { label: "日記", items: () => journal.items.filter((j) => j.text?.trim()).map((j) => ({ ...j, date: j.date || j.id })),
-      lines: (xs) => xs.map((j) => el("span", { class: "rec-text" }, j.text.trim())) },
+      rows: (xs, day) => xs.map((j) => recEntry("journal", j.id, `${day}の日記を編集`, { words: j.text.trim(), text: true })) },
     meal: { label: "食事", items: () => meals.items,
-      lines: (xs) => [...xs].sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || num(a.createdAt) - num(b.createdAt))
-        .map((m) => recLine(m.slot || "食事", m.text, typeof m.kcal === "number" ? `${m.kcal} kcal` : "")) },
+      rows: (xs) => [...xs].sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || num(a.createdAt) - num(b.createdAt))
+        .map((m) => recEntry("meal", m.id, `「${m.text}」を編集`, { tag: m.slot || "食事", words: m.text, n: typeof m.kcal === "number" ? `${m.kcal} kcal` : null })) },
     workout: { label: "運動", items: () => workouts.items,
-      lines: (xs) => byCreated(xs).map((w) => recLine(w.type, [workoutDetail(w), w.note].filter(Boolean).join("・"))) },
+      rows: (xs) => byCreated(xs).map((w) => recEntry("workout", w.id, `「${w.type} ${workoutDetail(w)}」を編集`, { tag: w.type, words: [workoutDetail(w), w.note].filter(Boolean).join("・") })) },
     study: { label: "勉強", items: () => study.items,
-      lines: (xs) => byCreated(xs).map((x) => { const sub = subjectOf(x); return recLine(sub ? sub.name : "科目なし", x.note, `${num(x.minutes)} 分`, sub ? labelHue(sub) : "var(--c-study)"); }) },
+      rows: (xs) => byCreated(xs).map((x) => {
+        const sub = subjectOf(x), name = sub ? sub.name : "科目なし";
+        return recEntry("study", x.id, `「${name} ${num(x.minutes)} 分」を編集`, { tag: name, dot: sub ? labelHue(sub) : "var(--c-study)", words: x.note, n: `${num(x.minutes)} 分` });
+      }) },
     // the items done, each kept whole, so a line breaks between them (朝の散歩・ストレッチ・／日記を書く)
     routine: { label: "ルーティーン", items: () => routineDays.items.filter((x) => x.done?.length),
-      lines: (xs) => xs.map((x) => {
+      rows: (xs, day) => xs.map((x) => {
         const names = x.done.map((id) => routines.get(id)?.name).filter(Boolean);
-        return recLine(null, names.length ? names.map((n, i) => el("span", { class: "phrase" }, n + (i < names.length - 1 ? "・" : ""))) : "（消した項目）", `${x.done.length} 項目`);
+        return recEntry("routine", x.id, `${day}のルーティーンを編集`,
+          { words: names.length ? names.map((n, i) => el("span", { class: "phrase" }, n + (i < names.length - 1 ? "・" : ""))) : "（消した項目）", n: `${x.done.length} 項目` });
       }) },
     weight: { label: "体重", oneLine: true, items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
-      lines: (xs) => xs.map((w) => recLine(null, `${fmtKg(w.kg)} kg`)) },
+      rows: (xs, day) => xs.map((w) => el("li", { class: "one" }, el("span", { class: "rec-date" }, day), recOpen("weight", w.id, `${day}の体重を編集`, `${fmtKg(w.kg)} kg`))) },
     money: { label: "家計簿", items: () => expenses.items,
-      lines: (xs) => byCreated(xs).map((e) => recLine(expenseCat(e) || (e.kind === "in" ? "収入" : "支出"), e.memo, (e.kind === "in" ? "+" : "") + fmtYen(e.amount), null, e.kind === "in")) },
+      rows: (xs) => byCreated(xs).map((e) => {
+        const cat = expenseCat(e) || (e.kind === "in" ? "収入" : "支出");
+        return recEntry("money", e.id, `「${cat} ${fmtYen(e.amount)}」を編集`, { tag: cat, words: e.memo, n: (e.kind === "in" ? "+" : "") + fmtYen(e.amount), isIn: e.kind === "in" });
+      }) },
   };
   // drawn before the page slides in, so it arrives whole
   function openRecList(kind) {
@@ -3852,8 +3904,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         month = d.slice(0, 7);
         parts.push(el("h3", { class: "group-head" }, fmtMonth(month)), ul = el("ul", { class: "list card rec-list" }));
       }
-      const rel = relLabel(d);
-      ul.append(el("li", { class: spec.oneLine ? "one" : null }, el("span", { class: "rec-date" }, (rel ? rel + "・" : "") + fmtMDW(d)), el("span", { class: "body" }, spec.lines(byDay.get(d)))));
+      const rel = relLabel(d), day = (rel ? rel + "・" : "") + fmtMDW(d);
+      ul.append(...(spec.oneLine ? [] : [el("li", { class: "dayhead" }, day)]), ...spec.rows(byDay.get(d), day));
     }
     setChildren($("recList"), parts.length ? parts : el("div", { class: "card empty" }, "まだ記録がありません。「きょう」から記録すると、ここに並びます。"));
   }
