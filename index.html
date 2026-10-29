@@ -795,7 +795,11 @@ ul.list.rec-list { line-break: strict; }  /* no line starts with ー or a small 
 ul.list.rec-list > li { align-items: baseline; gap: 8px; }
 ul.list.rec-list > li.dayhead { flex-wrap: wrap; column-gap: 12px; font-size: var(--t-sub); }
 .rec-total { margin-inline-start: auto; }  /* the day's total, at the end of its date (or beneath it, at the right) */
-ul.list.rec-list > li.one { justify-content: space-between; column-gap: 12px; }
+ul.list.rec-list > li.one { flex-wrap: wrap; column-gap: 12px; }
+/* the kg and its change from the one before, at the row's end, kept together: on a narrow screen they go beneath the date,
+   at the right. The change, a step smaller, has a width of its own, so the kg line up even on the first day, which has none */
+.rec-kg { display: flex; align-items: baseline; gap: 8px; margin-inline-start: auto; white-space: nowrap; }
+.rec-kg .rec-num { min-width: 3.8em; font-size: var(--t-sub); text-align: end; }
 .rec-date { font-size: var(--t-sub); line-height: 1.35; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rec-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 .rec-what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -3878,7 +3882,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const recOpen = (kind, id, label, content, cls = "") => el("button", { type: "button", class: "row-link " + cls, "data-edit": id, "aria-label": label,
     onclick: (ev) => openRecEdit(kind, id, ev.detail === 0) }, content);
   // an entry's row: its tag (朝食, a subject with its dot) and words, the number at the end. With no words of its own (no
-  // メモ), the tag is what it says
+  // メモ), the tag is what it says. Its button is named 「what it shows」を編集, so a screen reader reads the entry itself
   const recEntry = (kind, id, label, { tag = null, dot = null, words = null, n = null, isIn = false, text = false }) => el("li", {},
     recOpen(kind, id, label, [dot ? el("span", { class: "rec-dot", style: `--dot:${dot}` }) : null,
       words && tag ? el("span", { class: "rec-tag" }, tag) : null, words || tag].flat(), "rec-what" + (text ? " rec-text" : "")),
@@ -3887,7 +3891,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const RECORD_LISTS = {
     journal: { label: "日記", items: () => journal.items.filter((j) => j.text?.trim()).map((j) => ({ ...j, date: j.date || j.id })),
       find: "日記の言葉で探す", text: (j) => j.text,
-      rows: (xs, day) => xs.map((j) => recEntry("journal", j.id, `${day}の日記を編集`, { words: j.text.trim(), text: true })) },
+      rows: (xs) => xs.map((j) => recEntry("journal", j.id, `「${j.text.trim()}」を編集`, { words: j.text.trim(), text: true })) },
     // the day's total beside its date (the user's call): 食事's kcal, 運動's and 勉強's time, 家計簿's money out and in
     meal: { label: "食事", items: () => meals.items, find: "食べたものや区分で探す", text: (m) => [m.text, m.slot].join(" "),
       total: (xs) => { const ks = xs.filter((m) => typeof m.kcal === "number"); return ks.length ? `合計 ${sum(ks, (m) => m.kcal).toLocaleString("ja-JP")} kcal` : null; },
@@ -3905,13 +3909,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // the items done, each kept whole, so a line breaks between them (朝の散歩・ストレッチ・／日記を書く)
     routine: { label: "ルーティーン", items: () => routineDays.items.filter((x) => x.done?.length),
       find: "項目の名前で探す", text: (x) => x.done.map((id) => routines.get(id)?.name || "").join(" "),
-      rows: (xs, day) => xs.map((x) => {
+      rows: (xs) => xs.map((x) => {
         const names = x.done.map((id) => routines.get(id)?.name).filter(Boolean);
-        return recEntry("routine", x.id, `${day}のルーティーンを編集`,
+        return recEntry("routine", x.id, `「${names.join("・") || "消した項目"}」を編集`,
           { words: names.length ? names.map((n, i) => el("span", { class: "phrase" }, n + (i < names.length - 1 ? "・" : ""))) : "（消した項目）", n: `${x.done.length} 項目` });
       }) },
-    weight: { label: "体重", oneLine: true, items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
-      rows: (xs, day) => xs.map((w) => el("li", { class: "one" }, el("span", { class: "rec-date" }, day), recOpen("weight", w.id, `${day}の体重を編集`, `${fmtKg(w.kg)} kg`))) },
+    // each with its change from the one before (the user's call), as the 体重 page has it; the first has none
+    weight: { label: "体重", oneLine: true, items: () => sortedWeights().map((w, i, all) => ({ ...w, date: w.id, prev: all[i - 1] })),
+      rows: (xs, day) => xs.map((w) => el("li", { class: "one" }, el("span", { class: "rec-date" }, day), el("span", { class: "rec-kg" },
+        recOpen("weight", w.id, `「${fmtKg(w.kg)} kg」を編集`, `${fmtKg(w.kg)} kg`),
+        el("span", { class: "rec-num" }, w.prev ? `${signed(num(w.kg) - num(w.prev.kg))} kg` : "")))) },
     money: { label: "家計簿", items: () => expenses.items, find: "費目やメモで探す", text: (e) => [expenseCat(e) || (e.kind === "in" ? "収入" : "支出"), e.memo].join(" "),
       total: (xs) => {
         const out = sum(xs.filter((e) => e.kind !== "in"), (e) => e.amount), inn = sum(xs.filter((e) => e.kind === "in"), (e) => e.amount);
@@ -3919,7 +3926,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       },
       rows: (xs) => byCreated(xs).map((e) => {
         const cat = expenseCat(e) || (e.kind === "in" ? "収入" : "支出");
-        return recEntry("money", e.id, `「${cat} ${fmtYen(e.amount)}」を編集`, { tag: cat, words: e.memo, n: (e.kind === "in" ? "+" : "") + fmtYen(e.amount), isIn: e.kind === "in" });
+        return recEntry("money", e.id, `「${[cat, e.memo, fmtYen(e.amount)].filter(Boolean).join(" ")}」を編集`, { tag: cat, words: e.memo, n: (e.kind === "in" ? "+" : "") + fmtYen(e.amount), isIn: e.kind === "in" });
       }) },
   };
   // drawn before the page slides in, so it arrives whole
