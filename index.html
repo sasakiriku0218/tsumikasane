@@ -560,6 +560,11 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* home: Health-style summary cards; the coloured head opens the page and its hit area covers the card */
 .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 @media (min-width: 480px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tile.wide { grid-column: 1 / -1; } }
+/* きょう's tiles go two to a row on iPhone too (the user's call: the page was a long column of ten): ToDo and the day's
+   plans (their lines cut short to fit), 日記 and 食事, 運動 and 勉強, 体重 and 家計簿, while ルーティーン, with its
+   checklist, and 目標, with its longer line, keep a row each. With large text, or on the narrowest screens, the page is
+   too narrow for two and they stay one to a row */
+@container (min-width: 20em) { #homeTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } #homeTiles > .tile.wide { grid-column: 1 / -1; } }
 .tile { position: relative; padding: 10px var(--space-2) var(--space-2); display: flex; flex-direction: column; gap: 4px; }
 .tile-head { display: flex; align-items: center; gap: 6px; min-height: 36px; margin-inline: -4px; padding: 0 4px; background: transparent; border: 0; color: var(--tile-c); font-size: var(--t-sub); font-weight: 600; line-height: 1.2; text-align: left; cursor: pointer; }
 .tile-head::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius); }
@@ -569,6 +574,10 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .tile .big { font-family: var(--font-round); font-size: var(--t-title1); line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .tile .big small { margin-inline-start: 4px; font-family: var(--font-body); font-size: var(--t-sub); font-weight: 600; color: var(--muted); }
 .tile .sub { line-height: 1.4; }
+.tile .big.word { font-size: var(--t-title2); }
+/* a part of a line breaks only at a space inside it, so 予算の残り and 63,800 円 stay whole */
+.tile .sub .part { display: inline-block; word-break: keep-all; overflow-wrap: anywhere; }
+.tile[data-tile="journal"] .sub { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .tile ul { margin: 4px 0 0; padding: 0; list-style: none; }
 .tile ul li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.5; }
 .tile ul li::before { content: "・"; color: var(--tile-c); }
@@ -3382,13 +3391,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     showTab(key);
   }
   // a Health-style summary card: the coloured head with its chevron opens the page, and its hit area covers the card
+  // half a row on a phone is narrow, so a word in the big place (書きました, まだ) is a step smaller than a number, and a line
+  // of parts (合計 1150 kcal・朝食・昼食) breaks between its parts rather than inside one (the diary's words are left as written)
   function tile(color, label, big, unit, sub, extra, tabKey, wide) {
     const page = PAGES.find((p) => p.key === tabKey);
-    return el("div", { class: "card tile" + (wide ? " wide" : ""), style: `--tile-c:${color}` },
+    // a number keeps its unit on its line (63,800 円, −0.2 kg)
+    const keep = (s) => s.replace(/ (?=円|kcal|kg|分|件|回)/g, " ");
+    const parts = typeof sub === "string" && tabKey !== "journal" && sub.includes("・")
+      ? sub.split("・").map((s, i, all) => el("span", { class: "part" }, keep(s) + (i < all.length - 1 ? "・" : ""))) : sub;
+    return el("div", { class: "card tile" + (wide ? " wide" : ""), "data-tile": tabKey, style: `--tile-c:${color}` },
       el("button", { type: "button", class: "tile-head", "aria-label": label + "を開く", onclick: () => openFromHome(tabKey) },
         icon(page.icon, 18), el("span", { class: "lbl" }, label), el("span", { class: "chev" }, icon("next", 16))),
-      el("div", { class: "big" }, big, unit ? el("small", {}, unit) : null),
-      sub ? el("div", { class: "sub" }, sub) : null,
+      el("div", { class: "big" + (/^[\d.,]+$/.test(big) ? "" : " word") }, big, unit ? el("small", {}, unit) : null),
+      sub ? el("div", { class: "sub" }, parts) : null,
       extra);
   }
   function renderHome() {
@@ -3420,10 +3435,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("homeTiles").replaceChildren(
       tile("var(--c-todo)", "ToDo", String(undone.length), "件 残り",
         undone.length ? `きょう期限 ${dueToday}・期限切れ ${overdue}` : (todos.items.length ? "すべて完了しています" : "まだ登録がありません"),
-        top.length ? el("ul", {}, top.map((t) => el("li", { title: t.text }, t.text))) : null, "todo", true),
+        top.length ? el("ul", {}, top.map((t) => el("li", { title: t.text }, t.text))) : null, "todo"),
       tile("var(--c-cal)", "きょうの予定", String(evToday.length), "件",
         evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evText(nextEv)}` : "まだ予定はありません",
-        evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null, "calendar", true),
+        evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null, "calendar"),
       tile("var(--c-journal)", "日記", j?.text ? "書きました" : "まだ", null,
         j?.text ? j.text.slice(0, 60) + (j.text.length > 60 ? "…" : "") : "ひとことでも残しておくと、あとで効いてきます。", null, "journal"),
       tile("var(--c-meal)", "食事", String(ms.length), "回",
@@ -3432,13 +3447,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       // 勉強 like 運動: today's time only (the user's call: no line about the last 7 days)
       tile("var(--c-study)", "勉強", String(stMins), "分", null, null, "study"),
       tile("var(--c-routine)", "ルーティーン", rts.length ? String(rts.length - rtLeft.length) : "まだ", rts.length ? `/ ${rts.length} できた` : null,
-        rts.length ? null : "毎日やることを登録して、チェックしていきましょう。", routineTileList(rts, rtDone), "routine"),
+        rts.length ? null : "毎日やることを登録して、チェックしていきましょう。", routineTileList(rts, rtDone), "routine", true),
       tile("var(--c-weight)", "体重", wLast ? fmtKg(wLast.kg) : "未記録", wLast ? "kg" : null,
         wLast
           ? (wLast.id === todayKey ? "きょう記録済み" : `${relLabel(wLast.id) || fmtMD(wLast.id)}の記録`) + (wPrev ? `・前回比 ${signed(num(wLast.kg) - num(wPrev.kg))} kg` : "")
           : "最初の1回を記録しましょう", null, "weight"),
-      tile("var(--c-money)", "家計簿", Math.round(mon.out).toLocaleString("ja-JP"), "円 今月の支出",
-        (budget > 0 ? (budget - mon.out >= 0 ? `予算の残り ${fmtYen(budget - mon.out)}` : `予算を ${fmtYen(mon.out - budget)} 超過`) : `収入 ${fmtYen(mon.inn)}`) + `・きょう ${fmtYen(todayOut)}`,
+      // 今月の支出 leads the line under the sum, the unit beside it being just 円, so the sum keeps its line in half a row
+      tile("var(--c-money)", "家計簿", Math.round(mon.out).toLocaleString("ja-JP"), "円",
+        "今月の支出・" + (budget > 0 ? (budget - mon.out >= 0 ? `予算の残り ${fmtYen(budget - mon.out)}` : `予算を ${fmtYen(mon.out - budget)} 超過`) : `収入 ${fmtYen(mon.inn)}`) + `・きょう ${fmtYen(todayOut)}`,
         null, "money"),
       // 目標: no counts, as on its page (the user's call); the goal due soonest and the days left to it
       tile("var(--c-goal)", "目標",
@@ -3446,7 +3462,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         left > 0 ? "日" : null,
         !nearest ? (goals.items.length ? "新しい目標を立ててみましょう。" : "目標を立ててみましょう。")
           : `「${nearest.title}」` + (left > 0 ? "の期限まで" : left === 0 ? "の期限です" : ""),
-        null, "goal")
+        null, "goal", true)
     );
     if (rtFocus) $("homeTiles").querySelector(`[data-rt="${rtFocus}"]`)?.focus();
   }
