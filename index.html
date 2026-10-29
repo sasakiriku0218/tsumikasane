@@ -455,8 +455,8 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .td-tile li.done .check circle { fill: var(--f-todo); stroke: var(--f-todo); }
 .td-tile li.done .rt-label { text-decoration: line-through; }
 /* 運動: the fields for the kind picked sit in the form's grid as if loose; the other kind's are hidden (and switched off) */
-.wo-group { display: contents; }
-.wo-group[hidden] { display: none; }
+.wo-group, .form-rows { display: contents; }
+.wo-group[hidden], .form-rows[hidden] { display: none; }
 /* an item's name is typed over where it stands, as in Reminders; it reads as plain text until tapped */
 .rt-name { display: block; width: calc(100% + 12px); min-width: 0; margin: -4px -6px; padding: 4px 6px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; line-height: 1.3; }
 .rt-name:focus { background: var(--fill); }
@@ -760,6 +760,8 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .32); animation: sheet-fade .
 /* 終日にする stays whole beside the time; the time field gives up the room */
 .ffield > .link-btn { flex: none; white-space: nowrap; }
 /* an event row opens its edit form; its label shows as a dot in its colour beside the name */
+/* a day's list: a plan's time can run 13:00〜15:00, kept whole */
+.chip.when { max-width: none; font-variant-numeric: tabular-nums; }
 .ev-label::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; background: var(--lc); vertical-align: 1px; }
 @container (max-width: 17em) {
   .row-btn:has(> .chip) { flex-wrap: wrap; row-gap: 4px; }
@@ -1279,11 +1281,30 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     </div>
     <div class="sheet-view" id="editView" hidden>
       <form class="add" id="evEdit" autocomplete="off">
+        <!-- a repeating plan: whether 保存 and 削除 change this turn alone or every one -->
+        <div class="seg full" role="group" aria-label="変える範囲" id="edScope" hidden>
+          <button type="button" data-scope="one" aria-pressed="true">この回だけ</button>
+          <button type="button" data-scope="all" aria-pressed="false">すべての回</button>
+        </div>
         <input type="text" id="edTitle" class="full" aria-label="予定の内容" maxlength="100" required>
-        <label class="flabel" for="edDate">日付</label>
+        <label class="flabel" for="edDate" id="edDateLabel">日付</label>
         <div class="ffield"><input type="date" id="edDate" required></div>
+        <label class="flabel" for="edEndDate">終わりの日 <span class="opt">任意</span></label>
+        <div class="ffield"><input type="date" id="edEndDate"></div>
         <label class="flabel" for="edTime">時間 <span class="opt">任意</span></label>
         <div class="ffield"><input type="time" id="edTime"><button type="button" class="link-btn" id="edTimeClear">終日にする</button></div>
+        <div class="form-rows" id="edEndTimeRow" hidden>
+          <label class="flabel" for="edEndTime">終わりの時間 <span class="opt">任意</span></label>
+          <div class="ffield"><input type="time" id="edEndTime"></div>
+        </div>
+        <div class="form-rows" id="edRepeatRows">
+          <label class="flabel" for="edRepeat">繰り返し</label>
+          <div class="ffield"><select id="edRepeat"></select></div>
+          <div class="form-rows" id="edUntilRow" hidden>
+            <label class="flabel" for="edUntil">いつまで <span class="opt">任意</span></label>
+            <div class="ffield"><input type="date" id="edUntil"></div>
+          </div>
+        </div>
         <span class="flabel" id="edLabelLabel">ラベル</span>
         <div class="ffield" id="edLabels"></div>
       </form>
@@ -1321,8 +1342,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <input type="text" id="planTitle" class="full" placeholder="新しい予定" aria-label="予定の内容" maxlength="100" required>
         <label class="flabel" for="planDate">日付</label>
         <div class="ffield"><input type="date" id="planDate" required></div>
+        <!-- a plan over several days, an end time, and a repeat (the user's call): the end time once there is a start,
+             the repeat's end once it repeats -->
+        <label class="flabel" for="planEndDate">終わりの日 <span class="opt">任意</span></label>
+        <div class="ffield"><input type="date" id="planEndDate"></div>
         <label class="flabel" for="planTime">時間 <span class="opt">任意</span></label>
         <div class="ffield"><input type="time" id="planTime"></div>
+        <div class="form-rows" id="planEndTimeRow" hidden>
+          <label class="flabel" for="planEndTime">終わりの時間 <span class="opt">任意</span></label>
+          <div class="ffield"><input type="time" id="planEndTime"></div>
+        </div>
+        <label class="flabel" for="planRepeat">繰り返し</label>
+        <div class="ffield"><select id="planRepeat"></select></div>
+        <div class="form-rows" id="planUntilRow" hidden>
+          <label class="flabel" for="planUntil">いつまで <span class="opt">任意</span></label>
+          <div class="ffield"><input type="date" id="planUntil"></div>
+        </div>
         <span class="flabel" id="planLabelLabel">ラベル</span>
         <div class="ffield" id="planLabels"></div>
       </form>
@@ -2555,6 +2590,61 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // untimed (all-day) events sort first
   const byTime = (a, b) => (a.time || "").localeCompare(b.time || "") || num(a.createdAt) - num(b.createdAt);
   const evText = (e) => (e.time ? e.time + " " : "") + e.title;
+  // a plan can run over several days (endDate, its last day), have an end time (endTime) and come round again (repeat:
+  // every day, week, month or year from its first day, up to repeatUntil, less the turns taken out of it, skip); the
+  // user's call. The month, a day's list and きょう read plans as turns: { e, start, day, days } — the turn's first day,
+  // which of its days this one is (0 for the first) and how many it has. Plans from before have none of these: one day
+  const REPEATS = [["", "しない"], ["daily", "毎日"], ["weekly", "毎週"], ["monthly", "毎月"], ["yearly", "毎年"]];
+  const repeatName = (r) => (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
+  const extraDays = (e) => (e.endDate && e.endDate > e.date ? daysBetween(e.date, e.endDate) : 0);
+  // the first days of e's turns that reach into from … to
+  function turnStarts(e, from, to) {
+    const lo = addDays(from, -extraDays(e));
+    if (!e.repeat) return e.date >= lo && e.date <= to ? [e.date] : [];
+    const last = e.repeatUntil && e.repeatUntil < to ? e.repeatUntil : to, skip = new Set(e.skip || []), out = [];
+    const take = (d) => { if (d >= lo && d <= last && !skip.has(d)) out.push(d); };
+    if (e.repeat === "daily" || e.repeat === "weekly") {
+      const step = e.repeat === "daily" ? 1 : 7;
+      let d = e.date;
+      if (lo > d) d = addDays(d, Math.ceil(daysBetween(d, lo) / step) * step);
+      for (; d <= last; d = addDays(d, step)) take(d);
+    } else {
+      // the same date each month or year; a month without it (the 31st, the 29th of February) is passed over
+      const [y0, m0, d0] = e.date.split("-").map(Number), every = e.repeat === "yearly" ? 12 : 1, [ly, lm] = lo.split("-").map(Number);
+      for (let k = Math.max(0, (Math.floor(((ly - y0) * 12 + lm - m0) / every) - 1) * every); ; k += every) {
+        const ym = `${y0 + Math.floor((m0 - 1 + k) / 12)}-${pad(((m0 - 1 + k) % 12) + 1)}`;
+        if (ym + "-01" > last) break;
+        if (d0 <= daysInMonth(ym)) take(`${ym}-${pad(d0)}`);
+      }
+    }
+    return out;
+  }
+  // a turn's own time on this day: its start, on its first day only (the days after count as all day)
+  const turnTime = (t) => (t.day === 0 ? t.e.time || "" : "");
+  // all day first, a longer run before a shorter one, then by time
+  const byTurn = (a, b) => turnTime(a).localeCompare(turnTime(b)) || b.days - a.days || num(a.e.createdAt) - num(b.e.createdAt);
+  // every plan's turns on each day from … to
+  function turnsByDay(from, to) {
+    const by = new Map();
+    for (const e of events.items) for (const start of turnStarts(e, from, to)) {
+      const days = extraDays(e) + 1;
+      for (let day = 0; day < days; day++) {
+        const d = addDays(start, day);
+        if (d < from || d > to) continue;
+        if (!by.has(d)) by.set(d, []);
+        by.get(d).push({ e, start, day, days });
+      }
+    }
+    for (const list of by.values()) list.sort(byTurn);
+    return by;
+  }
+  // a turn's time in a day's list: 終日, 13:00 or 13:00〜15:00; over several days 13:00〜 on the first, 〜15:00 on the last
+  function turnTimeText({ e, day, days }) {
+    const end = e.time && e.endTime ? e.endTime : "";
+    if (days === 1) return e.time ? e.time + (end ? "〜" + end : "") : "終日";
+    if (day === 0) return e.time ? e.time + "〜" : "終日";
+    return day === days - 1 && end ? "〜" + end : "終日";
+  }
   function groupBy(items, key) {
     const m = new Map();
     for (const x of items) {
@@ -2642,7 +2732,29 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a new plan from the ＋ beside the gear (openNewPlan): any day, 追加 grey until it has its text and a day
   const syncPlanSave = () => { $("planSave").disabled = !$("planTitle").value.trim() || !$("planDate").value; };
   for (const id of ["planTitle", "planDate"]) for (const type of ["input", "change"]) $(id).addEventListener(type, syncPlanSave);
-  function clearPlanForm() { $("planForm").reset(); syncPlanSave(); }
+  function clearPlanForm() { $("planForm").reset(); syncPlanSave(); syncPlanRows("plan"); }
+  for (const id of ["planRepeat", "edRepeat"]) setChildren($(id), REPEATS.map(([k, name]) => el("option", { value: k }, name)));
+  // a plan form's rows that come and go (f: "plan" for a new one, "ed" for a change): the end time once there is a start
+  // time, the repeat's end once it repeats. No end may come before its start (min), so 追加 and 保存 wait until it's right
+  function syncPlanRows(f) {
+    const date = $(f + "Date").value, endDate = $(f + "EndDate").value, time = $(f + "Time").value, rep = $(f + "Repeat").value;
+    $(f + "EndTimeRow").hidden = !time; $(f + "EndTime").disabled = !time;
+    if (!time) $(f + "EndTime").value = "";
+    $(f + "EndDate").min = date;
+    $(f + "EndTime").min = time && !(endDate > date) ? time : ""; // over several days the end can be any time
+    $(f + "UntilRow").hidden = !rep; $(f + "Until").disabled = !rep;
+    if (!rep) $(f + "Until").value = "";
+    $(f + "Until").min = date;
+  }
+  for (const f of ["plan", "ed"]) for (const id of ["Date", "EndDate", "Time", "Repeat"]) for (const type of ["input", "change"]) $(f + id).addEventListener(type, () => syncPlanRows(f));
+  // what a form adds to a plan: its last day, its end time and its repeat, each only when it says something
+  function planExtras(f, date, time) {
+    const x = {}, endDate = $(f + "EndDate").value, endTime = $(f + "EndTime").value, rep = $(f + "Repeat").value, until = $(f + "Until").value;
+    if (endDate > date) x.endDate = endDate;
+    if (time && endTime && (x.endDate || endTime > time)) x.endTime = endTime;
+    if (REPEATS.some(([k]) => k && k === rep)) { x.repeat = rep; if (until >= date) x.repeatUntil = until; }
+    return x;
+  }
   // the day a fresh form starts on: the day picked in the month on show, else today if it is that month, else the 1st
   const planDay = () => (monthOf(calDay) === calMonth ? calDay : monthOf(todayKey) === calMonth ? todayKey : calMonth + "-01");
   $("calAdd").addEventListener("click", (ev) => openNewPlan(ev.detail === 0));
@@ -2650,7 +2762,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     ev.preventDefault();
     const title = $("planTitle").value.trim(), date = $("planDate").value, time = $("planTime").value;
     if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-    const item = { date, title, createdAt: Date.now() };
+    const item = { date, title, createdAt: Date.now(), ...planExtras("plan", date, time) };
     if (time) item.time = time;
     if (planLabelChoice && labels.get(planLabelChoice)) item.labelId = planLabelChoice;
     act(() => events.add(item));
@@ -2761,7 +2873,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- the day sheet: a tap on a day opens its plans, to add, change and delete them there ----------
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
-  let editingId = null, edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
+  let editingId = null, editingStart = null, editScope = "one", edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
   let settingsFrom = null; // the settings showing: "gear" when opened from the month bar, "day" when from a day's sheet
   let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or ＋, 勉強's or きょう's gear, ToDo's or 目標's ＋
   let settingsScope = "calendar"; // whose settings: the calendar's labels, 勉強's subjects or きょう's tiles ("home")
@@ -2816,7 +2928,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // 予定を追加 under a day's list: the new plan's form in the same sheet, on that day; a text typed before stays
   function openPlanFromDay() {
     if (!$("planTitle").value.trim()) clearPlanForm();
-    $("planDate").value = calDay;
+    $("planDate").value = calDay; syncPlanRows("plan");
     planNew = true; planFromDay = true; renderPlanLabels(); syncSheetHead(); syncPlanSave();
     sheetEl.scrollTop = 0;
     $("planTitle").focus();
@@ -2870,7 +2982,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function openNewPlan(byKey) {
     if (sheetEl.open) return;
     resetSheet();
-    if (!$("planTitle").value.trim()) { clearPlanForm(); $("planDate").value = planDay(); }
+    if (!$("planTitle").value.trim()) { clearPlanForm(); $("planDate").value = planDay(); syncPlanRows("plan"); }
     planNew = true; renderPlanLabels(); syncSheetHead(); syncPlanSave();
     presentSheet(byKey, "plan", $("planTitle"));
   }
@@ -3212,22 +3324,45 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(() => goals.remove(id));
   });
 
-  // an event's edit form: its text, day, time and label, and a delete that asks for a second press
-  function editEvent(id) {
+  // an event's edit form: its text, days, times, repeat and label, and a delete that asks for a second press. For a
+  // repeating plan, opened from one of its turns (start), the form changes that turn alone (この回だけ, the first choice:
+  // it is taken out of the plan and kept as a plan of its own) or every turn (すべての回, the plan itself)
+  function editEvent(id, start) {
     const e = events.get(id);
     if (!e) return;
-    editingId = id;
+    editingId = id; editingStart = start || e.date; editScope = "one";
     $("edTitle").value = e.title;
-    $("edDate").value = e.date;
-    $("edTime").value = e.time || "";
+    $("edTime").value = e.time || ""; $("edEndTime").value = e.endTime || "";
     $("edTimeClear").hidden = !e.time;
+    $("edRepeat").value = e.repeat || ""; $("edUntil").value = e.repeatUntil || "";
+    $("edScope").hidden = !e.repeat;
+    fillEditDays();
     edLabelChoice = labelOf(e) ? e.labelId : "";
     setChildren($("edLabels"), labelPicker("edLabel", edLabelChoice, (v) => { edLabelChoice = v; }, "edLabelLabel"));
-    disarmDelete();
     syncSheetHead();
     sheetEl.scrollTop = 0;
     $("sheetTitle").focus();
   }
+  // the form's days: this turn's alone, or the plan's first (開始日) with its repeat
+  function fillEditDays() {
+    const e = events.get(editingId);
+    if (!e) return;
+    const all = !e.repeat || editScope === "all", start = all ? e.date : editingStart, extra = extraDays(e);
+    $("edDate").value = start;
+    $("edEndDate").value = extra ? addDays(start, extra) : "";
+    $("edDateLabel").textContent = e.repeat && all ? "開始日" : "日付";
+    $("edRepeatRows").hidden = !all;
+    for (const b of $("edScope").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.scope === editScope));
+    disarmDelete(); // its words follow the choice
+    syncPlanRows("ed");
+    // the repeat's fields left out of one turn's change are switched off, so the browser doesn't check them
+    if (!all) $("edUntil").disabled = true;
+    $("edRepeat").disabled = !all;
+  }
+  $("edScope").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-scope]");
+    if (b && b.dataset.scope !== editScope) { editScope = b.dataset.scope; fillEditDays(); }
+  });
   function showDayView() {
     editingId = null; settingsFrom = null;
     disarmDelete();
@@ -3241,29 +3376,43 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const title = $("edTitle").value.trim(), date = $("edDate").value, time = $("edTime").value;
     if (!title) { $("edTitle").value = ""; $("edTitle").focus(); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { $("edDate").focus(); return; }
-    const moved = date !== e.date; // read before the update, which changes e in place
     const labelId = edLabelChoice && labels.get(edLabelChoice) ? edLabelChoice : undefined;
+    const { repeat, repeatUntil, ...rest } = planExtras("ed", date, time);
+    const fields = { title, date, time: time || undefined, labelId, endDate: undefined, endTime: undefined, ...rest };
+    if (e.repeat && editScope === "one") {
+      // this turn alone: taken out of the plan, and kept as a plan of its own with what the form says
+      const skip = [...new Set([...(e.skip || []), editingStart])], moved = date !== editingStart;
+      showDayView();
+      act(async () => { await events.update(e.id, { skip }); await events.add({ ...fields, createdAt: Date.now() }); });
+      if (moved) flash(`${fmtMDW(date)}に移しました`);
+      return;
+    }
+    const moved = !e.repeat && !repeat && date !== e.date; // read before the update, which changes e in place
+    Object.assign(fields, repeat ? { repeat, repeatUntil } : { repeat: undefined, repeatUntil: undefined, skip: undefined });
     showDayView();
-    act(() => events.update(e.id, { title, date, time: time || undefined, labelId }));
+    act(() => events.update(e.id, fields));
     if (moved) flash(`${fmtMDW(date)}に移しました`);
   });
   for (const type of ["input", "change"]) $("edTime").addEventListener(type, () => { $("edTimeClear").hidden = !$("edTime").value; });
   $("edTimeClear").addEventListener("click", (ev) => {
     $("edTime").value = "";
     $("edTimeClear").hidden = true;
+    syncPlanRows("ed");
     if (ev.detail === 0) $("edTime").focus(); // pressed from the keyboard: keep focus in the form
   });
   // opening another event starts the delete over, so one press can never delete the wrong event
-  function disarmDelete() { clearTimeout(delTimer); edDelete.classList.remove("armed"); edDelete.textContent = "この予定を削除"; }
+  function disarmDelete() { clearTimeout(delTimer); edDelete.classList.remove("armed"); edDelete.textContent = deleteWords(); }
+  function deleteWords() { return events.get(editingId)?.repeat ? (editScope === "all" ? "すべての回を削除" : "この回を削除") : "この予定を削除"; }
   edDelete.addEventListener("click", () => {
     if (!edDelete.classList.contains("armed")) {
       edDelete.classList.add("armed"); edDelete.textContent = "もう一度押すと削除します";
       delTimer = setTimeout(disarmDelete, 4000);
       return;
     }
-    const id = editingId;
+    const id = editingId, e = events.get(id), start = editingStart, one = e?.repeat && editScope === "one";
     showDayView();
-    act(() => events.remove(id));
+    // a repeating plan's turn alone is taken out of it; otherwise the plan goes
+    act(() => (one ? events.update(id, { skip: [...new Set([...(e.skip || []), start])] }) : events.remove(id)));
   });
 
   // ---------- an entry's edit form: ToDo, 食事, 運動, 勉強 and 家計簿, and from 記録's lists 日記, 体重 and a day's ルーティーン ----------
@@ -3531,28 +3680,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function renderCalendar() {
     const monthName = fmtMonth(calMonth);
     if ($("calMonthName").textContent !== monthName) $("calMonthName").textContent = monthName; // a live region: only a change is read out
-    const evBy = groupBy(events.items, (e) => e.date);
     const todoBy = groupBy(todos.items, (t) => t.due);
     const goalBy = groupBy(goals.items, (g) => g.deadline);
 
     // whole weeks from Sunday, padded with the neighbouring months' days
     const first = calMonth + "-01";
     const lead = parseYmd(first).getDay();
-    const start = addDays(first, -lead);
+    const start = addDays(first, -lead), count = Math.ceil((lead + daysInMonth(calMonth)) / 7) * 7;
+    const turnsBy = turnsByDay(start, addDays(start, count - 1));
     const cells = [];
-    for (let i = 0; i < Math.ceil((lead + daysInMonth(calMonth)) / 7) * 7; i++) {
+    for (let i = 0; i < count; i++) {
       const d = addDays(start, i), dt = parseYmd(d), wd = dt.getDay();
-      const evs = evBy.get(d) || [];
+      const evs = turnsBy.get(d) || [];
       const todosDue = (todoBy.get(d) || []).filter((t) => !t.done);
       const goalsDue = (goalBy.get(d) || []).filter((g) => !g.done);
       // the day's plans as bars: events by time in their label's colour, then ToDo and goal deadlines; the day's name lists the labels too
       const plans = [
-        ...[...evs].sort(byTime).map((e) => ({ text: e.title, hue: labelHue(labelOf(e)), plain: !labelOf(e) })),
+        ...evs.map(({ e }) => ({ text: e.title, hue: labelHue(labelOf(e)), plain: !labelOf(e) })),
         ...todosDue.map((t) => ({ text: t.text, hue: "var(--c-todo)", due: true })),
         ...goalsDue.map((g) => ({ text: g.title, hue: "var(--c-goal)", due: true })),
       ];
       const hol = holidayName(d);
-      const evNames = [...new Set(evs.map((e) => (labelOf(e) || {}).name).filter(Boolean))];
+      const evNames = [...new Set(evs.map(({ e }) => (labelOf(e) || {}).name).filter(Boolean))];
       const notes = [evs.length ? `予定 ${evs.length} 件` + (evNames.length ? `（${evNames.join("、")}）` : "") : "", todosDue.length ? `ToDo の期限 ${todosDue.length} 件` : "", goalsDue.length ? `目標の期限 ${goalsDue.length} 件` : ""];
       cells.push(el("button", {
         type: "button",
@@ -3572,7 +3721,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     fitBars();
 
     // the chosen day, in its sheet: its events (a tap opens one to change or delete it), then whatever falls due on it
-    const evs = [...(evBy.get(calDay) || [])].sort(byTime);
+    const evs = turnsByDay(calDay, calDay).get(calDay) || [];
     const todosDue = [...(todoBy.get(calDay) || [])].sort((a, b) => num(a.createdAt) - num(b.createdAt));
     const goalsDue = goalBy.get(calDay) || [];
     const dueCount = todosDue.length + goalsDue.length;
@@ -3580,12 +3729,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const list = $("calDayList");
     list.replaceChildren();
     if (!evs.length && !dueCount) { list.append(el("li", { class: "empty" }, "この日の予定はありません。")); return; }
-    for (const e of evs) {
-      const l = labelOf(e);
+    // each turn: its time, its title, and under it the label, the days a run covers (10/30〜11/2) and the repeat
+    for (const t of evs) {
+      const { e } = t, l = labelOf(e), when = turnTimeText(t);
+      const sub = [l ? l.name : "", t.days > 1 ? `${fmtMD(t.start)}〜${fmtMD(addDays(t.start, t.days - 1))}` : "", e.repeat ? repeatName(e.repeat) : ""].filter(Boolean).join("・");
       list.append(el("li", { class: "btn-row", style: labelStyle(l) },
-        el("button", { type: "button", class: "row-btn nav", "aria-label": `「${e.title}」を編集（${e.time || "終日"}${l ? "・" + l.name : ""}）`, onclick: () => editEvent(e.id) },
-          el("span", { class: "chip", style: "--chip-c: var(--lc)" }, e.time || "終日"),
-          el("span", { class: "body" }, el("span", { class: "text" }, e.title), l ? el("span", { class: "sub ev-label" }, l.name) : null),
+        el("button", { type: "button", class: "row-btn nav", "aria-label": `「${e.title}」を編集（${when}${sub ? "・" + sub : ""}）`, onclick: () => editEvent(e.id, t.start) },
+          el("span", { class: "chip when", style: "--chip-c: var(--lc)" }, when),
+          el("span", { class: "body" }, el("span", { class: "text" }, e.title), sub ? el("span", { class: "sub" + (l ? " ev-label" : "") }, sub) : null),
           el("span", { class: "chev" }, icon("next", 16)))));
     }
     for (const t of todosDue) {
@@ -3726,8 +3877,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const active = goals.items.filter((g) => !g.done);
     const nearest = [...active].sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999"))[0];
     const left = nearest?.deadline ? daysUntil(nearest.deadline) : null;
-    const evToday = events.items.filter((e) => e.date === todayKey).sort(byTime);
-    const nextEv = events.items.filter((e) => e.date > todayKey).sort((a, b) => a.date.localeCompare(b.date) || byTime(a, b))[0];
+    const evToday = turnsByDay(todayKey, todayKey).get(todayKey) || [];
+    // the next plan to come: the soonest turn starting after today, looking a year ahead
+    const nextEv = events.items.map((e) => ({ e, start: turnStarts(e, addDays(todayKey, 1), addDays(todayKey, 366)).find((d) => d > todayKey) }))
+      .filter((x) => x.start).sort((a, b) => a.start.localeCompare(b.start) || byTime(a.e, b.e))[0];
 
     const tiles = [
       tile("todo", String(undone.length), "件 残り",
@@ -3735,8 +3888,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         undone.length ? `きょう期限 ${dueToday}・期限切れ ${overdue}` : (todos.items.length ? "すべて完了" : "まだありません"),
         todoTileList(top)),
       tile("calendar", String(evToday.length), "件",
-        evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evText(nextEv)}` : "予定はありません",
-        evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null),
+        evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.start)} ${evText(nextEv.e)}` : "予定はありません",
+        evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((t) => el("li", { title: t.e.title, style: `--dot:${labelHue(labelOf(t.e))}` }, (turnTime(t) ? turnTime(t) + " " : "") + t.e.title))) : null),
       tile("journal", null, null, null, journalTile(j)),
       tile("meal", String(ms.length), "回",
         ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだありません"),
