@@ -543,6 +543,18 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
     margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
     padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px); border-radius: 0;
   }
+  /* and it fills the screen down to just above the tab bar (the user's call: no space left under a five-week month).
+     The page is the screen's height, and the weeks share what the month's name leaves (each 108px at least, so a
+     six-week month on a small phone still scrolls a little). The screen's height is the one with the browser's bars
+     showing, so nothing jumps as they come and go */
+  html[data-tab="calendar"] .wrap { padding-bottom: calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + var(--space-1)); }
+  #sec-calendar {
+    display: grid; grid-template-rows: auto 1fr;
+    min-height: calc(100vh - max(var(--space-1), env(safe-area-inset-top, 0px)) - var(--tabbar) - max(12px, env(safe-area-inset-bottom, 0px)) - var(--space-1));
+    min-height: calc(100svh - max(var(--space-1), env(safe-area-inset-top, 0px)) - var(--tabbar) - max(12px, env(safe-area-inset-bottom, 0px)) - var(--space-1));
+  }
+  .cal { display: grid; grid-template-rows: auto 1fr; }
+  .cal-grid { grid-auto-rows: minmax(108px, 1fr); }
 }
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .cal-grid { border-top: .5px solid var(--separator); }
