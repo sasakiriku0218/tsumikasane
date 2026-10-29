@@ -500,6 +500,9 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* goals: each one a row that opens its mandala chart, with how far the chart has got */
 .goal { position: relative; }
 .goal + .goal::before { content: ""; position: absolute; top: 0; left: var(--space-2); right: 0; border-top: .5px solid var(--separator); }
+/* the list's section names (期限切れ・進行中・達成) with their counts, as ToDo's; 期限切れ in red, as the 期限 under it */
+.goal-head { display: flex; justify-content: space-between; gap: var(--space-1); padding: 14px var(--space-2) 4px; font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.goal-head.warn { color: var(--warn); }
 .goal-open { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px var(--space-2); background: transparent; border: 0; border-radius: inherit; color: var(--fg); font: inherit; line-height: 1.3; text-align: left; cursor: pointer; }
 .goal-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .goal-open .chev { display: grid; color: var(--muted); }
@@ -2360,6 +2363,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       renderGoals();
     });
   });
+  const goalSection = (g) => (g.done ? "達成" : g.deadline && g.deadline < todayKey ? "期限切れ" : "進行中");
   function renderGoals() {
     const active = goals.items.filter((g) => !g.done).sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999") || num(a.createdAt) - num(b.createdAt));
     const done = goals.items.filter((g) => g.done).sort((a, b) => num(b.doneAt) - num(a.doneAt));
@@ -2368,10 +2372,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!goals.items.length) { list.append(el("div", { class: "empty" }, el("span", { class: "phrase" }, "まだ目標がありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。"))); return; }
     const shown = goalFilter === "active" ? active : goalFilter === "done" ? done : [...active, ...done];
     if (!shown.length) { list.append(el("div", { class: "empty" }, goalFilter === "done" ? "達成した目標はまだありません。" : "進行中の目標はありません。")); return; }
+    // in sections, each under its name with its count, as ToDo's list (the user's call): 期限切れ, 進行中, then 達成, which
+    // is the order the goals already come in. With only 達成 showing, its name would just say the bar's choice again
+    const counts = new Map();
+    for (const g of shown) counts.set(goalSection(g), (counts.get(goalSection(g)) || 0) + 1);
+    let section = null;
     // a row per goal that opens its chart, in three lines (the user's call: more goals on the screen): its name; its 期限
     // and 達成基準 on one line, the two kept whole so a narrow row breaks between them; how far the chart has got, with
     // how many of the eight around the goal are done. 分割 is left to the chart, where it is set
     for (const g of shown) {
+      if (goalFilter !== "done" && goalSection(g) !== section) {
+        section = goalSection(g);
+        list.append(el("div", { class: "goal-head" + (section === "期限切れ" ? " warn" : "") }, el("span", {}, section), el("span", {}, `${counts.get(section)} 件`)));
+      }
       const depth = goalDepth(g), root = nodeAt(g, []), els = kidsOf(root, depth), crit = criterionText(g);
       const pct = g.done ? 100 : Math.floor(cellProgress(root, depth) * 100);
       const when = g.done ? null : deadlineText(g);
