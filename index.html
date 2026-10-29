@@ -1529,8 +1529,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const label = t.due === todayKey ? "期限：きょう" : `期限：${fmtShort(t.due)}`;
     return el("span", { class: "sub" + (overdue ? " warn" : "") }, label + (overdue ? "（過ぎています）" : ""));
   }
+  // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): the 期限
+  // soonest first, which puts those past it first and today's next, then those without one, each oldest first. Done
+  // ones go after the rest, as they were added
+  const todoOrder = (a, b) => Number(!!a.done) - Number(!!b.done)
+    || (a.done ? 0 : (a.due || "9999").localeCompare(b.due || "9999"))
+    || num(a.createdAt) - num(b.createdAt);
   function renderTodos() {
-    const items = [...todos.items].sort((a, b) => num(a.createdAt) - num(b.createdAt));
+    const items = [...todos.items].sort(todoOrder);
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? t.done : !t.done));
     const remaining = items.filter((t) => !t.done).length;
     $("todoCount").textContent = `残り ${remaining} 件 ／ 全 ${items.length} 件`;
@@ -3127,11 +3133,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   function renderHome() {
     const rtFocus = document.activeElement?.dataset?.rt; // a ルーティーン row on the tile, pressed from the keyboard
-    const rank = (t) => (t.due && t.due < todayKey ? 0 : t.due === todayKey ? 1 : t.due ? 2 : 3);
     const undone = todos.items.filter((t) => !t.done);
     const dueToday = undone.filter((t) => t.due === todayKey).length;
     const overdue = undone.filter((t) => t.due && t.due < todayKey).length;
-    const top = [...undone].sort((a, b) => rank(a) - rank(b) || (a.due || "").localeCompare(b.due || "") || num(a.createdAt) - num(b.createdAt)).slice(0, 3);
+    const top = [...undone].sort(todoOrder).slice(0, 3);
     const j = journal.get(todayKey);
     const ms = meals.items.filter((m) => m.date === todayKey);
     const kcal = sum(ms.filter((m) => typeof m.kcal === "number"), (m) => m.kcal);
