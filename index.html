@@ -581,6 +581,8 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .tile .big small { margin-inline-start: 4px; font-family: var(--font-body); font-size: var(--t-sub); font-weight: 600; color: var(--muted); }
 .tile .sub { line-height: 1.4; }
 .tile .big.word { font-size: var(--t-title2); }
+.tile .sub .line { display: flex; column-gap: 0.3em; white-space: nowrap; }  /* 運動's and 勉強's: one to a line */
+.tile .sub .line .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }  /* cut short before the amount is */
 /* a part of a line breaks only at a space inside it, so 予算の残り and 63,800 円 stay whole */
 .tile .sub .part { display: inline-block; word-break: keep-all; overflow-wrap: anywhere; }
 /* 日記's tile: the day's words, three lines at most, or a field to write them in (above the head's hit area, so a tap
@@ -3416,6 +3418,24 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       sub ? el("div", { class: "sub" }, parts) : null,
       extra);
   }
+  // under 運動's and 勉強's time, what it was (the user's call): 運動 by kind, with the km run or walked (else its minutes),
+  // and 筋トレ by its moves; 勉強 by subject, with its minutes. One to a line, three lines at most (two and ほか N 件 when there
+  // are more), so half a row stays short; a name too long for its line is cut short, its amount never is; nothing on a day
+  // without any
+  const fewParts = (list) => (list.length
+    ? el("span", { class: "lines" }, (list.length > 3 ? [...list.slice(0, 2), [`ほか ${list.length - 2} 件`]] : list)
+      .map(([name, amount]) => el("span", { class: "line" }, el("span", { class: "name" }, name), amount ? el("span", { class: "amount" }, amount) : null)))
+    : null);
+  function workoutLine(ws) {
+    const kinds = [...groupBy(ws.filter((w) => !w.exercise), (w) => w.type)].map(([type, xs]) => {
+      const km = sum(xs, (w) => w.km);
+      return [type, km > 0 ? `${Math.round(km * 100) / 100} km` : `${sum(xs, (w) => w.minutes)} 分`];
+    });
+    return fewParts([...kinds, ...[...new Set(ws.filter((w) => w.exercise).map((w) => w.exercise))].map((move) => [move])]);
+  }
+  function studyLine(xs) {
+    return fewParts([...groupBy(xs, (x) => subjectOf(x)?.name || "科目なし")].map(([name, ys]) => [name, `${sum(ys, (y) => y.minutes)} 分`]));
+  }
   // 日記 on きょう's tile (the user's call): a day written shows its words, up to three lines, the tile opening the page as
   // before; a day not written yet has a field to write the day's ひとこと in right there. It is saved as the 日記 page saves:
   // after a pause in typing, on leaving the field, and when the app goes to the background
@@ -3462,7 +3482,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const slotsDone = SLOTS.filter((s) => ms.some((m) => m.slot === s));
     const ws = workouts.items.filter((w) => w.date === todayKey);
     const mins = sum(ws, (w) => w.minutes);
-    const stMins = sum(study.items.filter((x) => x.date === todayKey), (x) => x.minutes);
+    const sts = study.items.filter((x) => x.date === todayKey), stMins = sum(sts, (x) => x.minutes);
     const rts = sortedRoutines(), rtDone = routineDone(todayKey), rtLeft = rts.filter((r) => !rtDone.has(r.id));
     const wts = sortedWeights();
     const wLast = wts[wts.length - 1], wPrev = wts[wts.length - 2];
@@ -3487,9 +3507,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       tile("var(--c-journal)", "日記", null, null, null, journalTile(j), "journal"),
       tile("var(--c-meal)", "食事", String(ms.length), "回",
         ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだありません", null, "meal"),
-      tile("var(--c-workout)", "運動", ws.length && !mins ? String(ws.length) : String(mins), ws.length && !mins ? "件" : "分", null, null, "workout"),
-      // 勉強 like 運動: today's time only (the user's call: no line about the last 7 days)
-      tile("var(--c-study)", "勉強", String(stMins), "分", null, null, "study"),
+      tile("var(--c-workout)", "運動", ws.length && !mins ? String(ws.length) : String(mins), ws.length && !mins ? "件" : "分", workoutLine(ws), null, "workout"),
+      // 勉強 like 運動: today's time, and what it went on (the user's call: no line about the last 7 days)
+      tile("var(--c-study)", "勉強", String(stMins), "分", studyLine(sts), null, "study"),
       tile("var(--c-routine)", "ルーティーン", rts.length ? String(rts.length - rtLeft.length) : "まだ", rts.length ? `/ ${rts.length} できた` : null,
         rts.length ? null : "毎日やることを登録して、チェックしていきましょう。", routineTileList(rts, rtDone), "routine", true),
       tile("var(--c-weight)", "体重", wLast ? fmtKg(wLast.kg) : "未記録", wLast ? "kg" : null,
