@@ -764,6 +764,7 @@ ul.list > li.btn-row { padding: 0; }
 .sum-head { display: flex; align-items: center; gap: 6px; min-height: 28px; margin: 0; color: var(--sum-c); font-size: var(--t-sub); font-weight: 600; line-height: 1.2; }
 .sum-card .big { font-family: var(--font-round); font-size: var(--t-title1); line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .sum-card .big small { margin-inline-start: 4px; font-family: var(--font-body); font-size: var(--t-sub); font-weight: 600; color: var(--muted); }
+.sum-card .sub { text-wrap: balance; }  /* half a row is narrow: lines of a like length, not まだ記録がありませ／ん */
 .sum-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--t-sub); line-height: 1.4; }
 .sum-list li { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .sum-list li::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--lc, var(--sum-c)); }
@@ -3786,8 +3787,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const x of expenses.items) s.add(x.date);
     return s;
   }
-  // minutes as hours once they add up: 53 時間 20 分
-  const durBig = (min) => (min >= 60 ? [String(Math.floor(min / 60)), `時間 ${min % 60} 分`] : [String(min), "分"]);
+  // minutes as hours once they add up: 53 時間 20 分, or 56 時間 when it comes to whole hours (the user's call: no 0 分)
+  const durBig = (min) => (min >= 60 ? [String(Math.floor(min / 60)), min % 60 ? `時間 ${min % 60} 分` : "時間"] : [String(min), "分"]);
   const durText = (min) => durBig(min).join(" ");
   // size: "wide" takes a row, "list" (a card with a list of three) a row on a phone, otherwise half a row; kind: the record
   // whose entries the card opens (続けた日 has none)
