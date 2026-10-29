@@ -1595,12 +1595,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       try { await todos.remove(td.id); } catch (e) { showError(e); break; }
     }
   });
+  // the 期限 by the days left, as 目標 has it (the user's call: short, so it fits one line): past it in red, きょう and あした
+  // by name, later ones with the date too. A done one keeps only its date, the days left meaning nothing now. The parts
+  // are kept whole, so a narrow row breaks the line between them, not inside a word, and the ・ stays at the end of the
+  // first line (a line doesn't start with it)
   function dueText(t) {
     if (!t.due) return null;
-    const overdue = !t.done && t.due < todayKey;
-    const label = t.due === todayKey ? "期限：きょう" : `期限：${fmtShort(t.due)}`;
-    // each part kept whole, so a narrow row breaks the line between them, not inside a word
-    return el("span", { class: "sub" + (overdue ? " warn" : "") }, el("span", { class: "phrase" }, label), overdue ? el("span", { class: "phrase" }, "（過ぎています）") : null);
+    const n = daysUntil(t.due), date = fmtShort(t.due);
+    if (t.done) return el("span", { class: "sub" }, `期限 ${date}`);
+    if (n < 0) return el("span", { class: "sub warn" }, el("span", { class: "phrase" }, `${-n} 日過ぎています・`), el("span", { class: "phrase" }, date));
+    if (n <= 1) return el("span", { class: "sub" }, n ? "あしたまで" : "きょうまで");
+    return el("span", { class: "sub" }, el("span", { class: "phrase" }, `あと ${n} 日・`), el("span", { class: "phrase" }, date));
   }
   // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): the 期限
   // soonest first, which puts those past it first and today's next, then those without one, each oldest first. Done
