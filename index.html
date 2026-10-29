@@ -386,6 +386,7 @@ ul.list li.current { background: var(--fill); }
 ul.list li.current .datecell { color: var(--fg); font-weight: 600; }
 ul.list li.dayhead { min-height: 0; padding: 14px var(--space-2) 4px; justify-content: space-between; font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 ul.list li.dayhead::before, ul.list li.dayhead + li::before { display: none; }
+ul.list li.dayhead.warn { color: var(--warn); }  /* ToDo's 期限切れ, red as the 期限 under it */
 .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .text { overflow-wrap: anywhere; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1613,6 +1614,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const todoOrder = (a, b) => Number(!!a.done) - Number(!!b.done)
     || (a.done ? 0 : (a.due || "9999").localeCompare(b.due || "9999"))
     || num(a.createdAt) - num(b.createdAt);
+  const todoSection = (t) => (t.done ? "完了" : !t.due ? "期限なし" : t.due < todayKey ? "期限切れ" : t.due === todayKey ? "きょう" : "これから");
   function renderTodos() {
     const items = [...todos.items].sort(todoOrder);
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? t.done : !t.done));
@@ -1627,7 +1629,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         : [el("span", { class: "phrase" }, "まだ何もありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。")]));
       return;
     }
+    // in sections, each under its name with its count (the user's call): 期限切れ, きょう, これから, 期限なし, then 完了, which
+    // is the order todoOrder already gives. With only 完了 showing, its name would just say the bar's choice again
+    const counts = new Map();
+    for (const t of shown) counts.set(todoSection(t), (counts.get(todoSection(t)) || 0) + 1);
+    let section = null;
     for (const t of shown) {
+      if (todoFilter !== "done" && todoSection(t) !== section) {
+        section = todoSection(t);
+        list.append(el("li", { class: "dayhead" + (section === "期限切れ" ? " warn" : "") }, el("span", {}, section), el("span", {}, `${counts.get(section)} 件`)));
+      }
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => act(() => todos.update(t.id, { done: !t.done })) }, checkMark()),
         el("span", { class: "body" }, editLink("todo", t.id, t.text), dueText(t)),
