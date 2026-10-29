@@ -1559,16 +1559,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const input = $("todoText");
     const text = input.value.trim();
     if (!text) return;
+    // a new one isn't done, so with 完了 picked it would not show and seem not added: the list goes back to すべて
+    if (todoFilter === "done") setTodoFilter("all");
     act(() => todos.add({ text, done: false, due: $("todoDue").value || "", createdAt: Date.now() }));
     input.value = ""; $("todoDue").value = ""; input.focus();
   });
-  $("todoFilters").querySelectorAll("button").forEach((b) => {
-    b.addEventListener("click", () => {
-      todoFilter = b.dataset.filter;
-      $("todoFilters").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-      renderTodos();
-    });
-  });
+  // すべて・未完了・完了, in the page's own bar
+  function setTodoFilter(f) {
+    todoFilter = f;
+    $("todoFilters").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.filter === f)));
+    renderTodos();
+  }
+  $("todoFilters").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setTodoFilter(b.dataset.filter)));
   armLink($("clearDone"), "完了したものを削除", "もう一度押すと削除します", async () => {
     for (const td of todos.items.filter((x) => x.done)) {
       try { await todos.remove(td.id); } catch (e) { showError(e); break; }
