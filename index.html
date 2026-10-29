@@ -309,7 +309,7 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
 /* the month bar has two: the gear, then ＋ for a new plan right beside it (the user's call), their 44px squares touching */
 .monthbar .icon-btn:has(+ .icon-btn) { margin-inline-end: 0; }
 .monthbar .icon-btn + .icon-btn { margin-inline-start: calc(-1 * var(--space-1)); }
-/* a large title with a button at its trailing end (勉強's gear for its subjects, ToDo's and 目標's ＋) */
+/* a large title with a button at its trailing end (きょう's gear for its tiles, 勉強's for its subjects, ToDo's and 目標's ＋) */
 .title-row { align-self: stretch; display: flex; align-items: center; gap: var(--space-1); }
 @media (hover: none), (pointer: coarse) {
   .monthbar .navbtn:not(:focus-visible) { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
@@ -581,6 +581,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .tile .big small { margin-inline-start: 4px; font-family: var(--font-body); font-size: var(--t-sub); font-weight: 600; color: var(--muted); }
 .tile .sub { line-height: 1.4; }
 .tile .big.word { font-size: var(--t-title2); }
+.tiles-none { grid-column: 1 / -1; margin: 0; padding: var(--space-2); color: var(--muted); }  /* every tile hidden */
 .tile .sub .line { display: flex; column-gap: 0.3em; white-space: nowrap; }  /* 運動's and 勉強's: one to a line */
 .tile .sub .line .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }  /* cut short before the amount is */
 /* a part of a line breaks only at a space inside it, so 予算の残り and 63,800 円 stay whole */
@@ -685,6 +686,20 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
   .label-row .del { margin-inline-start: auto; }
 }
 .label-tools .link-btn { display: inline-flex; align-items: center; gap: 4px; }
+/* きょう's tiles in the settings (きょう's gear): a row a tile, in their order. A tap on the row shows or hides its tile, the
+   check filled while it shows; the grip at the end drags it up or down, the rows it passes making room for it */
+#tileList > li { padding-block: 0; padding-inline-end: 0; transition: transform .2s ease; }
+#tileList > li:has(.tile-pick:active) { background: var(--fill-press); }
+.tile-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0; background: transparent; border: 0; color: var(--fg); font: inherit; line-height: 1.3; text-align: left; cursor: pointer; }
+.tile-pick .ticon { display: grid; color: var(--tile-c); }
+.tile-pick .tname { min-width: 0; overflow-wrap: anywhere; }
+#tileList li.on .check circle { fill: var(--accent-fill); stroke: var(--accent-fill); }
+#tileList li.on .check path { fill: var(--accent-ink); }
+#tileList li:not(.on) .tname { color: var(--muted); }
+.grip { flex: none; align-self: stretch; display: grid; place-items: center; width: 52px; min-height: 44px; padding: 0; background: transparent; border: 0; color: var(--muted); cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#tileList > li.lifted { z-index: 2; transition: none; border-radius: 12px; background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, .2); }
+#tileList > li.lifted::before { display: none; }
+#tileList.dragging { cursor: grabbing; -webkit-user-select: none; user-select: none; }
 
 /* the day sheet (HIG sheets): a tap on a day in the month slides that day's plans up in a sheet, where they are added,
    changed and deleted. On iPhone it rises from the bottom with a grabber and goes away with a pull down, 完了 or a tap
@@ -825,6 +840,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.4 18.6-1-1 5.5-5.6-5.6-5.6 1.1-1 5.6 5.5 5.6-5.6 1 1.1L13 12l5.6 5.6-1 1L12 13l-5.6 5.6Z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M21 11H13V3H11V11H3V13H11V21H13V13H21V11Z"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M21 11H3V13H21V11Z"/></symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24"><path d="M4 7.2H20V8.8H4ZM4 11.2H20V12.8H4ZM4 15.2H20V16.8H4Z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M9.93 4.27 L10.34 1.53 L13.66 1.53 L14.07 4.27 L16.00 5.07 L18.23 3.42 L20.58 5.77 L18.93 8.00 L19.73 9.93 L22.47 10.34 L22.47 13.66 L19.73 14.07 L18.93 16.00 L20.58 18.23 L18.23 20.58 L16.00 18.93 L14.07 19.73 L13.66 22.47 L10.34 22.47 L9.93 19.73 L8.00 18.93 L5.77 20.58 L3.42 18.23 L5.07 16.00 L4.27 14.07 L1.53 13.66 L1.53 10.34 L4.27 9.93 L5.07 8.00 L3.42 5.77 L5.77 3.42 L8.00 5.07ZM15.40 12A3.4 3.4 0 1 0 8.60 12A3.4 3.4 0 1 0 15.40 12Z"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M12.65 3.27a1 1 0 0 0-1.3 0l-8.5 7.3a1 1 0 0 0 1.3 1.52l.85-.73v8.14c0 .83.67 1.5 1.5 1.5H10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5h3.5c.83 0 1.5-.67 1.5-1.5v-8.14l.85.73a1 1 0 0 0 1.3-1.52l-8.5-7.3Z"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M8 2.5a1 1 0 0 1 1 1V4h6v-.5a1 1 0 1 1 2 0V4h1.5A2.5 2.5 0 0 1 21 6.5v12a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5v-12A2.5 2.5 0 0 1 5.5 4H7v-.5a1 1 0 0 1 1-1ZM5 9v9.5c0 .28.22.5.5.5h13a.5.5 0 0 0 .5-.5V9H5Zm2 2.5h2.5V14H7v-2.5Zm3.75 0h2.5V14h-2.5v-2.5Zm3.75 0H17V14h-2.5v-2.5ZM7 15.5h2.5v2H7v-2Zm3.75 0h2.5v2h-2.5v-2Z"/></symbol>
@@ -880,8 +896,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <!-- ホーム -->
       <section id="sec-home" style="--sec-c: var(--accent)">
         <!-- the large title is today's date itself (the user's call), not the word きょう with a small date above it; the tab
-             still says きょう. The year is left out so the date stays on one line on a phone -->
-        <div class="sec-head"><h2 id="homeDate"></h2></div>
+             still says きょう. The year is left out so the date stays on one line on a phone. The gear at its end opens the
+             settings for the tiles: which show, and in what order -->
+        <div class="sec-head">
+          <div class="title-row"><h2 id="homeDate"></h2><button type="button" class="icon-btn" id="homeSettings" aria-label="タイルの設定" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-gear"/></svg></button></div>
+        </div>
         <!-- a quiet reminder when it has been a while since the last backup -->
         <div class="card backup-nudge" id="backupNudge" hidden>
           <strong>記録のバックアップ</strong>
@@ -1202,7 +1221,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     </div>
     <!-- the calendar's settings, opened from the gear on the month bar (or from a day when there are no labels yet) -->
     <div class="sheet-view" id="settingsView" hidden>
-      <!-- one group shows at a time: the calendar's labels, or 勉強's subjects -->
+      <!-- one group shows at a time: the calendar's labels, 勉強's subjects, or きょう's tiles -->
       <div class="sheet-view" id="labelsGroup">
         <h3 class="group-head">ラベル</h3>
         <div class="card">
@@ -1218,6 +1237,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <div class="label-tools"><button type="button" class="link-btn" id="subjectAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>科目を追加</button></div>
         </div>
         <p class="group-foot">勉強の記録に付けて色分けできます。科目を消すと、付いていた記録は「科目なし」になります。</p>
+      </div>
+      <div class="sheet-view" id="tilesGroup" hidden>
+        <h3 class="group-head">きょうのタイル</h3>
+        <ul class="list card" id="tileList"></ul>
+        <p class="group-foot"><span class="phrase">チェックを付けたタイルが、きょうに出ます。</span><span class="phrase">≡&nbsp;を上下にドラッグすると、順番を変えられます。</span></p>
       </div>
     </div>
     <!-- a new plan, from the ＋ beside the calendar's gear: キャンセル and 追加 on the bar, as for a new goal. Its day starts
@@ -2650,8 +2674,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
   let editingId = null, edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
   let settingsFrom = null; // the settings showing: "gear" when opened from the month bar, "day" when from a day's sheet
-  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or ＋, 勉強's gear, ToDo's or 目標's ＋
-  let settingsScope = "calendar"; // whose settings: the calendar's labels or 勉強's subjects
+  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or ＋, 勉強's or きょう's gear, ToDo's or 目標's ＋
+  let settingsScope = "calendar"; // whose settings: the calendar's labels, 勉強's subjects or きょう's tiles ("home")
+  let tileDrag = null; // きょう's tile whose row is being dragged by its grip in the settings
   let goalNew = false; // the sheet holds a new goal's form, opened from 目標's ＋
   let planNew = false; // the sheet holds a new plan's form, opened from the ＋ beside the calendar's gear
   let todoNew = false; // the sheet holds a new ToDo's form, opened from the ＋ beside ToDo's title
@@ -2670,7 +2695,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function syncSheetHead() {
     const mode = sheetMode(), adding = mode === "goal" || mode === "plan" || mode === "todo", changing = mode === "edit" || mode === "rec";
     for (const [m, id] of Object.entries(SHEET_VIEWS)) $(id).hidden = m !== mode;
-    $("labelsGroup").hidden = settingsScope !== "calendar"; $("subjectsGroup").hidden = settingsScope !== "study";
+    $("labelsGroup").hidden = settingsScope !== "calendar"; $("subjectsGroup").hidden = settingsScope !== "study"; $("tilesGroup").hidden = settingsScope !== "home";
     $("sheetDone").hidden = changing || adding; $("sheetSave").hidden = mode !== "edit"; $("recSave").hidden = mode !== "rec";
     $("goalSave").hidden = mode !== "goal"; $("planSave").hidden = mode !== "plan"; $("todoSave").hidden = mode !== "todo";
     $("sheetCancel").hidden = !(changing || adding || (mode === "chart" && (mPath.length || chartFromDay)) || (mode === "settings" && settingsFrom === "day"));
@@ -2684,6 +2709,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const a of sheetAnims) a.cancel();
     clearTimeout(closeTimer);
     sheetAnims = []; sheetClosing = false; drag = null;
+    if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
     editingId = null; settingsFrom = null; goalNew = false; planNew = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; chartFromDay = false; mOverview = false;
@@ -2695,7 +2721,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     setCalDay(d); // draws the grid and the sheet's list for that day
     presentSheet(byKey, "day");
   }
-  // the calendar's settings (the labels for now) open in the same sheet: from the gear, or from a day's sheet
+  // the settings open in the same sheet: the calendar's labels from its gear or from a day's sheet, 勉強's subjects and
+  // きょう's tiles from their own gears
   function openSettings(byKey, scope = "calendar") {
     settingsScope = scope;
     if (sheetEl.open) {
@@ -2706,7 +2733,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     resetSheet();
     settingsFrom = "gear"; syncSheetHead();
-    presentSheet(byKey, scope === "study" ? "study" : "gear");
+    presentSheet(byKey, scope === "calendar" ? "gear" : scope);
   }
   // a new goal: the form takes the sheet, its name field ready to type in (what was typed stays if the sheet is pulled away)
   function openNewGoal(byKey) {
@@ -2778,7 +2805,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (sheetEl.open) return; // opened again before this arrived
     resetSheet();
     // keyboard users land back on what they opened it from: the day (the grid has been redrawn since) or the gear
-    if (sheetByKey) ({ gear: $("calSettings"), plan: $("calAdd"), todo: $("todoAdd"), rec: document.querySelector(`[data-edit="${recReturnId}"]`), study: $("studySettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
+    if (sheetByKey) ({ gear: $("calSettings"), plan: $("calAdd"), todo: $("todoAdd"), rec: document.querySelector(`[data-edit="${recReturnId}"]`), study: $("studySettings"), home: $("homeSettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
   // Esc: from an edit form (or settings or a chart reached from a day) back to the day's list, from a chart's cell back
   // out of it, otherwise out of the sheet
@@ -3402,17 +3429,41 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (key === "calendar") setCalDay(todayKey);
     showTab(key);
   }
+  // きょう's tiles, in the order they first come in: each opens its page, in the page's colour. ルーティーン, with its
+  // checklist, and 目標, with its longer line, take a row each; the others go two to a row on a phone
+  const HOME_TILES = [
+    { key: "todo", label: "ToDo", color: "var(--c-todo)" },
+    { key: "calendar", label: "きょうの予定", color: "var(--c-cal)" },
+    { key: "journal", label: "日記", color: "var(--c-journal)" },
+    { key: "meal", label: "食事", color: "var(--c-meal)" },
+    { key: "workout", label: "運動", color: "var(--c-workout)" },
+    { key: "study", label: "勉強", color: "var(--c-study)" },
+    { key: "routine", label: "ルーティーン", color: "var(--c-routine)", wide: true },
+    { key: "weight", label: "体重", color: "var(--c-weight)" },
+    { key: "money", label: "家計簿", color: "var(--c-money)" },
+    { key: "goal", label: "目標", color: "var(--c-goal)", wide: true },
+  ];
+  const homeTile = (key) => HOME_TILES.find((t) => t.key === key);
+  // which of them show, and in what order, is the user's to choose (the user's call), from the gear by the date. The
+  // settings keep the keys of both, the order and the ones hidden, so a tile the app gains later shows, at the end
+  const homePrefs = () => settings.get("home") || {};
+  function homeTileOrder() {
+    const saved = (homePrefs().order || []).filter((k) => homeTile(k));
+    return [...saved, ...HOME_TILES.map((t) => t.key).filter((k) => !saved.includes(k))];
+  }
+  const homeHidden = () => new Set(homePrefs().hidden || []);
+  const saveHomePrefs = (patch) => act(() => settings.set("home", { ...homePrefs(), ...patch, updatedAt: Date.now() }));
   // a Health-style summary card: the coloured head with its chevron opens the page, and its hit area covers the card
   // half a row on a phone is narrow, so a word in the big place (まだ, 未記録) is a step smaller than a number, and a line of
   // parts (合計 1150 kcal・朝食・昼食) breaks between its parts rather than inside one. A tile without a big one (日記) has none
-  function tile(color, label, big, unit, sub, extra, tabKey, wide) {
-    const page = PAGES.find((p) => p.key === tabKey);
+  function tile(key, big, unit, sub, extra) {
+    const { label, color } = homeTile(key), page = PAGES.find((p) => p.key === key);
     // a number keeps its unit on its line (63,800 円, −0.2 kg)
     const keep = (s) => s.replace(/ (?=円|kcal|kg|分|件|回)/g, " ");
     const parts = typeof sub === "string" && sub.includes("・")
       ? sub.split("・").map((s, i, all) => el("span", { class: "part" }, keep(s) + (i < all.length - 1 ? "・" : ""))) : sub;
-    return el("div", { class: "card tile" + (wide ? " wide" : ""), "data-tile": tabKey, style: `--tile-c:${color}` },
-      el("button", { type: "button", class: "tile-head", "aria-label": label + "を開く", onclick: () => openFromHome(tabKey) },
+    return el("div", { class: "card tile", "data-tile": key, style: `--tile-c:${color}` },
+      el("button", { type: "button", class: "tile-head", "aria-label": label + "を開く", onclick: () => openFromHome(key) },
         icon(page.icon, 18), el("span", { class: "lbl" }, label), el("span", { class: "chev" }, icon("next", 16))),
       big != null ? el("div", { class: "big" + (/^[\d.,]+$/.test(big) ? "" : " word") }, big, unit ? el("small", {}, unit) : null) : null,
       sub ? el("div", { class: "sub" }, parts) : null,
@@ -3497,45 +3548,143 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const nextEv = events.items.filter((e) => e.date > todayKey).sort((a, b) => a.date.localeCompare(b.date) || byTime(a, b))[0];
 
     const tiles = [
-      tile("var(--c-todo)", "ToDo", String(undone.length), "件 残り",
+      tile("todo", String(undone.length), "件 残り",
         // the lines kept short enough for half a row
         undone.length ? `きょう期限 ${dueToday}・期限切れ ${overdue}` : (todos.items.length ? "すべて完了" : "まだありません"),
-        todoTileList(top), "todo"),
-      tile("var(--c-cal)", "きょうの予定", String(evToday.length), "件",
+        todoTileList(top)),
+      tile("calendar", String(evToday.length), "件",
         evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evText(nextEv)}` : "予定はありません",
-        evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null, "calendar"),
-      tile("var(--c-journal)", "日記", null, null, null, journalTile(j), "journal"),
-      tile("var(--c-meal)", "食事", String(ms.length), "回",
-        ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだありません", null, "meal"),
-      tile("var(--c-workout)", "運動", ws.length && !mins ? String(ws.length) : String(mins), ws.length && !mins ? "件" : "分", workoutLine(ws), null, "workout"),
+        evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null),
+      tile("journal", null, null, null, journalTile(j)),
+      tile("meal", String(ms.length), "回",
+        ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだありません"),
+      tile("workout", ws.length && !mins ? String(ws.length) : String(mins), ws.length && !mins ? "件" : "分", workoutLine(ws)),
       // 勉強 like 運動: today's time, and what it went on (the user's call: no line about the last 7 days)
-      tile("var(--c-study)", "勉強", String(stMins), "分", studyLine(sts), null, "study"),
-      tile("var(--c-routine)", "ルーティーン", rts.length ? String(rts.length - rtLeft.length) : "まだ", rts.length ? `/ ${rts.length} できた` : null,
-        rts.length ? null : "毎日やることを登録して、チェックしていきましょう。", routineTileList(rts, rtDone), "routine", true),
-      tile("var(--c-weight)", "体重", wLast ? fmtKg(wLast.kg) : "未記録", wLast ? "kg" : null,
+      tile("study", String(stMins), "分", studyLine(sts)),
+      tile("routine", rts.length ? String(rts.length - rtLeft.length) : "まだ", rts.length ? `/ ${rts.length} できた` : null,
+        rts.length ? null : "毎日やることを登録して、チェックしていきましょう。", routineTileList(rts, rtDone)),
+      tile("weight", wLast ? fmtKg(wLast.kg) : "未記録", wLast ? "kg" : null,
         wLast
           ? (wLast.id === todayKey ? "きょう記録済み" : `${relLabel(wLast.id) || fmtMD(wLast.id)}の記録`) + (wPrev ? `・前回比 ${signed(num(wLast.kg) - num(wPrev.kg))} kg` : "")
-          : "最初の1回を記録しましょう", null, "weight"),
+          : "最初の1回を記録しましょう"),
       // 今月の支出 leads the line under the sum, the unit beside it being just 円, so the sum keeps its line in half a row
-      tile("var(--c-money)", "家計簿", Math.round(mon.out).toLocaleString("ja-JP"), "円",
-        "今月の支出・" + (budget > 0 ? (budget - mon.out >= 0 ? `予算の残り ${fmtYen(budget - mon.out)}` : `予算を ${fmtYen(mon.out - budget)} 超過`) : `収入 ${fmtYen(mon.inn)}`) + `・きょう ${fmtYen(todayOut)}`,
-        null, "money"),
+      tile("money", Math.round(mon.out).toLocaleString("ja-JP"), "円",
+        "今月の支出・" + (budget > 0 ? (budget - mon.out >= 0 ? `予算の残り ${fmtYen(budget - mon.out)}` : `予算を ${fmtYen(mon.out - budget)} 超過`) : `収入 ${fmtYen(mon.inn)}`) + `・きょう ${fmtYen(todayOut)}`),
       // 目標: no counts, as on its page (the user's call); the goal due soonest and the days left to it
-      tile("var(--c-goal)", "目標",
+      tile("goal",
         !nearest ? (goals.items.length ? "すべて達成" : "まだ") : left === null ? "期限なし" : left < 0 ? "期限切れ" : left === 0 ? "きょう" : String(left),
         left > 0 ? "日" : null,
         !nearest ? (goals.items.length ? "新しい目標を立ててみましょう。" : "目標を立ててみましょう。")
-          : `「${nearest.title}」` + (left > 0 ? "の期限まで" : left === 0 ? "の期限です" : ""),
-        null, "goal", true),
+          : `「${nearest.title}」` + (left > 0 ? "の期限まで" : left === 0 ? "の期限です" : "")),
     ];
+    // the ones shown, in the user's order. Two to a row: one left without a partner (beside one hidden, or moved next to a
+    // wide one) takes the row, rather than leave half of it empty
+    const hidden = homeHidden(), shown = homeTileOrder().filter((k) => !hidden.has(k)).map((k) => tiles.find((t) => t.dataset.tile === k));
+    let alone = null;
+    for (const t of shown) {
+      if (homeTile(t.dataset.tile).wide) { alone?.classList.add("wide"); alone = null; t.classList.add("wide"); }
+      else alone = alone ? null : t;
+    }
+    alone?.classList.add("wide");
     // the 日記 tile being written in stays as it is, its words, caret and keyboard with it; the others are drawn anew
     const grid = $("homeTiles"), writing = grid.querySelector(':scope > [data-tile="journal"]');
     if (writing?.contains(document.activeElement)) {
-      for (const t of tiles) if (t.dataset.tile !== "journal") grid.querySelector(`:scope > [data-tile="${t.dataset.tile}"]`)?.replaceWith(t);
-    } else grid.replaceChildren(...tiles);
+      for (const t of shown) if (t.dataset.tile !== "journal") grid.querySelector(`:scope > [data-tile="${t.dataset.tile}"]`)?.replaceWith(t);
+    } else grid.replaceChildren(...(shown.length ? shown : [el("p", { class: "card tiles-none" }, "タイルをすべて隠しています。日付の右の歯車から、出すタイルを選べます。")]));
     if (focusRow.rt) $("homeTiles").querySelector(`[data-rt="${focusRow.rt}"]`)?.focus();
     if (focusRow.td) $("homeTiles").querySelector(`[data-td="${focusRow.td}"]`)?.focus();
   }
+  // きょう's tiles in the settings: a row a tile, in its order. A tap on the row shows or hides it; its grip drags it up or
+  // down, or moves it a step with the arrow keys (focus stays on it). Not drawn anew while a row is being dragged
+  function renderTileList() {
+    const list = $("tileList");
+    if (tileDrag) return;
+    const a = list.contains(document.activeElement) ? document.activeElement : null, focusKey = a?.closest("li")?.dataset.key, onGrip = a?.classList.contains("grip");
+    const hidden = homeHidden(), keys = homeTileOrder();
+    setChildren(list, keys.map((k, i) => {
+      const { label, color } = homeTile(k), on = !hidden.has(k);
+      return el("li", { class: on ? "on" : null, "data-key": k, style: `--tile-c:${color}` },
+        el("button", { type: "button", class: "tile-pick", role: "checkbox", "aria-checked": String(on), onclick: () => {
+          const h = homeHidden();
+          if (on) h.add(k); else h.delete(k);
+          saveHomePrefs({ hidden: [...h] });
+        } },
+          el("span", { class: "check", "aria-hidden": "true" }, checkMark()),
+          el("span", { class: "ticon" }, icon(PAGES.find((p) => p.key === k).icon, 20)),
+          el("span", { class: "tname" }, label)),
+        el("button", { type: "button", class: "grip", "aria-label": `「${label}」を動かす（${i + 1} 番目）`, onpointerdown: (ev) => startTileDrag(ev, k),
+          onkeydown: (ev) => {
+            const to = i + (ev.key === "ArrowUp" ? -1 : ev.key === "ArrowDown" ? 1 : 0);
+            if (to === i) return;
+            ev.preventDefault();
+            if (to >= 0 && to < keys.length) moveHomeTile(k, to);
+          } }, icon("grip", 22)));
+    }));
+    if (focusKey) list.querySelector(`li[data-key="${focusKey}"] ${onGrip ? ".grip" : ".tile-pick"}`)?.focus();
+  }
+  function moveHomeTile(k, to) {
+    const keys = homeTileOrder().filter((x) => x !== k);
+    keys.splice(to, 0, k);
+    saveHomePrefs({ order: keys });
+  }
+  // the row follows the finger (or the mouse) up and down the list, the rows it passes moving out of its way, and it goes
+  // where it is let go. Held near the top or bottom of the sheet, the sheet scrolls (the list can be longer than the
+  // screen with large text)
+  function startTileDrag(ev, k) {
+    if (ev.button !== 0 || tileDrag || sheetClosing) return;
+    ev.preventDefault(); // no text selected on a long press
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    const list = $("tileList"), li = ev.currentTarget.closest("li"), rows = [...list.children], base = list.getBoundingClientRect().top;
+    const box = (r) => r.getBoundingClientRect(), from = rows.indexOf(li);
+    tileDrag = { key: k, li, rows, from, to: from, id: ev.pointerId, y: ev.clientY, py: ev.clientY, scroll: sheetEl.scrollTop,
+      mids: rows.map((r) => box(r).top - base + box(r).height / 2), top: box(li).top - base, h: box(li).height, room: box(list).height };
+    li.classList.add("lifted"); list.classList.add("dragging");
+    tileDrag.raf = requestAnimationFrame(scrollTileDrag);
+  }
+  function placeTileDrag() {
+    const d = tileDrag, y = Math.min(d.room - d.top - d.h, Math.max(-d.top, d.py - d.y + sheetEl.scrollTop - d.scroll));
+    d.li.style.transform = `translateY(${y}px)`;
+    // it takes a row's place once it covers half of it
+    const top = d.top + y;
+    let to = d.from;
+    while (to > 0 && top < d.mids[to - 1]) to--;
+    while (to < d.rows.length - 1 && top + d.h > d.mids[to + 1]) to++;
+    if (to === d.to) return;
+    d.to = to;
+    d.rows.forEach((r, i) => { if (r !== d.li) r.style.transform = i > d.from && i <= to ? `translateY(${-d.h}px)` : i < d.from && i >= to ? `translateY(${d.h}px)` : ""; });
+  }
+  function scrollTileDrag() {
+    const d = tileDrag;
+    if (!d) return;
+    const r = sheetEl.getBoundingClientRect(), top = r.top + sheetHead.offsetHeight, edge = 48;
+    const by = d.py < top + edge ? d.py - (top + edge) : d.py > r.bottom - edge ? d.py - (r.bottom - edge) : 0;
+    const was = sheetEl.scrollTop;
+    if (by) sheetEl.scrollTop += by / 4;
+    if (sheetEl.scrollTop !== was) placeTileDrag();
+    d.raf = requestAnimationFrame(scrollTileDrag);
+  }
+  function endTileDrag(ev) {
+    const d = tileDrag;
+    if (!d || (ev.pointerId !== undefined && ev.pointerId !== d.id)) return; // another finger's, not the one dragging
+    cancelAnimationFrame(d.raf);
+    tileDrag = null;
+    $("tileList").classList.remove("dragging");
+    if (ev.type === "pointerup" && d.to !== d.from) {
+      // the list is drawn anew in the new order, and the row glides from where it was let go into its place
+      const was = d.li.getBoundingClientRect().top;
+      moveHomeTile(d.key, d.to);
+      const li = $("tileList").querySelector(`li[data-key="${d.key}"]`);
+      if (li && !reduceMotion.matches) li.animate([{ transform: `translateY(${was - li.getBoundingClientRect().top}px)` }, { transform: "none" }], { duration: 150, easing: "ease-out" });
+      return;
+    }
+    // let go where it was picked up (or the drag was cut off): the rows slide back
+    d.li.classList.remove("lifted");
+    for (const r of d.rows) r.style.transform = "";
+  }
+  $("tileList").addEventListener("pointermove", (ev) => { if (tileDrag?.id === ev.pointerId) { tileDrag.py = ev.clientY; placeTileDrag(); } });
+  $("tileList").addEventListener("pointerup", endTileDrag);
+  $("tileList").addEventListener("pointercancel", endTileDrag);
+  $("homeSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0, "home"));
 
   // ---------- 記録: これまでの積み重ね (the user's call: everything so far in one view; no weeks, months or years, no charts) ----------
   // a day counts as recorded when it has any record: a journal entry, a meal, a workout, study, a weight or money in or out
@@ -3852,7 +4001,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderStudy(); renderRoutine(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderBackup(); renderSummary(); paintChart(); if (tab === "reclist") renderRecList();
+    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderStudy(); renderRoutine(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderTileList(); renderBackup(); renderSummary(); paintChart(); if (tab === "reclist") renderRecList();
   }
   const initial = (location.hash || "").slice(1);
   // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
