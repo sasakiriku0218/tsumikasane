@@ -1615,13 +1615,34 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     || (a.done ? 0 : (a.due || "9999").localeCompare(b.due || "9999"))
     || num(a.createdAt) - num(b.createdAt);
   const todoSection = (t) => (t.done ? "完了" : !t.due ? "期限なし" : t.due < todayKey ? "期限切れ" : t.due === todayKey ? "きょう" : "これから");
+  // a ToDo checked off stays where it was for a moment, done, then fades and goes down to 完了 (the user's call: a
+  // mistaken tap shows, and is undone right there). It is saved as done at once, so きょう's tile and the calendar have it;
+  // only this list holds it in its old place. Unchecked, it goes straight back among the rest
+  const TODO_SETTLE = 1500;
+  const todoSettling = new Map(); // id → the timer that sends it down
+  const todoPlaced = (t) => (todoSettling.has(t.id) ? { ...t, done: false } : t); // where the list puts it
+  function toggleTodo(t) {
+    const done = !t.done;
+    clearTimeout(todoSettling.get(t.id));
+    todoSettling.delete(t.id);
+    if (done) todoSettling.set(t.id, setTimeout(() => settleTodo(t.id), TODO_SETTLE));
+    act(() => todos.update(t.id, { done }));
+  }
+  function settleTodo(id) {
+    const row = $("todoList").querySelector(`[data-check="${id}"]`)?.closest("li");
+    const move = () => { todoSettling.delete(id); renderTodos(); };
+    if (!row || reduceMotion.matches) { move(); return; }
+    row.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" });
+    setTimeout(move, 200); // a timer, not the animation's promise, which waits while the page isn't drawn
+  }
   function renderTodos() {
-    const items = [...todos.items].sort(todoOrder);
-    const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? t.done : !t.done));
+    const items = [...todos.items].sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
+    const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? todoPlaced(t).done : !todoPlaced(t).done));
     const remaining = items.filter((t) => !t.done).length;
     $("todoCount").textContent = `残り ${remaining} 件 ／ 全 ${items.length} 件`;
     $("todoFoot").hidden = !items.some((t) => t.done); // only while there is something done to clear
     const list = $("todoList");
+    const focusId = list.contains(document.activeElement) ? document.activeElement.dataset.check : null; // a check pressed from the keyboard
     list.replaceChildren();
     if (!shown.length) {
       list.append(el("li", { class: "empty" }, items.length
@@ -1632,19 +1653,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // in sections, each under its name with its count (the user's call): 期限切れ, きょう, これから, 期限なし, then 完了, which
     // is the order todoOrder already gives. With only 完了 showing, its name would just say the bar's choice again
     const counts = new Map();
-    for (const t of shown) counts.set(todoSection(t), (counts.get(todoSection(t)) || 0) + 1);
+    for (const t of shown) counts.set(todoSection(todoPlaced(t)), (counts.get(todoSection(todoPlaced(t))) || 0) + 1);
     let section = null;
     for (const t of shown) {
-      if (todoFilter !== "done" && todoSection(t) !== section) {
-        section = todoSection(t);
+      if (todoFilter !== "done" && todoSection(todoPlaced(t)) !== section) {
+        section = todoSection(todoPlaced(t));
         list.append(el("li", { class: "dayhead" + (section === "期限切れ" ? " warn" : "") }, el("span", {}, section), el("span", {}, `${counts.get(section)} 件`)));
       }
       list.append(el("li", { class: t.done ? "done" : "" },
-        el("button", { type: "button", class: "check", "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => act(() => todos.update(t.id, { done: !t.done })) }, checkMark()),
+        el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => toggleTodo(t) }, checkMark()),
         el("span", { class: "body" }, editLink("todo", t.id, t.text), dueText(t)),
         delButton(() => act(() => todos.remove(t.id)))
       ));
     }
+    // the check keeps keyboard focus as the list is drawn again, and follows its ToDo down to 完了
+    if (focusId) list.querySelector(`[data-check="${focusId}"]`)?.focus();
   }
 
   // ---------- 日記 ----------
