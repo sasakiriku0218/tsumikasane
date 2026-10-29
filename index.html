@@ -782,6 +782,12 @@ ul.list > li.btn-row { padding: 0; }
 /* the entries, a row per day under its month: the date level with the first line, then each entry as written, its kind
    in grey at the start and its number kept to the right */
 .rec-groups { display: flex; flex-direction: column; gap: var(--space-2); }
+/* the words to look for: a filled field with the magnifier at its start and × at its end, as iOS search bars have */
+.rec-search { position: relative; display: flex; align-items: center; }
+.rec-search > .icon { position: absolute; inset-inline-start: 10px; color: var(--muted); pointer-events: none; }
+.rec-search input { flex: 1; min-width: 0; min-height: 40px; padding: 0 40px 0 34px; border: 0; border-radius: 12px; background: var(--fill); color: var(--fg); font: inherit; font-size: max(16px, 1rem); -webkit-appearance: none; appearance: none; }
+.rec-search input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }  /* the × below instead */
+.rec-search-clear { position: absolute; inset-inline-end: 0; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 /* a day's date heads its entries, and each entry is a row of its own at the row's full width (the user's call: beside the
    date they had a third of it less, and words broke a character at a time); a tap anywhere on the row opens it in the
    sheet, as on the record pages. 体重, one number a day, has its date at the start of its row instead */
@@ -857,6 +863,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.4 18.6-1-1 5.5-5.6-5.6-5.6 1.1-1 5.6 5.5 5.6-5.6 1 1.1L13 12l5.6 5.6-1 1L12 13l-5.6 5.6Z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M21 11H13V3H11V11H3V13H11V21H13V13H21V11Z"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M21 11H3V13H21V11Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M10.5 3a7.5 7.5 0 1 0 4.55 13.46l4.75 4.75 1.41-1.41-4.75-4.75A7.5 7.5 0 0 0 10.5 3Zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z"/></symbol>
   <symbol id="i-grip" viewBox="0 0 24 24"><path d="M4 7.2H20V8.8H4ZM4 11.2H20V12.8H4ZM4 15.2H20V16.8H4Z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M9.93 4.27 L10.34 1.53 L13.66 1.53 L14.07 4.27 L16.00 5.07 L18.23 3.42 L20.58 5.77 L18.93 8.00 L19.73 9.93 L22.47 10.34 L22.47 13.66 L19.73 14.07 L18.93 16.00 L20.58 18.23 L18.23 20.58 L16.00 18.93 L14.07 19.73 L13.66 22.47 L10.34 22.47 L9.93 19.73 L8.00 18.93 L5.77 20.58 L3.42 18.23 L5.07 16.00 L4.27 14.07 L1.53 13.66 L1.53 10.34 L4.27 9.93 L5.07 8.00 L3.42 5.77 L5.77 3.42 L8.00 5.07ZM15.40 12A3.4 3.4 0 1 0 8.60 12A3.4 3.4 0 1 0 15.40 12Z"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M12.65 3.27a1 1 0 0 0-1.3 0l-8.5 7.3a1 1 0 0 0 1.3 1.52l.85-.73v8.14c0 .83.67 1.5 1.5 1.5H10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5h3.5c.83 0 1.5-.67 1.5-1.5v-8.14l.85.73a1 1 0 0 0 1.3-1.52l-8.5-7.3Z"/></symbol>
@@ -996,6 +1003,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
            記録, sliding in from the right -->
       <section id="sec-reclist" hidden>
         <div class="sec-head"><h2 id="recListTitle"></h2><p class="sum-since" id="recListNote"></p></div>
+        <!-- the entries narrowed to the words typed (the user's call): 日記's words, 食事's food, 家計簿's 費目 and memo, and so
+             on; 体重, numbers only, has no field -->
+        <div class="rec-search" id="recSearchBox" hidden>
+          <svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>
+          <input type="search" id="recSearch" autocomplete="off" enterkeyhint="search">
+          <button type="button" class="rec-search-clear" id="recSearchClear" aria-label="探す言葉を消す" hidden><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+        </div>
         <div class="rec-groups" id="recList"></div>
       </section>
 
@@ -1561,6 +1575,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const wideScreen = matchMedia("(min-width: 768px)");
   let lastRecord = null; // the record page the きょう tab returns to (HIG: a tab keeps its place while you visit others)
   let recListKind = null; // the record whose entries show under 記録; the 記録 tab returns to them the same way
+  let recQuery = ""; // the words those entries are narrowed to, each of them in an entry (none: all of them)
   function menuButton(p) {
     return el("button", { type: "button", "data-tab": p.key, style: `--item-f:${p.fill}`, onclick: () => openTab(p.key) },
       el("span", { class: "mi" }, icon(p.icon, 24)), el("span", { class: "lbl" }, p.label));
@@ -3871,16 +3886,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const byCreated = (xs) => [...xs].sort((a, b) => num(a.createdAt) - num(b.createdAt));
   const RECORD_LISTS = {
     journal: { label: "日記", items: () => journal.items.filter((j) => j.text?.trim()).map((j) => ({ ...j, date: j.date || j.id })),
+      find: "日記の言葉で探す", text: (j) => j.text,
       rows: (xs, day) => xs.map((j) => recEntry("journal", j.id, `${day}の日記を編集`, { words: j.text.trim(), text: true })) },
     // the day's total beside its date (the user's call): 食事's kcal, 運動's and 勉強's time, 家計簿's money out and in
-    meal: { label: "食事", items: () => meals.items,
+    meal: { label: "食事", items: () => meals.items, find: "食べたものや区分で探す", text: (m) => [m.text, m.slot].join(" "),
       total: (xs) => { const ks = xs.filter((m) => typeof m.kcal === "number"); return ks.length ? `合計 ${sum(ks, (m) => m.kcal).toLocaleString("ja-JP")} kcal` : null; },
       rows: (xs) => [...xs].sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || num(a.createdAt) - num(b.createdAt))
         .map((m) => recEntry("meal", m.id, `「${m.text}」を編集`, { tag: m.slot || "食事", words: m.text, n: typeof m.kcal === "number" ? `${m.kcal} kcal` : null })) },
-    workout: { label: "運動", items: () => workouts.items,
+    workout: { label: "運動", items: () => workouts.items, find: "種目やメモで探す", text: (w) => [w.type, w.exercise, w.note].join(" "),
       total: (xs) => { const min = sum(xs, (w) => w.minutes); return min > 0 ? `合計 ${durText(min)}` : null; }, // 筋トレ has no time
       rows: (xs) => byCreated(xs).map((w) => recEntry("workout", w.id, `「${w.type} ${workoutDetail(w)}」を編集`, { tag: w.type, words: [workoutDetail(w), w.note].filter(Boolean).join("・") })) },
-    study: { label: "勉強", items: () => study.items,
+    study: { label: "勉強", items: () => study.items, find: "科目やメモで探す", text: (x) => [subjectOf(x)?.name || "科目なし", x.note].join(" "),
       total: (xs) => `合計 ${durText(sum(xs, (x) => x.minutes))}`,
       rows: (xs) => byCreated(xs).map((x) => {
         const sub = subjectOf(x), name = sub ? sub.name : "科目なし";
@@ -3888,6 +3904,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       }) },
     // the items done, each kept whole, so a line breaks between them (朝の散歩・ストレッチ・／日記を書く)
     routine: { label: "ルーティーン", items: () => routineDays.items.filter((x) => x.done?.length),
+      find: "項目の名前で探す", text: (x) => x.done.map((id) => routines.get(id)?.name || "").join(" "),
       rows: (xs, day) => xs.map((x) => {
         const names = x.done.map((id) => routines.get(id)?.name).filter(Boolean);
         return recEntry("routine", x.id, `${day}のルーティーンを編集`,
@@ -3895,7 +3912,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       }) },
     weight: { label: "体重", oneLine: true, items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
       rows: (xs, day) => xs.map((w) => el("li", { class: "one" }, el("span", { class: "rec-date" }, day), recOpen("weight", w.id, `${day}の体重を編集`, `${fmtKg(w.kg)} kg`))) },
-    money: { label: "家計簿", items: () => expenses.items,
+    money: { label: "家計簿", items: () => expenses.items, find: "費目やメモで探す", text: (e) => [expenseCat(e) || (e.kind === "in" ? "収入" : "支出"), e.memo].join(" "),
       total: (xs) => {
         const out = sum(xs.filter((e) => e.kind !== "in"), (e) => e.amount), inn = sum(xs.filter((e) => e.kind === "in"), (e) => e.amount);
         return [out ? `支出 ${fmtYen(out)}` : null, inn ? `収入 ${fmtYen(inn)}` : null].filter(Boolean).join("・");
@@ -3908,17 +3925,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // drawn before the page slides in, so it arrives whole
   function openRecList(kind) {
     if (!RECORD_LISTS[kind]) return;
-    recListKind = kind;
+    recListKind = kind; recQuery = ""; // a list opened from its card starts whole; back from a page, its words stay
     renderRecList();
     showTab("reclist");
   }
-  // up to today, as the cards count
+  // words looked for: full- and half-width, upper and lower case, and hiragana and katakana count as the same (かれー, カレー)
+  const foldText = (t) => String(t || "").normalize("NFKC").toLowerCase().replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  // up to today, as the cards count; with words to look for, only the entries holding all of them, and no day's totals
+  // (a day shows only some of its entries then)
   function renderRecList() {
     const spec = RECORD_LISTS[recListKind];
     if (!spec) return;
-    const byDay = groupBy(spec.items().filter((x) => x.date && x.date <= todayKey), (x) => x.date), days = [...byDay.keys()].sort().reverse();
+    const words = spec.text ? foldText(recQuery).split(/\s+/).filter(Boolean) : [];
+    const all = spec.items().filter((x) => x.date && x.date <= todayKey);
+    const found = words.length ? all.filter((x) => { const t = foldText(spec.text(x)); return words.every((w) => t.includes(w)); }) : all;
+    const byDay = groupBy(found, (x) => x.date), days = [...byDay.keys()].sort().reverse(), q = recQuery.trim();
     $("recListTitle").textContent = spec.label;
-    $("recListNote").textContent = days.length ? `${days.length} 日分・新しい順` : "";
+    $("recListNote").textContent = !days.length ? "" : words.length ? `「${q}」の記録 ${found.length} 件・${days.length} 日分` : `${days.length} 日分・新しい順`;
+    $("recSearchBox").hidden = !spec.text;
+    $("recSearch").placeholder = spec.find || "";
+    $("recSearch").setAttribute("aria-label", spec.find || "探す");
+    if ($("recSearch").value !== recQuery) $("recSearch").value = recQuery;
+    $("recSearchClear").hidden = !recQuery;
     const parts = [];
     let month = null, ul = null;
     for (const d of days) {
@@ -3926,11 +3954,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         month = d.slice(0, 7);
         parts.push(el("h3", { class: "group-head" }, fmtMonth(month)), ul = el("ul", { class: "list card rec-list" }));
       }
-      const rel = relLabel(d), day = (rel ? rel + "・" : "") + fmtMDW(d), xs = byDay.get(d), total = spec.total?.(xs);
+      const rel = relLabel(d), day = (rel ? rel + "・" : "") + fmtMDW(d), xs = byDay.get(d), total = words.length ? null : spec.total?.(xs);
       ul.append(...(spec.oneLine ? [] : [el("li", { class: "dayhead" }, el("span", {}, day), total ? el("span", { class: "rec-total" }, subParts(total)) : null)]), ...spec.rows(xs, day));
     }
-    setChildren($("recList"), parts.length ? parts : el("div", { class: "card empty" }, "まだ記録がありません。「きょう」から記録すると、ここに並びます。"));
+    setChildren($("recList"), parts.length ? parts : el("div", { class: "card empty" }, words.length ? `「${q}」に合う記録はありません。` : "まだ記録がありません。「きょう」から記録すると、ここに並びます。"));
   }
+  $("recSearch").addEventListener("input", (ev) => { recQuery = ev.target.value; renderRecList(); });
+  // 検索 on the keyboard puts it away, the entries found staying
+  $("recSearch").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing) ev.target.blur(); });
+  // × empties the field and keeps the keyboard up for other words
+  $("recSearchClear").addEventListener("pointerdown", (ev) => ev.preventDefault());
+  $("recSearchClear").addEventListener("click", () => { recQuery = ""; renderRecList(); $("recSearch").focus(); });
+
 
   // ---------- 記録の書き出し・読み込み ----------
   // one JSON file with every store; reading it back adds what is not on this device yet (once the user says so), so
