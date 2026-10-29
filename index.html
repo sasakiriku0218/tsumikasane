@@ -810,9 +810,9 @@ ul.list.rec-list > li > .body { order: 0; }  /* with large text the date stays a
 .notice strong { display: flex; align-items: center; gap: var(--space-1); color: var(--warn); font-weight: 600; line-height: 1.3; }
 .notice .cut { fill: var(--surface); }
 .notice-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin-top: 6px; }
-.backup-nudge { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); }
-.backup-nudge strong { font-weight: 600; }
-.backup-nudge .nudge-text { font-size: var(--t-sub); line-height: 1.45; color: var(--muted); }
+.backup-nudge, .import-ask { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); }
+.backup-nudge strong, .import-ask strong { font-weight: 600; }
+.backup-nudge .nudge-text, .import-ask .nudge-text { font-size: var(--t-sub); line-height: 1.45; color: var(--muted); }
 /* iOS-style push and pop between a page and the one under it (きょう and a record page, 記録 and a record's entries);
    the script only starts it on phones without Reduce Motion */
 .menu { view-transition-name: tabbar; }
@@ -958,6 +958,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <li class="btn-row"><button type="button" class="row-btn" id="exportBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>記録を書き出す</button></li>
           <li class="btn-row"><button type="button" class="row-btn" id="importBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-import"/></svg>記録を読み込む</button></li>
         </ul>
+        <!-- a file chosen to read in is not read in yet: this asks first, saying how many records it adds (what is on this
+             device stays as it is) -->
+        <div class="card import-ask" id="importAsk" hidden>
+          <strong>記録を読み込みますか？</strong>
+          <span class="nudge-text" id="importAskText"></span>
+          <div class="notice-actions">
+            <button type="button" class="btn sm" id="importGo" aria-describedby="importAskText">読み込む</button>
+            <button type="button" class="link-btn" id="importCancel">やめる</button>
+          </div>
+        </div>
         <p class="group-foot" id="storeNote"></p>
         <input type="file" id="importFile" accept=".json,application/json" hidden>
       </section>
@@ -3837,7 +3847,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
 
   // ---------- 記録の書き出し・読み込み ----------
-  // one JSON file with every store; reading it back merges by id, so nothing already on this device is lost
+  // one JSON file with every store; reading it back adds what is not on this device yet (once the user says so), so
+  // nothing already here is lost or changed
   async function exportRecords() {
     const payload = { app: "tsumikasane", version: 1, exportedAt: new Date().toISOString(), data: Object.fromEntries(ALL_STORES.map((s) => [s.name, s.items])) };
     const name = `tsumikasane-${todayKey}.json`;
@@ -3856,27 +3867,62 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     noteExport();
   }
   function noteExport() { act(() => settings.set("backup", { ...(settings.get("backup") || {}), lastExport: Date.now() })); }
+  // a file chosen is only looked at first (the user's call): the card under the buttons says when it was written out and
+  // how many records it adds, and nothing changes until 読み込む
+  let importPending = null; // the records of the file waiting on 読み込む
   async function importRecords(file) {
     let payload = null;
     try { payload = JSON.parse(await file.text()); } catch {}
+    hideImportAsk();
     if (!payload || payload.app !== "tsumikasane" || !payload.data || typeof payload.data !== "object") {
       flash("このファイルは読み込めません。「記録を書き出す」で作ったファイルを選んでください。");
       return;
     }
-    const count = mergeRecords(payload.data);
-    flash(count ? `${count} 件の記録を読み込みました。` : "読み込める記録がありませんでした。");
+    const { add, differ } = mergePlan(payload.data);
+    if (!add) { flash(differ ? `足す記録はありません。内容のちがう ${differ} 件は、この端末のほうのままにします。` : "このファイルの記録は、すべてこの端末にあります。"); return; }
+    const at = new Date(payload.exportedAt);
+    const when = isNaN(at) ? "" : (at.getFullYear() !== new Date().getFullYear() ? `${at.getFullYear()}年` : "") + fmtMDW(ymd(at)) + "に書き出した";
+    importPending = payload.data;
+    $("importAskText").textContent = `${when}「${file.name}」から、この端末にない記録を ${add.toLocaleString("ja-JP")} 件足します。いまある記録は変わりません。`
+      + (differ ? `この端末にもあって内容のちがう ${differ} 件は、この端末のほうを残します。` : "");
+    $("importAsk").hidden = false;
+    $("importGo").focus();
   }
-  // adds a set of records to what is here, matching by id: nothing already on this device is lost
+  function hideImportAsk() { importPending = null; $("importAsk").hidden = true; }
+  $("importGo").addEventListener("click", () => {
+    if (!importPending) return;
+    const count = mergeRecords(importPending);
+    hideImportAsk();
+    flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を足しました。` : "足す記録はありませんでした。");
+    saveCopy();
+    $("importBtn").focus();
+  });
+  $("importCancel").addEventListener("click", () => { hideImportAsk(); $("importBtn").focus(); });
+  // a store's records in a set read in (a file, or a copy kept on this device): one to an id, the last if repeated
+  const incomingOf = (data, s) => [...new Map((Array.isArray(data[s.name]) ? data[s.name] : []).filter((x) => x && typeof x.id === "string").map((x) => [x.id, x])).values()];
+  // what reading a set in would do, without doing it: the records it adds (none here with their id yet), and those here
+  // already whose contents differ, which stay as they are (settings aren't counted: this device keeps its own)
+  function mergePlan(data) {
+    let add = 0, differ = 0;
+    for (const s of ALL_STORES) {
+      const here = new Map(s.items.map((x) => [x.id, x]));
+      for (const x of incomingOf(data, s)) {
+        const h = here.get(x.id);
+        if (!h) add++; else if (s !== settings && JSON.stringify(h) !== JSON.stringify(x)) differ++;
+      }
+    }
+    return { add, differ };
+  }
+  // adds what is not on this device yet, matching by id. One already here is left as it is, even where the one read in
+  // differs (the same day's 日記 or 体重 from another phone, a setting), so nothing on this device is lost or changed
   function mergeRecords(data) {
     let count = 0;
     for (const s of ALL_STORES) {
-      const incoming = Array.isArray(data[s.name]) ? data[s.name].filter((x) => x && typeof x.id === "string") : [];
-      if (!incoming.length) continue;
-      const byId = new Map(s.items.map((x) => [x.id, x]));
-      for (const x of incoming) byId.set(x.id, x);
-      s.items = [...byId.values()];
+      const here = new Set(s.items.map((x) => x.id)), add = incomingOf(data, s).filter((x) => !here.has(x.id));
+      if (!add.length) continue;
+      s.items = [...s.items, ...add];
       s.saveLocal();
-      count += incoming.length;
+      count += add.length;
     }
     loadJournalForm();
     renderAll();
