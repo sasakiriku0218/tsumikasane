@@ -444,6 +444,12 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .rt-tile li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
 .rt-tile li.done .check path { fill: #ffffff; }
 .rt-tile li.done .rt-label { color: var(--muted); }
+/* ToDo's tile: each on one line (cut short in half a row), the check in ToDo's colour, done ones struck through as on the
+   page, and one past its 期限 in red */
+.td-tile .rt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-tile .rt-label.warn { color: var(--warn); font-weight: 600; }
+.td-tile li.done .check circle { fill: var(--f-todo); stroke: var(--f-todo); }
+.td-tile li.done .rt-label { text-decoration: line-through; }
 /* 運動: the fields for the kind picked sit in the form's grid as if loose; the other kind's are hidden (and switched off) */
 .wo-group { display: contents; }
 .wo-group[hidden] { display: none; }
@@ -1667,10 +1673,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(() => todos.update(t.id, { done }));
   }
   function settleTodo(id) {
-    const row = $("todoList").querySelector(`[data-check="${id}"]`)?.closest("li");
-    const move = () => { todoSettling.delete(id); renderTodos(); };
-    if (!row || reduceMotion.matches) { move(); return; }
-    row.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" });
+    // its row on the page and on きょう's tile, whichever it was checked on
+    const rows = [...document.querySelectorAll(`#todoList [data-check="${id}"], #homeTiles [data-td="${id}"]`)].map((b) => b.closest("li"));
+    const move = () => { todoSettling.delete(id); renderTodos(); renderHome(); };
+    if (!rows.length || reduceMotion.matches) { move(); return; }
+    for (const row of rows) row.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" });
     setTimeout(move, 200); // a timer, not the animation's promise, which waits while the page isn't drawn
   }
   function renderTodos() {
@@ -3406,12 +3413,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       sub ? el("div", { class: "sub" }, parts) : null,
       extra);
   }
+  // on きょう's tile: the first three ToDo to do, each checked off right there with a tap, as ルーティーン's tile has it (the
+  // user's call); one past its 期限 is in red. A checked one stays a moment, done, as on the page, then the next comes up
+  function todoTileList(items) {
+    if (!items.length) return null;
+    return el("ul", { class: "rt-tile td-tile" }, items.map((t) => el("li", { class: t.done ? "done" : "" },
+      el("button", { type: "button", class: "rt-row", "data-td": t.id, "aria-label": t.done ? `「${t.text}」を未完了に戻す` : `「${t.text}」を完了にする`, onclick: () => toggleTodo(t) },
+        el("span", { class: "check", "aria-hidden": "true" }, checkMark()),
+        el("span", { class: "rt-label" + (!t.done && t.due && t.due < todayKey ? " warn" : ""), title: t.text }, t.text)))));
+  }
   function renderHome() {
-    const rtFocus = document.activeElement?.dataset?.rt; // a ルーティーン row on the tile, pressed from the keyboard
+    const focusRow = document.activeElement?.dataset || {}; // a ルーティーン or ToDo row on a tile, pressed from the keyboard
     const undone = todos.items.filter((t) => !t.done);
     const dueToday = undone.filter((t) => t.due === todayKey).length;
     const overdue = undone.filter((t) => t.due && t.due < todayKey).length;
-    const top = [...undone].sort(todoOrder).slice(0, 3);
+    // the tile's three to do: one checked off a moment ago still holds its place there
+    const top = todos.items.filter((t) => !todoPlaced(t).done).sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b))).slice(0, 3);
     const j = journal.get(todayKey);
     const ms = meals.items.filter((m) => m.date === todayKey);
     const kcal = sum(ms.filter((m) => typeof m.kcal === "number"), (m) => m.kcal);
@@ -3435,7 +3452,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("homeTiles").replaceChildren(
       tile("var(--c-todo)", "ToDo", String(undone.length), "件 残り",
         undone.length ? `きょう期限 ${dueToday}・期限切れ ${overdue}` : (todos.items.length ? "すべて完了しています" : "まだ登録がありません"),
-        top.length ? el("ul", {}, top.map((t) => el("li", { title: t.text }, t.text))) : null, "todo"),
+        todoTileList(top), "todo"),
       tile("var(--c-cal)", "きょうの予定", String(evToday.length), "件",
         evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evText(nextEv)}` : "まだ予定はありません",
         evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null, "calendar"),
@@ -3464,7 +3481,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           : `「${nearest.title}」` + (left > 0 ? "の期限まで" : left === 0 ? "の期限です" : ""),
         null, "goal", true)
     );
-    if (rtFocus) $("homeTiles").querySelector(`[data-rt="${rtFocus}"]`)?.focus();
+    if (focusRow.rt) $("homeTiles").querySelector(`[data-rt="${focusRow.rt}"]`)?.focus();
+    if (focusRow.td) $("homeTiles").querySelector(`[data-td="${focusRow.td}"]`)?.focus();
   }
 
   // ---------- 記録: これまでの積み重ね (the user's call: everything so far in one view; no weeks, months or years, no charts) ----------
