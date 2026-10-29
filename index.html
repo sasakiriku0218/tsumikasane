@@ -824,6 +824,9 @@ ul.list.rec-list > li.one { justify-content: space-between; column-gap: 12px; }
 .notice strong { display: flex; align-items: center; gap: var(--space-1); color: var(--warn); font-weight: 600; line-height: 1.3; }
 .notice .cut { fill: var(--surface); }
 .notice-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin-top: 6px; }
+/* in red once a week has gone by since the last export (or there has been none), when きょう's reminder comes too */
+.backup-last { font-weight: 600; word-break: keep-all; }
+.backup-last.due { color: var(--warn); }
 .backup-nudge, .import-ask { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); }
 .backup-nudge strong, .import-ask strong { font-weight: 600; }
 .backup-nudge .nudge-text, .import-ask .nudge-text { font-size: var(--t-sub); line-height: 1.45; color: var(--muted); }
@@ -972,6 +975,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <li class="btn-row"><button type="button" class="row-btn" id="exportBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>記録を書き出す</button></li>
           <li class="btn-row"><button type="button" class="row-btn" id="importBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-import"/></svg>記録を読み込む</button></li>
         </ul>
+        <!-- the last export, on a line of its own under the buttons, as iOS gives the last backup (the user's call: it was
+             lost at the end of the explanation) -->
+        <p class="group-foot backup-last" id="backupLast" hidden></p>
         <!-- a file chosen to read in is not read in yet: this asks first, saying how many records it adds (what is on this
              device stays as it is) -->
         <div class="card import-ask" id="importAsk" hidden>
@@ -4103,16 +4109,20 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const b = settings.get("backup") || {};
     const last = num(b.lastExport);
     const days = last ? daysBetween(ymd(new Date(last)), todayKey) : null;
-    const lastText = last
+    const due = !last || days >= 7, enough = recordCount(allData()) >= 10;
+    // its words kept whole (keep-all), so it breaks neither as 10／月17日 nor as （12 日／前）
+    $("backupLast").hidden = !canStoreLocal;
+    $("backupLast").textContent = keepUnits(last
       ? `最後に書き出した日：${fmtMDW(ymd(new Date(last)))}` + (days ? `（${days} 日前）` : "（きょう）")
-      : "まだ一度も書き出していません。";
-    // the last export kept whole, so it breaks neither as 10／月17日 nor as （12 日／前）
-    setChildren($("storeNote"), (canStoreLocal
-      ? "記録はこの端末のブラウザにだけ保存されます。端末の空き容量が少ないときなどに消えることがあるので、ときどき書き出して、ファイルを iCloud Drive などに保存しておくと安心です。書き出したファイルを読み込むと、記録を戻したり別の端末へ移したりできます。"
-      : "この画面では記録が保存されません。") + (canStoreLocal && storageKept ? " 空き容量が少なくなっても記録を消さないよう、ブラウザに頼んであります。" : "") + " ", el("span", { class: "part" }, keepUnits(lastText)));
-    const due = !last || days >= 7;
+      : "まだ一度も書き出していません");
+    $("backupLast").classList.toggle("due", due && enough);
+    // short (the user's call): where the records are, that they can go, and what a written-out file is for
+    $("storeNote").textContent = canStoreLocal
+      ? "記録はこの端末のブラウザにだけあります。書き出したファイルを iCloud Drive などに置いておけば、消えても読み込んで戻せて、別の端末へも移せます。"
+        + (storageKept ? "ブラウザには、記録を消さないよう頼んであります。" : "")
+      : "この画面では記録が保存されません。";
     const snoozed = b.snoozeUntil && b.snoozeUntil > todayKey;
-    $("backupNudge").hidden = !(canStoreLocal && due && !snoozed && recordCount(allData()) >= 10);
+    $("backupNudge").hidden = !(canStoreLocal && due && !snoozed && enough);
     $("backupNudgeText").textContent = (last ? `最後に書き出してから ${days} 日たちました。` : "まだ一度も記録を書き出していません。")
       + "端末の空き容量が少ないときなどに記録が消えることがあるので、ときどき書き出しておくと安心です。";
   }
