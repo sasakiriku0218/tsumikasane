@@ -583,7 +583,10 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .tile .big.word { font-size: var(--t-title2); }
 /* a part of a line breaks only at a space inside it, so 予算の残り and 63,800 円 stay whole */
 .tile .sub .part { display: inline-block; word-break: keep-all; overflow-wrap: anywhere; }
-.tile[data-tile="journal"] .sub { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* 日記's tile: the day's words, three lines at most, or a field to write them in (above the head's hit area, so a tap
+   writes rather than opens the page) */
+.jt-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; overflow-wrap: anywhere; }
+.jt-input { position: relative; z-index: 1; width: 100%; margin-top: 2px; padding: 8px 10px; border: .5px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); font: inherit; font-size: max(16px, 1rem); line-height: 1.4; resize: none; }
 .tile ul { margin: 4px 0 0; padding: 0; list-style: none; }
 .tile ul li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.5; }
 .tile ul li::before { content: "・"; color: var(--tile-c); }
@@ -3398,21 +3401,45 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     showTab(key);
   }
   // a Health-style summary card: the coloured head with its chevron opens the page, and its hit area covers the card
-  // half a row on a phone is narrow, so a word in the big place (書きました, まだ) is a step smaller than a number, and a line
-  // of parts (合計 1150 kcal・朝食・昼食) breaks between its parts rather than inside one (the diary's words are left as written)
+  // half a row on a phone is narrow, so a word in the big place (まだ, 未記録) is a step smaller than a number, and a line of
+  // parts (合計 1150 kcal・朝食・昼食) breaks between its parts rather than inside one. A tile without a big one (日記) has none
   function tile(color, label, big, unit, sub, extra, tabKey, wide) {
     const page = PAGES.find((p) => p.key === tabKey);
     // a number keeps its unit on its line (63,800 円, −0.2 kg)
     const keep = (s) => s.replace(/ (?=円|kcal|kg|分|件|回)/g, " ");
-    const parts = typeof sub === "string" && tabKey !== "journal" && sub.includes("・")
+    const parts = typeof sub === "string" && sub.includes("・")
       ? sub.split("・").map((s, i, all) => el("span", { class: "part" }, keep(s) + (i < all.length - 1 ? "・" : ""))) : sub;
     return el("div", { class: "card tile" + (wide ? " wide" : ""), "data-tile": tabKey, style: `--tile-c:${color}` },
       el("button", { type: "button", class: "tile-head", "aria-label": label + "を開く", onclick: () => openFromHome(tabKey) },
         icon(page.icon, 18), el("span", { class: "lbl" }, label), el("span", { class: "chev" }, icon("next", 16))),
-      el("div", { class: "big" + (/^[\d.,]+$/.test(big) ? "" : " word") }, big, unit ? el("small", {}, unit) : null),
+      big != null ? el("div", { class: "big" + (/^[\d.,]+$/.test(big) ? "" : " word") }, big, unit ? el("small", {}, unit) : null) : null,
       sub ? el("div", { class: "sub" }, parts) : null,
       extra);
   }
+  // 日記 on きょう's tile (the user's call): a day written shows its words, up to three lines, the tile opening the page as
+  // before; a day not written yet has a field to write the day's ひとこと in right there. It is saved as the 日記 page saves:
+  // after a pause in typing, on leaving the field, and when the app goes to the background
+  let homeJournalTimer = null;
+  function journalTile(j) {
+    if (j?.text) return el("div", { class: "jt-text" }, j.text);
+    const ta = el("textarea", { class: "jt-input", rows: 3, placeholder: "ひとこと", "aria-label": "きょうの日記" });
+    ta.addEventListener("input", () => { clearTimeout(homeJournalTimer); homeJournalTimer = setTimeout(() => saveHomeJournal(ta), 1200); });
+    ta.addEventListener("blur", (ev) => saveHomeJournal(ta, ev.relatedTarget));
+    return ta;
+  }
+  // leftTo: what focus went to on leaving the field. Done writing with nothing left to save, the tile shows the words, unless
+  // a button took focus (the tiles aren't drawn again under a press that is still going on)
+  function saveHomeJournal(ta, leftTo = null) {
+    clearTimeout(homeJournalTimer); homeJournalTimer = null;
+    const text = ta.value.trim(), cur = journal.get(todayKey);
+    if ((cur?.text || "") === text) { if (document.activeElement !== ta && !leftTo) renderHome(); return; }
+    if (!text) { act(() => journal.remove(todayKey)); return; }
+    act(() => journal.set(todayKey, { ...cur, date: todayKey, text, updatedAt: Date.now() }));
+  }
+  document.addEventListener("visibilitychange", () => {
+    const ta = document.querySelector("#homeTiles .jt-input");
+    if (document.visibilityState === "hidden" && ta && homeJournalTimer) saveHomeJournal(ta);
+  });
   // on きょう's tile: the first three ToDo to do, each checked off right there with a tap, as ルーティーン's tile has it (the
   // user's call); one past its 期限 is in red. A checked one stays a moment, done, as on the page, then the next comes up
   function todoTileList(items) {
@@ -3449,17 +3476,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const evToday = events.items.filter((e) => e.date === todayKey).sort(byTime);
     const nextEv = events.items.filter((e) => e.date > todayKey).sort((a, b) => a.date.localeCompare(b.date) || byTime(a, b))[0];
 
-    $("homeTiles").replaceChildren(
+    const tiles = [
       tile("var(--c-todo)", "ToDo", String(undone.length), "件 残り",
-        undone.length ? `きょう期限 ${dueToday}・期限切れ ${overdue}` : (todos.items.length ? "すべて完了しています" : "まだ登録がありません"),
+        // the lines kept short enough for half a row
+        undone.length ? `きょう期限 ${dueToday}・期限切れ ${overdue}` : (todos.items.length ? "すべて完了" : "まだありません"),
         todoTileList(top), "todo"),
       tile("var(--c-cal)", "きょうの予定", String(evToday.length), "件",
-        evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evText(nextEv)}` : "まだ予定はありません",
+        evToday.length ? null : nextEv ? `次の予定：${fmtShort(nextEv.date)} ${evText(nextEv)}` : "予定はありません",
         evToday.length ? el("ul", { class: "ev" }, evToday.slice(0, 3).map((e) => el("li", { title: e.title, style: `--dot:${labelHue(labelOf(e))}` }, evText(e)))) : null, "calendar"),
-      tile("var(--c-journal)", "日記", j?.text ? "書きました" : "まだ", null,
-        j?.text ? j.text.slice(0, 60) + (j.text.length > 60 ? "…" : "") : "ひとことでも残しておくと、あとで効いてきます。", null, "journal"),
+      tile("var(--c-journal)", "日記", null, null, null, journalTile(j), "journal"),
       tile("var(--c-meal)", "食事", String(ms.length), "回",
-        ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだ記録がありません", null, "meal"),
+        ms.length ? (kcal ? `合計 ${kcal} kcal・` : "") + slotsDone.join("・") : "まだありません", null, "meal"),
       tile("var(--c-workout)", "運動", ws.length && !mins ? String(ws.length) : String(mins), ws.length && !mins ? "件" : "分", null, null, "workout"),
       // 勉強 like 運動: today's time only (the user's call: no line about the last 7 days)
       tile("var(--c-study)", "勉強", String(stMins), "分", null, null, "study"),
@@ -3479,8 +3506,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         left > 0 ? "日" : null,
         !nearest ? (goals.items.length ? "新しい目標を立ててみましょう。" : "目標を立ててみましょう。")
           : `「${nearest.title}」` + (left > 0 ? "の期限まで" : left === 0 ? "の期限です" : ""),
-        null, "goal", true)
-    );
+        null, "goal", true),
+    ];
+    // the 日記 tile being written in stays as it is, its words, caret and keyboard with it; the others are drawn anew
+    const grid = $("homeTiles"), writing = grid.querySelector(':scope > [data-tile="journal"]');
+    if (writing?.contains(document.activeElement)) {
+      for (const t of tiles) if (t.dataset.tile !== "journal") grid.querySelector(`:scope > [data-tile="${t.dataset.tile}"]`)?.replaceWith(t);
+    } else grid.replaceChildren(...tiles);
     if (focusRow.rt) $("homeTiles").querySelector(`[data-rt="${focusRow.rt}"]`)?.focus();
     if (focusRow.td) $("homeTiles").querySelector(`[data-td="${focusRow.td}"]`)?.focus();
   }
