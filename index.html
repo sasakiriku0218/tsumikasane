@@ -539,6 +539,17 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .m-center .m-pct { font-size: var(--t-foot); font-variant-numeric: tabular-nums; }
 .m-center .m-tools { min-height: 0; justify-content: center; }
 .m-center .m-tools:not(:empty) { min-height: 30px; }
+/* 全体: the whole chart as one sheet of nine blocks of nine, like the paper chart. The goal's block is in the middle (the
+   goal and its eight elements), and each element's block sits where the element does, the element in its middle and
+   the eight under it around. Done cells are tinted as in 8マス. It is for looking: a block opens its element's 8マス */
+.mandala.whole { gap: 4px; }
+.m-block { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; cursor: pointer; }
+.m-block:disabled { opacity: .55; cursor: default; }
+.m-mini { aspect-ratio: 1; min-width: 0; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: var(--surface); font-size: 9px; line-height: 1.2; text-align: center; overflow: hidden; }
+.m-mini > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.m-mini.done { background: color-mix(in srgb, var(--c-goal) 16%, var(--surface)); }
+.m-mini.mid { background: color-mix(in srgb, var(--c-goal) 26%, var(--surface)); font-weight: 700; }
+.m-mini.mid.done { background: color-mix(in srgb, var(--c-goal) 40%, var(--surface)); }
 /* the goal's own part, under its chart */
 .m-split { padding: 8px var(--space-2); }
 
@@ -1237,6 +1248,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
          get it done one cell at a time). The goal's own part (達成基準, 期限, 分割, delete) shows under its first chart -->
     <div class="sheet-view" id="mandalaView" hidden>
       <p class="m-trail" id="mTrail" hidden></p>
+      <!-- the eight around the goal to write in, or the whole chart at a glance (the user's call); from 分割 2回, at the
+           goal's own level -->
+      <div class="seg" role="group" aria-label="チャートの見え方" id="mView" hidden>
+        <button type="button" data-view="cells" aria-pressed="true">8マス</button>
+        <button type="button" data-view="whole" aria-pressed="false">全体</button>
+      </div>
       <div class="mandala" id="mGrid"></div>
       <p class="group-foot" id="mHint"></p>
       <div class="sheet-view" id="mRoot">
@@ -2616,6 +2633,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let recEdit = null, recReturnId = null; // the entry being changed in the sheet ({ kind, id }), and its row for focus after
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
   let chartFromDay = false; // the chart was opened from a day's list (its goal falls due that day), which 戻る goes back to
+  let mOverview = false; // the chart shows 全体, the whole of it at a glance, rather than the eight to write in
   let chartDraft = null, composing = false, mDelTimer = null; // a cell's text not saved yet; a kana conversion under way
   // what the sheet holds, one view at a time: a new goal, a goal's chart, the settings, a new plan, an entry of a record
   // page, an event's edit form, or (by default) a day's plans. The settings come before a new plan, which can lead to
@@ -2643,7 +2661,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     sheetAnims = []; sheetClosing = false; drag = null;
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; chartFromDay = false;
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; chartFromDay = false; mOverview = false;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   function openDay(d, byKey) {
@@ -2790,6 +2808,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // the nine cells for the level walked into; paintChart fills them, and redraws them in place after each change so a
   // cell being typed in keeps its text, caret and keyboard
   function buildChart() {
+    mGrid.classList.toggle("whole", mOverview);
+    if (mOverview) { paintChart(); return; } // 全体 is drawn whole each time (paintWhole)
     const word = CELL_WORDS[mPath.length];
     mGrid.replaceChildren(...GRID_ORDER.map((k) => k < 0
       ? el("div", { class: "m-cell m-center" }, el("span", { class: "m-title" }), el("span", { class: "m-pct" }), el("span", { class: "m-tools" }))
@@ -2806,35 +2826,69 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const g = goals.get(mandalaGoal), node = g && nodeAt(g, mPath);
     if (!node) { mandalaGoal = null; closeSheet(true); return; }
     const depth = goalDepth(g), left = depth - mPath.length; // the levels that may still open below the middle
-    const focused = document.activeElement, keep = focused?.closest?.(".m-tools") ? { k: focused.closest(".m-cell").dataset.k ?? "mid", role: focused.dataset.role } : null;
-    const mid = mGrid.querySelector(".m-center"), kids = kidsOf(node, left), name = oneLine(node.t), midDone = cellDone(node, left);
-    mid.classList.toggle("done", midDone);
-    mid.querySelector(".m-title").textContent = name;
-    mid.querySelector(".m-pct").textContent = kids.length ? `${Math.floor(cellProgress(node, left) * 100)}%` : "";
-    setChildren(mid.querySelector(".m-tools"), kids.length ? null : chartCheck(name, midDone, toggleMiddle));
-    for (const box of mGrid.querySelectorAll(".m-cell[data-k]")) {
-      const k = Number(box.dataset.k), cell = node.c?.[k] || null, text = cell?.t || "", filled = !!text.trim(), cname = oneLine(text);
-      const ta = box.querySelector("textarea");
-      if (ta !== document.activeElement && ta.value !== text) ta.value = text;
-      const inner = kidsOf(cell, left - 1), done = filled && cellDone(cell, left - 1);
-      box.classList.toggle("done", done);
-      setChildren(box.querySelector(".m-tools"),
-        !filled ? null : inner.length ? el("span", { class: "m-count" }, `${inner.filter((x) => cellDone(x, left - 2)).length}/${inner.length}`) : chartCheck(cname, done, () => toggleCell(k)),
-        filled && left > 1 ? el("button", { type: "button", class: "m-open", "data-role": "open", "aria-label": inner.length ? `「${cname}」の中を開く` : `「${cname}」を8つに分ける`, onclick: () => openCell(k) }, icon("next", 16)) : null);
+    const canWhole = !mPath.length && depth >= 2; // 全体 is for the goal's own level, once there is a level under its eight
+    if (mOverview && !canWhole) { mOverview = false; buildChart(); return; } // 分割 went down to 1回
+    $("mView").hidden = !canWhole;
+    for (const b of $("mView").querySelectorAll("button")) b.setAttribute("aria-pressed", String((b.dataset.view === "whole") === mOverview));
+    const name = oneLine(node.t);
+    if (mOverview) paintWhole(g, depth);
+    else {
+      const focused = document.activeElement, keep = focused?.closest?.(".m-tools") ? { k: focused.closest(".m-cell").dataset.k ?? "mid", role: focused.dataset.role } : null;
+      const mid = mGrid.querySelector(".m-center"), kids = kidsOf(node, left), midDone = cellDone(node, left);
+      mid.classList.toggle("done", midDone);
+      mid.querySelector(".m-title").textContent = name;
+      mid.querySelector(".m-pct").textContent = kids.length ? `${Math.floor(cellProgress(node, left) * 100)}%` : "";
+      setChildren(mid.querySelector(".m-tools"), kids.length ? null : chartCheck(name, midDone, toggleMiddle));
+      for (const box of mGrid.querySelectorAll(".m-cell[data-k]")) {
+        const k = Number(box.dataset.k), cell = node.c?.[k] || null, text = cell?.t || "", filled = !!text.trim(), cname = oneLine(text);
+        const ta = box.querySelector("textarea");
+        if (ta !== document.activeElement && ta.value !== text) ta.value = text;
+        const inner = kidsOf(cell, left - 1), done = filled && cellDone(cell, left - 1);
+        box.classList.toggle("done", done);
+        setChildren(box.querySelector(".m-tools"),
+          !filled ? null : inner.length ? el("span", { class: "m-count" }, `${inner.filter((x) => cellDone(x, left - 2)).length}/${inner.length}`) : chartCheck(cname, done, () => toggleCell(k)),
+          filled && left > 1 ? el("button", { type: "button", class: "m-open", "data-role": "open", "aria-label": inner.length ? `「${cname}」の中を開く` : `「${cname}」を8つに分ける`, onclick: () => openCell(k) }, icon("next", 16)) : null);
+      }
+      if (keep) mGrid.querySelector(`${keep.k === "mid" ? ".m-center" : `.m-cell[data-k="${keep.k}"]`} [data-role="${keep.role}"]`)?.focus();
     }
-    if (keep) mGrid.querySelector(`${keep.k === "mid" ? ".m-center" : `.m-cell[data-k="${keep.k}"]`} [data-role="${keep.role}"]`)?.focus();
     const trail = $("mTrail");
     trail.hidden = !mPath.length;
     trail.textContent = mPath.map((_, i) => oneLine(nodeAt(g, mPath.slice(0, i))?.t)).concat(name).join(" › ");
-    $("mHint").textContent = left > 1
-      ? "まわりの8マスに書き出します。› でそのマスをさらに8つに分けられ、中が全部達成になるとそのマスも達成になります。"
-      : "まわりの8マスに書き出して、できたら ○ をタップして達成にします。";
+    $("mHint").textContent = mOverview
+      ? "チャート全体です。まわりのかたまりを押すと、その要素の8マスに入って書けます。"
+      : left > 1
+        ? "まわりの8マスに書き出します。› でそのマスをさらに8つに分けられ、中が全部達成になるとそのマスも達成になります。"
+        : "まわりの8マスに書き出して、できたら ○ をタップして達成にします。";
     $("mRoot").hidden = !!mPath.length;
     if (!mPath.length) {
       for (const [id, key] of GOAL_EDIT) if (document.activeElement !== $(id)) $(id).value = goalField(g, key);
       for (const r of document.querySelectorAll('input[name="chartSplit"]')) r.checked = Number(r.value) === depth;
     }
   }
+  // 全体: the goal's block in the middle (the goal and its eight elements) and around it each element's block (the element
+  // in its middle, the eight under it around), two levels whatever the 分割; done cells tinted as in 8マス. Each block is
+  // a button that opens its element's 8マス (the middle one goes back to the goal's); one not written yet has nothing
+  function paintWhole(g, depth) {
+    const root = nodeAt(g, []);
+    const mini = (cell, mid, left) => el("span", { class: "m-mini" + (mid ? " mid" : "") + (cell?.t?.trim() && cellDone(cell, left) ? " done" : "") },
+      el("span", {}, oneLine(cell?.t)));
+    mGrid.replaceChildren(...GRID_ORDER.map((k) => {
+      const centre = k < 0, node = centre ? root : root.c?.[k] || null, name = oneLine(node?.t), left = centre ? depth : depth - 1;
+      return el("button", {
+        type: "button", class: "m-block", disabled: !name,
+        "aria-label": centre ? `「${name}」の8マスに戻る` : name ? `「${name}」の8マスを開く` : `要素 ${k + 1}（まだ書いていません）`,
+        onclick: () => { mOverview = false; if (!centre) mPath = [k]; showChartLevel(); },
+      }, GRID_ORDER.map((j) => (j < 0 ? mini(node, true, left) : mini(node?.c?.[j] || null, false, left - 1))));
+    }));
+  }
+  // 8マス or 全体, from the switch over the chart
+  $("mView").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    const whole = b.dataset.view === "whole";
+    if (whole === mOverview) return;
+    commitChartText(); // a cell's unsaved text goes in first
+    mOverview = whole;
+    buildChart();
+  }));
   // the goal's own name, 達成基準 and 期限, changed in place under its first chart. All three were needed to make the goal,
   // so a field left empty takes its old value back
   const GOAL_EDIT = [["mTitle", "title"], ["mCriterion", "criterion"], ["mDeadline", "deadline"]];
@@ -2910,7 +2964,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // than to 目標's page); 戻る comes back to the list, as from settings reached from a day
   function openChartFromDay(id) {
     if (!goals.get(id)) return;
-    mandalaGoal = id; mPath = []; chartFromDay = true;
+    mandalaGoal = id; mPath = []; chartFromDay = true; mOverview = false;
     showChartLevel();
   }
   // 戻る over a chart: out of the cell walked into, or from the goal's own eight back to the day's list it came from
@@ -2919,7 +2973,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!chartFromDay) return;
     commitChartText(); saveGoalEdit(); // what was typed last goes in before the chart lets go
     disarmGoalDelete();
-    mandalaGoal = null; chartFromDay = false;
+    mandalaGoal = null; chartFromDay = false; mOverview = false;
     syncSheetHead();
     sheetEl.scrollTop = 0;
     $("sheetTitle").focus();
