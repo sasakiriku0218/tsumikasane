@@ -510,6 +510,9 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .bar-track i { display: block; height: 100%; border-radius: 999px; background: var(--sec-c); }
 .bar-track i.over { background: var(--warn); }
 .pct { flex: none; width: 4.5ch; text-align: right; font-size: var(--t-foot); color: var(--muted); font-variant-numeric: tabular-nums; }
+/* a goal's row: the 期限 and 達成基準 share a line, and the count of elements done sits by the % */
+.goal-meta { display: block; line-height: 1.35; }
+.progress .els { flex: none; font-size: var(--t-foot); color: var(--muted); font-variant-numeric: tabular-nums; }
 /* 目標のマンダラ, in the sheet: the cell walked into sits tinted in the middle and the eight around it are written in
    place, like a paper chart. A cell's foot holds its check, or, once something is written inside it, how many in there
    are done; › goes into it while the goal's 分割 allows. Square cells, three to a row: about 110px on a phone */
@@ -1596,17 +1599,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       try { await todos.remove(td.id); } catch (e) { showError(e); break; }
     }
   });
-  // the 期限 by the days left, as 目標 has it (the user's call: short, so it fits one line): past it in red, きょう and あした
-  // by name, later ones with the date too. A done one keeps only its date, the days left meaning nothing now. The parts
-  // are kept whole, so a narrow row breaks the line between them, not inside a word, and the ・ stays at the end of the
-  // first line (a line doesn't start with it)
+  // a 期限 by the days left, for ToDo and 目標 alike (the user's call: short, and the two written the same way): past it in
+  // red, きょう and あした by name, later ones with the date too. The parts are kept whole, so a narrow row breaks the line
+  // between them, not inside a word, and the ・ stays at the end of the first line (a line doesn't start with it)
+  function untilText(day) {
+    const n = daysUntil(day), date = fmtShort(day), part = (s) => el("span", { class: "phrase" }, s);
+    if (n < 0) return el("span", { class: "sub warn" }, part(`${-n} 日過ぎています・`), part(date));
+    if (n <= 1) return el("span", { class: "sub" }, part(n ? "あしたまで" : "きょうまで"));
+    return el("span", { class: "sub" }, part(`あと ${n} 日・`), part(date));
+  }
+  // a done one keeps only its date, the days left meaning nothing now
   function dueText(t) {
     if (!t.due) return null;
-    const n = daysUntil(t.due), date = fmtShort(t.due);
-    if (t.done) return el("span", { class: "sub" }, `期限 ${date}`);
-    if (n < 0) return el("span", { class: "sub warn" }, el("span", { class: "phrase" }, `${-n} 日過ぎています・`), el("span", { class: "phrase" }, date));
-    if (n <= 1) return el("span", { class: "sub" }, n ? "あしたまで" : "きょうまで");
-    return el("span", { class: "sub" }, el("span", { class: "phrase" }, `あと ${n} 日・`), el("span", { class: "phrase" }, date));
+    return t.done ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : untilText(t.due);
   }
   // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): the 期限
   // soonest first, which puts those past it first and today's next, then those without one, each oldest first. Done
@@ -2341,13 +2346,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const oneLine = (s) => String(s || "").replace(/\s+/g, " ").trim();
   // 達成基準 as written; a goal from before it kept its count's target instead
   const criterionText = (g) => g.criterion || (num(g.target) > 0 ? `${g.target}${g.unit ? " " + g.unit : ""}` : "");
+  // written as ToDo's 期限 is (untilText)
   function deadlineText(g) {
     if (!g.deadline) return null;
-    if (g.done) return el("span", { class: "sub" }, `期限 ${fmtShort(g.deadline)}`);
-    const n = daysUntil(g.deadline);
-    if (n < 0) return el("span", { class: "sub warn" }, `期限を ${-n} 日過ぎています（${fmtShort(g.deadline)}）`);
-    if (n === 0) return el("span", { class: "sub warn" }, "期限はきょうまで");
-    return el("span", { class: "sub" }, `あと ${n} 日（${fmtShort(g.deadline)}）`);
+    return g.done ? el("span", { class: "sub" }, `期限 ${fmtShort(g.deadline)}`) : untilText(g.deadline);
   }
   // which goals show, from the page's own bar: all of them, those still under way, or those achieved
   let goalFilter = "all";
@@ -2366,19 +2368,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!goals.items.length) { list.append(el("div", { class: "empty" }, el("span", { class: "phrase" }, "まだ目標がありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。"))); return; }
     const shown = goalFilter === "active" ? active : goalFilter === "done" ? done : [...active, ...done];
     if (!shown.length) { list.append(el("div", { class: "empty" }, goalFilter === "done" ? "達成した目標はまだありません。" : "進行中の目標はありません。")); return; }
-    // a row per goal that opens its chart: how far the chart has got, and how many of the eight around the goal are done
+    // a row per goal that opens its chart, in three lines (the user's call: more goals on the screen): its name; its 期限
+    // and 達成基準 on one line, the two kept whole so a narrow row breaks between them; how far the chart has got, with
+    // how many of the eight around the goal are done. 分割 is left to the chart, where it is set
     for (const g of shown) {
       const depth = goalDepth(g), root = nodeAt(g, []), els = kidsOf(root, depth), crit = criterionText(g);
       const pct = g.done ? 100 : Math.floor(cellProgress(root, depth) * 100);
+      const when = g.done ? null : deadlineText(g);
+      if (when && crit) when.lastChild.append("・"); // the ・ ends the line if it breaks before 達成基準
       list.append(el("div", { class: "goal" + (g.done ? " done" : "") },
         el("button", { type: "button", class: "goal-open", "data-goal": g.id, onclick: (ev) => openChart(g.id, ev.detail === 0) },
           el("span", { class: "goal-body" },
             el("span", { class: "row-between" },
               el("span", { class: "title" }, g.title),
-              g.done ? el("span", { class: "chip", style: "--chip-c: var(--c-goal)" }, "達成") : deadlineText(g)),
-            crit ? el("span", { class: "sub" }, `達成基準：${crit}`) : null,
-            el("span", { class: "progress" }, el("span", { class: "bar-track" }, el("i", { style: `width:${pct}%` })), el("span", { class: "pct" }, `${pct}%`)),
-            el("span", { class: "sub" }, (els.length ? `要素 ${els.filter((x) => cellDone(x, depth - 1)).length}/${els.length} 達成` : "要素はまだありません") + `・分割 ${depth} 回`)),
+              g.done ? el("span", { class: "chip", style: "--chip-c: var(--c-goal)" }, "達成") : null),
+            when || crit ? el("span", { class: "goal-meta" }, when, crit ? el("span", { class: "sub phrase" }, `達成基準：${crit}`) : null) : null,
+            el("span", { class: "progress" }, el("span", { class: "bar-track" }, el("i", { style: `width:${pct}%` })), el("span", { class: "pct" }, `${pct}%`),
+              els.length ? el("span", { class: "els" }, `要素 ${els.filter((x) => cellDone(x, depth - 1)).length}/${els.length}`) : null)),
           el("span", { class: "chev" }, icon("next", 16)))));
     }
   }
