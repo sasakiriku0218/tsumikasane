@@ -787,7 +787,8 @@ ul.list > li.btn-row { padding: 0; }
    sheet, as on the record pages. 体重, one number a day, has its date at the start of its row instead */
 ul.list.rec-list { line-break: strict; }  /* no line starts with ー or a small kana (トーストとコーヒ／ー) */
 ul.list.rec-list > li { align-items: baseline; gap: 8px; }
-ul.list.rec-list > li.dayhead { font-size: var(--t-sub); }
+ul.list.rec-list > li.dayhead { flex-wrap: wrap; column-gap: 12px; font-size: var(--t-sub); }
+.rec-total { margin-inline-start: auto; }  /* the day's total, at the end of its date (or beneath it, at the right) */
 ul.list.rec-list > li.one { justify-content: space-between; column-gap: 12px; }
 .rec-date { font-size: var(--t-sub); line-height: 1.35; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rec-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
@@ -3858,12 +3859,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const RECORD_LISTS = {
     journal: { label: "日記", items: () => journal.items.filter((j) => j.text?.trim()).map((j) => ({ ...j, date: j.date || j.id })),
       rows: (xs, day) => xs.map((j) => recEntry("journal", j.id, `${day}の日記を編集`, { words: j.text.trim(), text: true })) },
+    // the day's total beside its date (the user's call): 食事's kcal, 運動's and 勉強's time, 家計簿's money out and in
     meal: { label: "食事", items: () => meals.items,
+      total: (xs) => { const ks = xs.filter((m) => typeof m.kcal === "number"); return ks.length ? `合計 ${sum(ks, (m) => m.kcal).toLocaleString("ja-JP")} kcal` : null; },
       rows: (xs) => [...xs].sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || num(a.createdAt) - num(b.createdAt))
         .map((m) => recEntry("meal", m.id, `「${m.text}」を編集`, { tag: m.slot || "食事", words: m.text, n: typeof m.kcal === "number" ? `${m.kcal} kcal` : null })) },
     workout: { label: "運動", items: () => workouts.items,
+      total: (xs) => { const min = sum(xs, (w) => w.minutes); return min > 0 ? `合計 ${durText(min)}` : null; }, // 筋トレ has no time
       rows: (xs) => byCreated(xs).map((w) => recEntry("workout", w.id, `「${w.type} ${workoutDetail(w)}」を編集`, { tag: w.type, words: [workoutDetail(w), w.note].filter(Boolean).join("・") })) },
     study: { label: "勉強", items: () => study.items,
+      total: (xs) => `合計 ${durText(sum(xs, (x) => x.minutes))}`,
       rows: (xs) => byCreated(xs).map((x) => {
         const sub = subjectOf(x), name = sub ? sub.name : "科目なし";
         return recEntry("study", x.id, `「${name} ${num(x.minutes)} 分」を編集`, { tag: name, dot: sub ? labelHue(sub) : "var(--c-study)", words: x.note, n: `${num(x.minutes)} 分` });
@@ -3878,6 +3883,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     weight: { label: "体重", oneLine: true, items: () => sortedWeights().map((w) => ({ ...w, date: w.id })),
       rows: (xs, day) => xs.map((w) => el("li", { class: "one" }, el("span", { class: "rec-date" }, day), recOpen("weight", w.id, `${day}の体重を編集`, `${fmtKg(w.kg)} kg`))) },
     money: { label: "家計簿", items: () => expenses.items,
+      total: (xs) => {
+        const out = sum(xs.filter((e) => e.kind !== "in"), (e) => e.amount), inn = sum(xs.filter((e) => e.kind === "in"), (e) => e.amount);
+        return [out ? `支出 ${fmtYen(out)}` : null, inn ? `収入 ${fmtYen(inn)}` : null].filter(Boolean).join("・");
+      },
       rows: (xs) => byCreated(xs).map((e) => {
         const cat = expenseCat(e) || (e.kind === "in" ? "収入" : "支出");
         return recEntry("money", e.id, `「${cat} ${fmtYen(e.amount)}」を編集`, { tag: cat, words: e.memo, n: (e.kind === "in" ? "+" : "") + fmtYen(e.amount), isIn: e.kind === "in" });
@@ -3904,8 +3913,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         month = d.slice(0, 7);
         parts.push(el("h3", { class: "group-head" }, fmtMonth(month)), ul = el("ul", { class: "list card rec-list" }));
       }
-      const rel = relLabel(d), day = (rel ? rel + "・" : "") + fmtMDW(d);
-      ul.append(...(spec.oneLine ? [] : [el("li", { class: "dayhead" }, day)]), ...spec.rows(byDay.get(d), day));
+      const rel = relLabel(d), day = (rel ? rel + "・" : "") + fmtMDW(d), xs = byDay.get(d), total = spec.total?.(xs);
+      ul.append(...(spec.oneLine ? [] : [el("li", { class: "dayhead" }, el("span", {}, day), total ? el("span", { class: "rec-total" }, total) : null)]), ...spec.rows(xs, day));
     }
     setChildren($("recList"), parts.length ? parts : el("div", { class: "card empty" }, "まだ記録がありません。「きょう」から記録すると、ここに並びます。"));
   }
