@@ -1681,10 +1681,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       if (it) Object.assign(it, patch);
       this.saveLocal(); renderAll();
     }
-    async remove(id) {
-      const had = this.items.some((x) => x.id === id);
-      this.items = this.items.filter((x) => x.id !== id);
-      if (had) noteDeleted(this, id);
+    remove(id) { return this.removeMany([id]); }
+    // several at once, with one save and one redraw for all of them (完了したものを削除)
+    async removeMany(ids) {
+      const here = new Set(this.items.map((x) => x.id)), gone = new Set(ids.filter((id) => here.has(id)));
+      this.items = this.items.filter((x) => !gone.has(x.id));
+      noteDeleted(this, ...gone);
+      this.saveLocal(); renderAll();
+    }
+    // records deleted a moment ago, back as they were with their ids (元に戻す)
+    async putBack(list) {
+      const here = new Set(this.items.map((x) => x.id)), back = list.filter((x) => !here.has(x.id));
+      this.items.push(...back);
+      undelete(this, ...back.map((x) => x.id));
       this.saveLocal(); renderAll();
     }
     get(id) { return this.items.find((x) => x.id === id); }
@@ -1714,16 +1723,29 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // id (元に戻す) is no longer counted as deleted. Settings aren't records and aren't remembered
   const delKey = (st, id) => `${st.name}/${id}`;
   const remembers = (st) => st !== settings && st !== deleted;
-  function noteDeleted(st, id) {
-    if (!remembers(st)) return;
-    const key = delKey(st, id), had = deleted.get(key);
-    if (had) had.at = Date.now(); else deleted.items.push({ id: key, store: st.name, rid: id, at: Date.now() });
+  function noteDeleted(st, ...ids) {
+    if (!remembers(st) || !ids.length) return;
+    const at = Date.now();
+    for (const id of ids) {
+      const key = delKey(st, id), had = deleted.get(key);
+      if (had) had.at = at; else deleted.items.push({ id: key, store: st.name, rid: id, at });
+    }
     deleted.saveLocal();
   }
-  function undelete(st, id) {
-    if (!remembers(st) || !deleted.get(delKey(st, id))) return;
-    deleted.items = deleted.items.filter((t) => t.id !== delKey(st, id));
+  function undelete(st, ...ids) {
+    const keys = new Set(ids.map((id) => delKey(st, id)));
+    if (!remembers(st) || !deleted.items.some((t) => keys.has(t.id))) return;
+    deleted.items = deleted.items.filter((t) => !keys.has(t.id));
     deleted.saveLocal();
+  }
+  // a deletion with 元に戻す in its message for the seconds it shows (the user's call, as plans have it): the records come
+  // back as they were, with their ids, so nothing pointing at them needs putting right
+  const DELETED_WORDS = { todos: "ToDoを削除しました", journal: "日記を削除しました", meals: "食事の記録を削除しました", workouts: "運動の記録を削除しました", weights: "体重の記録を削除しました", expenses: "家計簿の記録を削除しました", goals: "目標を削除しました", labels: "ラベルを削除しました", study: "勉強の記録を削除しました", subjects: "科目を削除しました", routines: "ルーティーンの項目を削除しました", routineDays: "ルーティーンのチェックを削除しました" };
+  function removeWithUndo(st, ids, msg = DELETED_WORDS[st.name]) {
+    const list = [].concat(ids), before = list.map((id) => st.get(id)).filter(Boolean).map((x) => JSON.parse(JSON.stringify(x)));
+    if (!before.length) return;
+    act(() => st.removeMany(list));
+    flash(msg, () => act(async () => { await st.putBack(before); flash("元に戻しました"); }));
   }
 
   // ---------- 保存できないとき ----------
@@ -1948,10 +1970,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     renderTodos();
   }
   $("todoFilters").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setTodoFilter(b.dataset.filter)));
-  armLink($("clearDone"), "完了したものを削除", "もう一度押すと削除します", async () => {
-    for (const td of todos.items.filter((x) => x.done)) {
-      try { await todos.remove(td.id); } catch (e) { showError(e); break; }
-    }
+  // all of them at once (one save, one redraw), with 元に戻す
+  armLink($("clearDone"), "完了したものを削除", "もう一度押すと削除します", () => {
+    const done = todos.items.filter((x) => x.done);
+    removeWithUndo(todos, done.map((x) => x.id), `完了したToDoを ${done.length} 件削除しました`);
   });
   // a 期限 by the days left, for ToDo and 目標 alike (the user's call: short, and the two written the same way): past it in
   // red, きょう and あした by name, later ones with the date too. The parts are kept whole, so a narrow row breaks the line
@@ -2023,7 +2045,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => toggleTodo(t) }, checkMark()),
         el("span", { class: "body" }, editLink("todo", t.id, t.text), dueText(t)),
-        delButton(() => act(() => todos.remove(t.id)))
+        delButton(() => removeWithUndo(todos, t.id))
       ));
     }
     // the check keeps keyboard focus as the list is drawn again, and follows its ToDo down to 完了
@@ -2081,7 +2103,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   armLink($("journalDelete"), "この日の記録を削除", "もう一度押すと削除します", () => {
     clearTimeout(journalTimer); journalDirty = false;
     journalText.value = ""; journalState.textContent = "";
-    act(() => journal.remove(viewDate));
+    removeWithUndo(journal, viewDate);
   });
   function renderJournal() {
     if (!journalDirty) loadJournalForm();
@@ -2134,7 +2156,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("span", { class: "chip", style: "--chip-c: var(--c-meal)" }, m.slot || "食事"),
         el("span", { class: "body" }, editLink("meal", m.id, m.text)),
         typeof m.kcal === "number" ? el("span", { class: "num" }, `${m.kcal} kcal`) : null,
-        delButton(() => act(() => meals.remove(m.id)))
+        delButton(() => removeWithUndo(meals, m.id))
       ));
     }
     const withK = items.filter((m) => typeof m.kcal === "number");
@@ -2198,7 +2220,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       list.append(el("li", {},
         el("span", { class: "chip", style: "--chip-c: var(--c-workout)", title: w.type }, w.type),
         el("span", { class: "body" }, editLink("workout", w.id, workoutDetail(w) || w.type, `${w.type} ${workoutDetail(w)}`), w.note ? el("span", { class: "sub" }, w.note) : null),
-        delButton(() => act(() => workouts.remove(w.id)))
+        delButton(() => removeWithUndo(workouts, w.id))
       ));
     }
     const total = sum(items, (w) => w.minutes);
@@ -2242,7 +2264,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       list.append(el("li", { style: subjectStyle(sub) },
         el("span", { class: "chip", style: "--chip-c: var(--lc)" }, `${num(x.minutes)} 分`),
         el("span", { class: "body" }, editLink("study", x.id, sub ? sub.name : "科目なし", `${sub ? sub.name : "科目なし"} ${num(x.minutes)} 分`), x.note ? el("span", { class: "sub" }, x.note) : null),
-        delButton(() => act(() => study.remove(x.id)))
+        delButton(() => removeWithUndo(study, x.id))
       ));
     }
     const total = sum(items, (x) => x.minutes), wk = studyWeek();
@@ -2310,7 +2332,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("span", { class: "body" }, el("input", { type: "text", class: "rt-name", value: r.name, maxlength: 40, "aria-label": "項目の名前",
           onchange: (ev) => renameRoutine(r, ev.target), onkeydown: (ev) => { if (ev.key === "Enter" && !ev.isComposing) ev.target.blur(); } })),
         streak >= 2 ? el("span", { class: "num" }, `${streak}日連続`) : null,
-        delButton(() => act(() => routines.remove(r.id)))
+        delButton(() => removeWithUndo(routines, r.id))
       ));
     }
   }
@@ -2333,7 +2355,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   });
   armLink($("wtDelete"), "この日の記録を削除", "もう一度押すと削除します", () => {
     wtInput.value = ""; wtState.textContent = "";
-    act(() => weights.remove(viewDate));
+    removeWithUndo(weights, viewDate);
   });
   $("wtTargetForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -2394,7 +2416,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("span", { class: "datecell" }, r.id === todayKey ? "きょう" : fmtShort(r.id)),
         el("span", { class: "body" }, el("span", { class: "text" }, `${fmtKg(r.kg)} kg`)),
         p ? el("span", { class: "num" }, `${signed(num(r.kg) - num(p.kg))} kg`) : null,
-        delButton(() => act(() => weights.remove(r.id)))
+        delButton(() => removeWithUndo(weights, r.id))
       ));
     }
     if (rows.length > shown.length) list.append(el("li", { class: "note" }, `ほか ${rows.length - shown.length} 件`));
@@ -2652,7 +2674,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("span", { class: "chip", style: `--chip-c: ${isIn ? "var(--accent)" : "var(--c-money)"}`, title: expenseCat(e) || "" }, expenseCat(e) || (isIn ? "収入" : "支出")),
         el("span", { class: "body" }, editLink("money", e.id, e.memo || (isIn ? "収入" : "支出"), `${expenseCat(e) || (isIn ? "収入" : "支出")} ${fmtYen(e.amount)}`)),
         el("span", { class: "amount" + (isIn ? " in" : "") }, (isIn ? "+" : "") + fmtYen(e.amount)),
-        delButton(() => act(() => expenses.remove(e.id)))
+        delButton(() => removeWithUndo(expenses, e.id))
       ));
     }
   }
@@ -2928,7 +2950,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         ev.target.closest("li").style.cssText = labelStyle({ color: ev.target.value });
         act(() => store.update(l.id, { color: ev.target.value }));
       } }, LABEL_COLORS.map(([k, name]) => el("option", { value: k, selected: k === colorKey(l.color) }, name))),
-      delButton(() => act(() => store.remove(l.id))))));
+      delButton(() => removeWithUndo(store, l.id)))));
     if (ringFocus) list.querySelector(`[data-ring="${ringFocus}"]`)?.focus(); // pressed from the keyboard: still on it
   }
   for (const [store, id, what] of [[labels, "labelList", "ラベル"], [subjects, "subjectList", "科目"]]) {
@@ -3731,7 +3753,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // the chart stops drawing; the sheet goes down and the goal with it, or, opened from a day, the day's list comes back
     mandalaGoal = null;
     if (chartFromDay) { chartFromDay = false; syncSheetHead(); $("sheetTitle").focus(); } else closeSheet();
-    act(() => goals.remove(id));
+    removeWithUndo(goals, id);
   });
 
   // an event's edit form: its text, days, times, repeat and label, and a delete that asks for a second press. For a
@@ -4090,7 +4112,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     const { kind, id } = recEdit;
     closeSheet();
-    act(() => REC_EDIT[kind].store.remove(id));
+    removeWithUndo(REC_EDIT[kind].store, id);
   });
   // Japan's national holidays (国民の祝日) by the rules in force since 2020: the fixed days, the Mondays (ハッピーマンデー),
   // the equinoxes (a formula good for 1980–2099), a day off after one on a Sunday (振替休日) and a day between two of them
