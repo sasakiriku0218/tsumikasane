@@ -277,7 +277,7 @@ html[data-tab="calendar"] .wrap { padding-top: max(var(--space-1), env(safe-area
   html:is([data-tab="todo"], [data-tab="goal"]) #status { bottom: calc(max(var(--space-2), env(safe-area-inset-bottom, 0px)) + var(--pagebar) + 12px); }
   .navbar { padding-inline: var(--space-3); }
   .back { display: none; }
-  html[data-tab="reclist"] .back { display: grid; }
+  html:is([data-tab="reclist"], [data-tab="trash"]) .back { display: grid; }
 }
 
 /* ---------- pages ---------- */
@@ -808,6 +808,7 @@ ul.list > li.btn-row { padding: 0; }
 .row-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px var(--space-2); background: transparent; border: 0; border-radius: inherit; color: var(--accent); text-align: left; line-height: 1.3; cursor: pointer; }
 .row-btn.nav { color: var(--fg); }
 .row-btn .chev { display: grid; color: var(--muted); }
+.row-btn .row-count { margin-inline-start: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* 記録: これまでの積み重ね — everything recorded so far in one view (the user's call: no weeks, months or years, and no
    charts; entries are made from きょう). A card per record in its colour, Health-style: the total and a line or two under
    it; for study and money, the three largest as a short list */
@@ -944,6 +945,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-money" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19ZM8.3 6.9l1.3-.9 2.4 3.5 2.4-3.5 1.3.9-2.6 3.8H15v1.5h-2.25v1.2H15v1.5h-2.25V18h-1.5v-3.1H9v-1.5h2.25v-1.2H9v-1.5h1.9L8.3 6.9Z"/></symbol>
   <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .53.22l3.25 3.25a.75.75 0 0 1-1.06 1.06l-1.97-1.97v9.44a.75.75 0 0 1-1.5 0V4.81L9.28 6.78a.75.75 0 0 1-1.06-1.06l3.25-3.25A.75.75 0 0 1 12 2.25ZM6.5 9.5h2a.75.75 0 0 1 0 1.5h-2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.75.75 0 0 1 0-1.5h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/></symbol>
   <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .75.75v9.44l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0l-3.25-3.25a.75.75 0 1 1 1.06-1.06l1.97 1.97V3a.75.75 0 0 1 .75-.75ZM6.5 9.5h2a.75.75 0 0 1 0 1.5h-2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.75.75 0 0 1 0-1.5h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M9.25 3.75h5.5M4.75 6.5h14.5m-12.75 0 .85 12.65a1.5 1.5 0 0 0 1.5 1.35h6.3a1.5 1.5 0 0 0 1.5-1.35l.85-12.65M10 10.25v6.25m4-6.25v6.25" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
 <div class="app">
@@ -1062,6 +1064,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <section id="sec-records" style="--sec-c: var(--accent)" hidden>
         <div class="sec-head"><h2>記録</h2><p class="sum-since" id="sumSince"></p></div>
         <div class="grid" id="sumCards"></div>
+        <!-- what was deleted in the last 30 days, each back with a tap (the user's call, as the iPhone's Photos keeps them) -->
+        <ul class="list card">
+          <li class="btn-row"><button type="button" class="row-btn nav" id="trashBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-trash"/></svg><span>最近削除した項目</span><span class="row-count" id="trashCount"></span><span class="chev"><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></span></button></li>
+        </ul>
         <h3 class="group-head">バックアップ</h3>
         <ul class="list card">
           <li class="btn-row"><button type="button" class="row-btn" id="exportBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>記録を書き出す</button></li>
@@ -1096,6 +1102,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <button type="button" class="rec-search-clear" id="recSearchClear" aria-label="探す言葉を消す" hidden><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
         </div>
         <div class="rec-groups" id="recList"></div>
+      </section>
+
+      <!-- 記録 › 最近削除した項目: what was deleted in the last 30 days, newest first, each with 戻す; then it goes for good -->
+      <section id="sec-trash" hidden>
+        <div class="sec-head"><h2>最近削除した項目</h2><p class="sum-since" id="trashNote"></p></div>
+        <ul class="list card" id="trashList"></ul>
+        <p class="group-foot">削除してから 30 日のあいだは、ここから戻せます。そのあとは自動で消えます。</p>
       </section>
 
       <!-- 日記: the writing only, under 「ひとこと」 (the user's call: no mood scale of つらい … 最高) -->
@@ -1626,7 +1639,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const PAGES = [...TABS, ...RECORDS];
   const isRecord = (key) => RECORDS.some((r) => r.key === key);
   // a page a level down, under a tab, outside the menu: a record's entries under 記録
-  const SUBPAGES = [{ key: "reclist", parent: "records" }];
+  const SUBPAGES = [{ key: "reclist", parent: "records" }, { key: "trash", parent: "records" }];
   // the page a page sits under: きょう for the record pages, 記録 for a record's entries
   const parentOf = (key) => (isRecord(key) ? "home" : SUBPAGES.find((p) => p.key === key)?.parent || null);
   const SLOTS = ["朝食", "昼食", "夕食", "間食"];
@@ -1693,9 +1706,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     remove(id) { return this.removeMany([id]); }
     // several at once, with one save and one redraw for all of them (完了したものを削除)
     async removeMany(ids) {
-      const here = new Set(this.items.map((x) => x.id)), gone = new Set(ids.filter((id) => here.has(id)));
-      this.items = this.items.filter((x) => !gone.has(x.id));
-      noteDeleted(this, ...gone);
+      const drop = new Set(ids), gone = this.items.filter((x) => drop.has(x.id));
+      this.items = this.items.filter((x) => !drop.has(x.id));
+      noteDeleted(this, gone);
       this.saveLocal(); renderAll();
     }
     // records deleted a moment ago, back as they were with their ids (元に戻す)
@@ -1727,19 +1740,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const STORE_NAMES = { todos: "ToDo", journal: "日記", meals: "食事", workouts: "運動", weights: "体重", expenses: "家計簿", goals: "目標", events: "予定", labels: "予定のラベル", study: "勉強", subjects: "勉強の科目", routines: "ルーティーン", routineDays: "ルーティーンのチェック" };
 
   // ---------- 消した記録 ----------
-  // each record deleted here is remembered (its kind, id and when), so a file or copy read in later doesn't bring it back
-  // (mergeRecords) and the check against the daily copies doesn't take it for lost (missingIn). One put back with the same
-  // id (元に戻す) is no longer counted as deleted. Settings aren't records and aren't remembered
+  // each record deleted here is remembered (its kind, id and when, and for 30 days what it held, for 最近削除した項目), so a
+  // file or copy read in later doesn't bring it back (mergeRecords) and the check against the daily copies doesn't take it
+  // for lost (missingIn). One put back with the same id (元に戻す, 戻す) is no longer counted as deleted. Settings aren't
+  // records and aren't remembered
   const delKey = (st, id) => `${st.name}/${id}`;
   const remembers = (st) => st !== settings && st !== deleted;
-  function noteDeleted(st, ...ids) {
-    if (!remembers(st) || !ids.length) return;
+  function noteDeleted(st, records) {
+    if (!remembers(st) || !records.length) return;
     const at = Date.now();
-    for (const id of ids) {
-      const key = delKey(st, id), had = deleted.get(key);
-      if (had) had.at = at; else deleted.items.push({ id: key, store: st.name, rid: id, at });
+    for (const x of records) {
+      const key = delKey(st, x.id), data = JSON.parse(JSON.stringify(x)), had = deleted.get(key);
+      if (had) Object.assign(had, { at, data }); else deleted.items.push({ id: key, store: st.name, rid: x.id, at, data });
     }
     deleted.saveLocal();
+  }
+  // after 30 days only the id stays (so nothing older brings the record back), not what it held
+  const TRASH_DAYS = 30;
+  function pruneTrash() {
+    const old = Date.now() - TRASH_DAYS * 864e5;
+    let changed = false;
+    for (const t of deleted.items) if (t.data && !(t.at > old)) { delete t.data; changed = true; }
+    if (changed) deleted.saveLocal();
   }
   function undelete(st, ...ids) {
     const keys = new Set(ids.map((id) => delKey(st, id)));
@@ -1870,7 +1892,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // the record pages open from きょう (entries are made there; 記録 only sums up). On iPhone the きょう tab reopens the record
     // page left open there; pressed again from inside, it goes back to きょう
     if (key === "home" && !wideScreen.matches && lastRecord && tab !== "home" && !isRecord(tab)) key = lastRecord;
-    if (key === "records" && !wideScreen.matches && recListKind && tab !== "records" && tab !== "reclist") key = "reclist";
+    if (key === "records" && !wideScreen.matches && recListKind && tab !== "records" && tab !== "reclist" && tab !== "trash") key = "reclist";
     // the calendar has no きょうへ button (the user's call): its tab pressed again comes back to today, as iOS tabs reset
     if (key === "calendar" && tab === "calendar") setCalDay(todayKey);
     showTab(key);
@@ -1916,6 +1938,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (key === "weight") draw(renderWeightChart);
     if (key === "records") draw(renderSummary);
     if (key === "reclist") draw(renderRecList);
+    if (key === "trash") draw(renderTrash);
   }
   $("backBtn").addEventListener("click", () => { const up = parentOf(tab); if (up) showTab(up); });
 
@@ -2103,7 +2126,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     journalChain = journalChain.then(async () => {
       try {
         if (!text) {
-          if (journal.get(date)) await journal.remove(date);
+          // emptied, the day's 日記 goes, with 元に戻す, and stays in 最近削除した項目 for 30 days
+          if (journal.get(date)) removeWithUndo(journal, date);
         } else {
           // a mood from before the scale went stays in the entry (and its backups), unseen
           await journal.set(date, { ...journal.get(date), date, text, updatedAt: Date.now() });
@@ -4366,7 +4390,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     clearTimeout(homeJournalTimer); homeJournalTimer = null;
     const text = ta.value.trim(), cur = journal.get(todayKey);
     if ((cur?.text || "") === text) { if (document.activeElement !== ta && !leftTo) renderHome(); return; }
-    if (!text) { act(() => journal.remove(todayKey)); return; }
+    if (!text) { removeWithUndo(journal, todayKey); return; }
     act(() => journal.set(todayKey, { ...cur, date: todayKey, text, updatedAt: Date.now() }));
   }
   document.addEventListener("visibilitychange", () => {
@@ -5108,6 +5132,52 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (file) importRecords(file);
   });
 
+  // ---------- 最近削除した項目 ----------
+  // what deleted records held in the last 30 days, newest first, each back with 戻す as it was (its id too, so what pointed
+  // at it, a plan's label or a day's checks, is right again)
+  const trashItems = () => deleted.items.filter((t) => t.data).sort((a, b) => b.at - a.at);
+  // a deleted record in a few words, as its own page puts it
+  function trashText(t) {
+    const x = t.data, day = isDay(x.date) ? fmtMDW(x.date) + "　" : "";
+    switch (t.store) {
+      case "todos": return x.text || "";
+      case "journal": return day + (x.text || "");
+      case "meals": return day + [x.slot, x.text].filter(Boolean).join(" ");
+      case "workouts": return day + [x.type, x.exercise, x.note].filter(Boolean).join(" ");
+      case "weights": return day + fmtKg(x.kg) + " kg";
+      case "expenses": return day + [expenseCat(x) || (x.kind === "in" ? "収入" : "支出"), x.memo, fmtYen(num(x.amount))].filter(Boolean).join(" ");
+      case "study": return day + [subjectOf(x)?.name, num(x.minutes) ? `${num(x.minutes)} 分` : "", x.note].filter(Boolean).join(" ");
+      case "events": return day + (x.title || "");
+      case "routineDays": return (isDay(x.date) ? fmtMDW(x.date) : "") + "のチェック";
+      default: return x.title || x.name || x.text || "";
+    }
+  }
+  function renderTrash() {
+    const items = trashItems();
+    $("trashNote").textContent = items.length ? `${items.length.toLocaleString("ja-JP")} 件・新しい順` : "";
+    setChildren($("trashList"), items.length ? items.map((t) => {
+      const ago = daysBetween(ymd(new Date(t.at)), todayKey), left = Math.max(1, TRASH_DAYS - ago), text = trashText(t);
+      const when = ago <= 0 ? "きょう" : ago === 1 ? "きのう" : `${ago} 日前に`;
+      return el("li", {},
+        el("span", { class: "body" }, el("span", { class: "text clamp" }, text || "（中身なし）"),
+          el("span", { class: "sub" }, keepUnits(`${STORE_NAMES[t.store] || ""}・${when}削除・あと ${left} 日`))),
+        el("button", { type: "button", class: "link-btn", "aria-label": `「${text}」を戻す`, onclick: () => restoreFromTrash(t.id) }, "戻す"));
+    }) : el("li", { class: "empty" }, "最近削除した項目はありません。"));
+  }
+  function renderTrashRow() {
+    const n = trashItems().length;
+    $("trashCount").textContent = n ? n.toLocaleString("ja-JP") : "";
+    $("trashBtn").setAttribute("aria-label", n ? `最近削除した項目、${n} 件` : "最近削除した項目");
+  }
+  function restoreFromTrash(key) {
+    const t = deleted.get(key), st = t && ALL_STORES.find((x) => x.name === t.store);
+    if (!st || !t.data || !fits(st, t.data)) { flash("この記録は戻せませんでした。"); return; }
+    act(() => st.putBack([t.data]));
+    flash(`${STORE_NAMES[st.name]}を戻しました`);
+  }
+  // drawn before the page slides in, so it arrives whole
+  $("trashBtn").addEventListener("click", () => { renderTrash(); showTab("trash"); });
+
   // ---------- 書きかけ ----------
   // what was being typed into an add form and not yet added is kept as the app goes away, and put back when it opens
   // again: after the reload a new day brings, or when the phone has closed the app meanwhile (日記 saves itself, and an
@@ -5171,16 +5241,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    for (const fn of [renderDateNavs, renderHome, renderTodos, renderJournal, renderMeals, renderWorkouts, renderStudy, renderRoutine, renderWeight, renderMoney, renderGoals, renderCalendar, renderLabels, renderTileList, renderBackup, renderSummary, paintChart]) draw(fn);
+    for (const fn of [renderDateNavs, renderHome, renderTodos, renderJournal, renderMeals, renderWorkouts, renderStudy, renderRoutine, renderWeight, renderMoney, renderGoals, renderCalendar, renderLabels, renderTileList, renderBackup, renderTrashRow, renderSummary, paintChart]) draw(fn);
     if (tab === "reclist") draw(renderRecList);
+    if (tab === "trash") draw(renderTrash);
   }
   // the safeguards first, so a page that can't be drawn doesn't keep them from running
+  pruneTrash();
   showMode();
   checkRestore().then(() => saveCopy());
   askPersist();
   const initial = (location.hash || "").slice(1);
   // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
-  draw(() => setTab(initial === "reclist" ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home"));
+  draw(() => setTab(initial === "reclist" || initial === "trash" ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home"));
   draw(loadJournalForm);
   renderAll();
   draw(() => restoreDraft(!initial || initial === "home"));
