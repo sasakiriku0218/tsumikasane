@@ -277,7 +277,7 @@ html[data-tab="calendar"] .wrap { padding-top: max(var(--space-1), env(safe-area
   html:is([data-tab="todo"], [data-tab="goal"]) #status { bottom: calc(max(var(--space-2), env(safe-area-inset-bottom, 0px)) + var(--pagebar) + 12px); }
   .navbar { padding-inline: var(--space-3); }
   .back { display: none; }
-  html:is([data-tab="reclist"], [data-tab="trash"]) .back { display: grid; }
+  html:is([data-tab="reclist"], [data-tab="trash"], [data-tab="copies"]) .back { display: grid; }
 }
 
 /* ---------- pages ---------- */
@@ -810,6 +810,9 @@ ul.list > li.btn-row { padding: 0; }
 .row-btn.nav { color: var(--fg); }
 .row-btn .chev { display: grid; color: var(--muted); }
 .row-btn .row-count { margin-inline-start: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row-btn .row-count.warn { color: var(--warn); }
+.check-line { display: flex; align-items: center; gap: var(--space-1); margin-top: 6px; line-height: 1.4; }
+.check-line input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
 /* 記録: これまでの積み重ね — everything recorded so far in one view (the user's call: no weeks, months or years, and no
    charts; entries are made from きょう). A card per record in its colour, Health-style: the total and a line or two under
    it; for study and money, the three largest as a short list */
@@ -947,6 +950,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .53.22l3.25 3.25a.75.75 0 0 1-1.06 1.06l-1.97-1.97v9.44a.75.75 0 0 1-1.5 0V4.81L9.28 6.78a.75.75 0 0 1-1.06-1.06l3.25-3.25A.75.75 0 0 1 12 2.25ZM6.5 9.5h2a.75.75 0 0 1 0 1.5h-2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.75.75 0 0 1 0-1.5h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/></symbol>
   <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .75.75v9.44l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0l-3.25-3.25a.75.75 0 1 1 1.06-1.06l1.97 1.97V3a.75.75 0 0 1 .75-.75ZM6.5 9.5h2a.75.75 0 0 1 0 1.5h-2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.75.75 0 0 1 0-1.5h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M9.25 3.75h5.5M4.75 6.5h14.5m-12.75 0 .85 12.65a1.5 1.5 0 0 0 1.5 1.35h6.3a1.5 1.5 0 0 0 1.5-1.35l.85-12.65M10 10.25v6.25m4-6.25v6.25" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-copies" viewBox="0 0 24 24"><path d="M9 8.75h9.25a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9.75a1 1 0 0 1 1-1Zm7-3v-.75a1 1 0 0 0-1-1H5.75a1 1 0 0 0-1 1v9.25a1 1 0 0 0 1 1h1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
 <div class="app">
@@ -1081,6 +1085,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <ul class="list card">
           <li class="btn-row"><button type="button" class="row-btn" id="exportBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>記録を書き出す</button></li>
           <li class="btn-row"><button type="button" class="row-btn" id="importBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-import"/></svg>記録を読み込む</button></li>
+          <li class="btn-row" id="copiesRow" hidden><button type="button" class="row-btn nav" id="copiesBtn"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-copies"/></svg><span>端末の中のコピー</span><span class="row-count" id="copiesLatest"></span><span class="chev"><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></span></button></li>
         </ul>
         <!-- the last export, on a line of its own under the buttons, as iOS gives the last backup (the user's call: it was
              lost at the end of the explanation) -->
@@ -1118,6 +1123,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="sec-head"><h2>最近削除した項目</h2><p class="sum-since" id="trashNote"></p></div>
         <ul class="list card" id="trashList"></ul>
         <p class="group-foot">削除してから 30 日のあいだは、ここから戻せます。そのあとは自動で消えます。</p>
+      </section>
+
+      <!-- 記録 › 端末の中のコピー: the copies made each day, newest first; one picked shows what it would bring back first -->
+      <section id="sec-copies" hidden>
+        <div class="sec-head"><h2>端末の中のコピー</h2><p class="sum-since" id="copiesNote"></p></div>
+        <div class="card import-ask" id="copyAsk" hidden>
+          <strong>このコピーから戻しますか？</strong>
+          <span class="nudge-text" id="copyAskText"></span>
+          <label class="check-line" id="copyAskDeadRow" hidden><input type="checkbox" id="copyAskDead"><span id="copyAskDeadText"></span></label>
+          <div class="notice-actions">
+            <button type="button" class="btn sm" id="copyGo">戻す</button>
+            <button type="button" class="link-btn" id="copyCancel">やめる</button>
+          </div>
+        </div>
+        <ul class="list card" id="copiesList"></ul>
+        <p class="group-foot">アプリを開いたときに毎日作られ、この 1 週間の分と、その前は週に 1 つ・月に 1 つが残ります。戻しても、いまある記録は変わりません。ホーム画面のアプリといっしょに消えることがあるので、ファイルへの書き出しもしておいてください。</p>
       </section>
 
       <!-- 日記: the writing only, under 「ひとこと」 (the user's call: no mood scale of つらい … 最高) -->
@@ -1648,7 +1669,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const PAGES = [...TABS, ...RECORDS];
   const isRecord = (key) => RECORDS.some((r) => r.key === key);
   // a page a level down, under a tab, outside the menu: a record's entries under 記録
-  const SUBPAGES = [{ key: "reclist", parent: "records" }, { key: "trash", parent: "records" }];
+  const SUBPAGES = [{ key: "reclist", parent: "records" }, { key: "trash", parent: "records" }, { key: "copies", parent: "records" }];
   // the page a page sits under: きょう for the record pages, 記録 for a record's entries
   const parentOf = (key) => (isRecord(key) ? "home" : SUBPAGES.find((p) => p.key === key)?.parent || null);
   const SLOTS = ["朝食", "昼食", "夕食", "間食"];
@@ -1909,7 +1930,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // the record pages open from きょう (entries are made there; 記録 only sums up). On iPhone the きょう tab reopens the record
     // page left open there; pressed again from inside, it goes back to きょう
     if (key === "home" && !wideScreen.matches && lastRecord && tab !== "home" && !isRecord(tab)) key = lastRecord;
-    if (key === "records" && !wideScreen.matches && recListKind && tab !== "records" && tab !== "reclist" && tab !== "trash") key = "reclist";
+    if (key === "records" && !wideScreen.matches && recListKind && tab !== "records" && tab !== "reclist" && tab !== "trash" && tab !== "copies") key = "reclist";
     // the calendar has no きょうへ button (the user's call): its tab pressed again comes back to today, as iOS tabs reset
     if (key === "calendar" && tab === "calendar") setCalDay(todayKey);
     showTab(key);
@@ -1957,6 +1978,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (key === "records") draw(renderSummary);
     if (key === "reclist") draw(renderRecList);
     if (key === "trash") draw(renderTrash);
+    if (key === "copies") draw(renderCopies);
   }
   $("backBtn").addEventListener("click", () => { const up = parentOf(tab); if (up) showTab(up); });
 
@@ -4979,9 +5001,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // differs (the same day's 日記 or 体重 from another phone, a setting), so nothing on this device is lost or changed.
   // A record deleted here or where the set came from isn't brought back, and the set's deleted records (those not here)
   // are remembered here too, so an older file can't bring them back later either
-  // what it added comes back as [store, ids], for 元に戻す (unmerge)
-  function mergeRecords(data) {
-    const added = [], dead = deadIn(data);
+  // what it added comes back as [store, ids], for 元に戻す (unmerge). withDeleted (a copy picked by hand, the box ticked)
+  // brings back deleted ones too, which are then no longer counted as deleted
+  function mergeRecords(data, withDeleted = false) {
+    const added = [], dead = withDeleted ? new Set() : deadIn(data);
     const tomb = incomingOf(data, deleted).filter((t) => fits(deleted, t) && !deleted.get(t.id) && !ALL_STORES.find((s) => s.name === t.store)?.get(t.rid));
     if (tomb.length) { deleted.items = [...deleted.items, ...tomb]; deleted.saveLocal(); added.push([deleted, tomb.map((t) => t.id)]); }
     for (const s of ALL_STORES) {
@@ -4989,6 +5012,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const here = new Set(s.items.map((x) => x.id)), add = incomingOf(data, s).filter((x) => !here.has(x.id) && !dead.has(delKey(s, x.id)) && fits(s, x));
       if (!add.length) continue;
       s.items = [...s.items, ...add];
+      if (withDeleted) undelete(s, ...add.map((x) => x.id));
       s.saveLocal();
       added.push([s, add.map((x) => x.id)]);
     }
@@ -5086,6 +5110,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       r.onerror = () => { db.close(); reject(r.error); };
     }));
   }
+  // what is known of the copies (from their days and the newest one read or made): for the row on 記録
+  const copyState = { latest: 0, n: 0, failed: false };
+  function renderCopyRow() {
+    $("copiesRow").hidden = !(canStoreLocal && window.indexedDB);
+    const at = copyState.latest ? new Date(copyState.latest) : null;
+    $("copiesLatest").textContent = copyState.failed ? "作れませんでした" : at ? `最新 ${at.getMonth() + 1}/${at.getDate()} ${at.getHours()}:${pad(at.getMinutes())}` : "まだありません";
+    $("copiesLatest").classList.toggle("warn", copyState.failed);
+    $("copiesBtn").setAttribute("aria-label", `端末の中のコピー、${$("copiesLatest").textContent}${copyState.n ? `、${copyState.n} 個` : ""}`);
+  }
   // the first time, every copy is looked through once: those made before only held what was here on their own day
   const CARRY_KEY = LS_PREFIX + "copiesCarry";
   const carriedAll = () => { try { return !!localStorage.getItem(CARRY_KEY); } catch { return true; } };
@@ -5114,11 +5147,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         st.put({ day: todayKey, savedAt: Date.now(), count: recordCount(copy), data: copy });
         const keep = copiesKept([todayKey, ...days.filter((d) => d !== todayKey)]);
         for (const d of days) if (!keep.has(d)) st.delete(d);
-        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.oncomplete = () => { db.close(); Object.assign(copyState, { latest: Date.now(), n: keep.size, failed: false }); resolve(); };
         tx.onerror = () => { db.close(); reject(tx.error); };
       });
       if (all) try { localStorage.setItem(CARRY_KEY, "1"); } catch {}
-    } catch {}
+    } catch { copyState.failed = true; }
+    draw(renderCopyRow);
+    if (tab === "copies") draw(renderCopies);
   }
   // records taken back after a reading-in (元に戻す) leave today's copy as well, so the check against the copies doesn't
   // offer them back (in turn after a copy being made)
@@ -5152,9 +5187,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       // (saveCopy keeps them on), so it is the only one read, but for the first time. One from before: all of it gone,
       // or at least ten records and half missing. このままでいい set aside a copy from before and every older one
       let pick = null, lost = null;
-      for (const day of await copyDays()) {
+      const days = await copyDays();
+      copyState.n = days.length;
+      for (const day of days) {
         const c = await readCopy(day);
         if (!c) continue;
+        if (day === days[0]) { copyState.latest = c.savedAt; draw(renderCopyRow); }
         if (!(c.savedAt > skipped)) break;
         const m = lostIn(c);
         if (c.count > 0 && (m ? m.length : now === 0 || (c.count - now >= 10 && now < c.count / 2))) { pick = c; lost = m; break; }
@@ -5260,6 +5298,52 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     ev.target.value = "";
     if (file) importRecords(file);
   });
+
+  // ---------- 端末の中のコピー ----------
+  // the copies by their days, newest first (only the days are read); one tapped is read and says what it would bring back
+  let copyPending = null; // the copy waiting on 戻す
+  async function renderCopies() {
+    if (!canStoreLocal || !window.indexedDB) return;
+    let days = [];
+    try { days = await copyDays(); } catch {}
+    $("copiesNote").textContent = days.length ? `${days.length} 個・新しい順` : "";
+    setChildren($("copiesList"), days.length ? days.map((d) => {
+      const ago = daysBetween(d, todayKey), rel = ago <= 0 ? "きょう" : ago === 1 ? "きのう" : `${ago} 日前`;
+      return el("li", { class: "btn-row" }, el("button", { type: "button", class: "row-btn nav", "aria-label": `${fmtMDW(d)}のコピーを見る`, onclick: () => openCopy(d) },
+        el("span", { class: "body" }, el("span", { class: "text" }, fmtMDW(d)), el("span", { class: "sub" }, rel + (d === days[0] ? "・最新" : ""))),
+        el("span", { class: "chev" }, icon("next", 16))));
+    }) : el("li", { class: "empty" }, "まだコピーはありません。アプリを開くと、毎日作られます。"));
+  }
+  async function openCopy(day) {
+    let c = null;
+    try { c = await readCopy(day); } catch {}
+    if (!c) { flash("このコピーは読めませんでした。"); return; }
+    const plan = mergePlan(c.data), at = new Date(c.savedAt), when = `${fmtMDW(day)} ${at.getHours()}:${pad(at.getMinutes())}`;
+    if (!plan.add && !plan.gone) { flash("このコピーの記録は、すべてこの端末にあります。"); return; }
+    copyPending = c;
+    $("copyAskText").textContent = `${when} 時点のコピー（${c.count.toLocaleString("ja-JP")} 件）から、`
+      + (plan.add ? `この端末にない記録を ${plan.add.toLocaleString("ja-JP")} 件（${plan.adds.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")}`).join("・")}）戻します。` : "戻す記録はありません。")
+      + "いまある記録は変わりません。";
+    $("copyAskDeadRow").hidden = !plan.gone;
+    $("copyAskDead").checked = !plan.add;
+    $("copyAskDeadText").textContent = `この端末で消した ${plan.gone.toLocaleString("ja-JP")} 件も戻す`;
+    $("copyAsk").hidden = false;
+    $("copyAsk").scrollIntoView({ block: "nearest" });
+    $("copyGo").focus();
+  }
+  // brought back with 元に戻す for a while, as from the notice; the deleted ones taken back are counted as deleted again
+  $("copyGo").addEventListener("click", () => {
+    if (!copyPending) return;
+    const withDeleted = !$("copyAskDeadRow").hidden && $("copyAskDead").checked, tombBefore = JSON.parse(JSON.stringify(deleted.items));
+    const added = mergeRecords(copyPending.data, withDeleted), count = addedCount(added);
+    copyPending = null; $("copyAsk").hidden = true;
+    saveCopy();
+    flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を戻しました。` : "戻す記録はありませんでした。",
+      count ? () => { unmerge(added); if (withDeleted) deleted.restore(tombBefore); flash("取り消しました。"); checkRestore(); } : null, 10000);
+  });
+  $("copyCancel").addEventListener("click", () => { copyPending = null; $("copyAsk").hidden = true; });
+  // drawn before the page slides in, so it arrives with its days
+  $("copiesBtn").addEventListener("click", async () => { copyPending = null; $("copyAsk").hidden = true; await renderCopies(); showTab("copies"); });
 
   // ---------- 最近削除した項目 ----------
   // what deleted records held in the last 30 days, newest first, each back with 戻す as it was (its id too, so what pointed
@@ -5395,9 +5479,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    for (const fn of [renderDateNavs, renderHome, renderTodos, renderJournal, renderMeals, renderWorkouts, renderStudy, renderRoutine, renderWeight, renderMoney, renderGoals, renderCalendar, renderLabels, renderTileList, renderBackup, renderTrashRow, renderEmptyHint, renderSummary, paintChart]) draw(fn);
+    for (const fn of [renderDateNavs, renderHome, renderTodos, renderJournal, renderMeals, renderWorkouts, renderStudy, renderRoutine, renderWeight, renderMoney, renderGoals, renderCalendar, renderLabels, renderTileList, renderBackup, renderTrashRow, renderCopyRow, renderEmptyHint, renderSummary, paintChart]) draw(fn);
     if (tab === "reclist") draw(renderRecList);
     if (tab === "trash") draw(renderTrash);
+    if (tab === "copies") draw(renderCopies);
   }
   // the safeguards first, so a page that can't be drawn doesn't keep them from running
   pruneTrash();
@@ -5406,7 +5491,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   askPersist();
   const initial = (location.hash || "").slice(1);
   // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
-  draw(() => setTab(initial === "reclist" || initial === "trash" ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home"));
+  draw(() => setTab(["reclist", "trash", "copies"].includes(initial) ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home"));
   draw(loadJournalForm);
   renderAll();
   draw(() => restoreDraft(!initial || initial === "home"));
