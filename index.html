@@ -5003,15 +5003,25 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     } catch { storageKept = false; }
     renderBackup();
   }
+  // records written or changed since the records were last written out, by their own times (the ones from before
+  // records had times aren't counted)
+  function sinceExport(last) {
+    let n = 0;
+    for (const s of ALL_STORES) if (remembers(s)) for (const x of s.items) if (Math.max(num(x.createdAt), num(x.updatedAt)) > last) n++;
+    return n;
+  }
+  // the reminder is due a week after the last time, or sooner once this many records have come since (the user's call:
+  // not by days alone, since a busy few days put more at stake)
+  const BACKUP_AFTER = 30;
   function renderBackup() {
     const b = settings.get("backup") || {};
     const last = num(b.lastExport);
-    const days = last ? daysBetween(ymd(new Date(last)), todayKey) : null;
-    const due = !last || days >= 7, enough = recordCount(allData()) >= 10;
+    const days = last ? daysBetween(ymd(new Date(last)), todayKey) : null, added = last ? sinceExport(last) : 0;
+    const due = !last || days >= 7 || added >= BACKUP_AFTER, enough = recordCount(allData()) >= 10;
     // its words kept whole (keep-all), so it breaks neither as 10／月17日 nor as （12 日／前）
     $("backupLast").hidden = !canStoreLocal;
     $("backupLast").textContent = keepUnits(last
-      ? `最後に書き出した日：${fmtMDW(ymd(new Date(last)))}` + (days ? `（${days} 日前）` : "（きょう）")
+      ? `最後に書き出した日：${fmtMDW(ymd(new Date(last)))}` + (days ? `（${days} 日前）` : "（きょう）") + (added ? `。そのあと記録が ${added.toLocaleString("ja-JP")} 件ふえています` : "")
       : "まだ一度も書き出していません");
     $("backupLast").classList.toggle("due", due && enough);
     // short (the user's call): where the records are, that they can go, and what a written-out file is for
@@ -5021,7 +5031,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       : "この画面では記録が保存されません。";
     const snoozed = b.snoozeUntil && b.snoozeUntil > todayKey;
     $("backupNudge").hidden = !(canStoreLocal && due && !snoozed && enough);
-    $("backupNudgeText").textContent = (last ? `最後に書き出してから ${days} 日たちました。` : "まだ一度も記録を書き出していません。")
+    $("backupNudgeText").textContent = (!last ? "まだ一度も記録を書き出していません。"
+      : added ? `最後に書き出してから${days ? ` ${days} 日で、` : "、"}記録が ${added.toLocaleString("ja-JP")} 件ふえました。`
+      : `最後に書き出してから ${days} 日たちました。`)
       + "端末の空き容量が少ないときなどに記録が消えることがあるので、ときどき書き出しておくと安心です。";
   }
   $("nudgeExport").addEventListener("click", () => exportRecords());
