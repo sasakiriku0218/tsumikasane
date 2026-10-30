@@ -980,6 +980,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
       </div>
 
+      <!-- 端末に保存しきれなくなったとき（空き容量が足りない、または保存できる量の上限）：書き出しの案内 -->
+      <div class="notice" id="fullNote" role="status" hidden>
+        <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="警告"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg>記録を保存できません</strong>
+        <span>端末の空き容量が足りないか、このアプリが保存できる量の上限に達しています。このままだと、新しく書いた記録は開き直したときに消えてしまいます。いまのうちに「記録を書き出す」でファイルに残してください。</span>
+        <div class="notice-actions">
+          <button type="button" class="btn" id="fullExport">記録を書き出す</button>
+          <button type="button" class="link-btn" id="fullRetry">もう一度保存する</button>
+        </div>
+      </div>
+
       <!-- ホーム -->
       <section id="sec-home" style="--sec-c: var(--accent)">
         <!-- the large title is today's date itself (the user's call), not the word きょう with a small date above it; the tab
@@ -1620,21 +1630,50 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- storage: this device's browser (localStorage) ----------
   const LS_PREFIX = "tsumikasane:";
-  // some views refuse browser storage (private browsing, Claude's file preview); the page then says nothing is kept
+  // some views refuse browser storage (private browsing, Claude's file preview); the page then says nothing is kept.
+  // Storage that is there but full (no room left on the phone, or the most a site may keep) refuses the probe too; records
+  // already in it tell the two apart, and then the page keeps working and says it can't save (storageFull, renderSaveNote)
+  let storageFull = false;
   const canStoreLocal = (() => {
-    try { localStorage.setItem(LS_PREFIX + "probe", "1"); localStorage.removeItem(LS_PREFIX + "probe"); return true; } catch { return false; }
+    try { localStorage.setItem(LS_PREFIX + "probe", "1"); localStorage.removeItem(LS_PREFIX + "probe"); return true; }
+    catch {
+      try { if (localStorage.length) { storageFull = true; return true; } } catch {}
+      return false;
+    }
   })();
   class Store {
-    constructor(name) { this.name = name; this.items = this.loadLocal(); }
-    loadLocal() { try { return JSON.parse(localStorage.getItem(LS_PREFIX + this.name)) || []; } catch { return []; } }
+    constructor(name) { this.name = name; this.unsaved = false; this.items = this.loadLocal(); }
+    // text that can't be read back (cut short, or not a list) is kept aside under a key of its own instead of being saved
+    // over, and the store starts empty: the check against the daily copies (checkRestore) then offers its records back
+    loadLocal() {
+      let raw = null;
+      try { raw = localStorage.getItem(LS_PREFIX + this.name); } catch { return []; }
+      if (raw === null) return [];
+      try { const v = JSON.parse(raw); if (Array.isArray(v)) return v.filter((x) => x && typeof x === "object"); } catch {}
+      // kept once: opened again before anything is saved over it, the same text isn't kept a second time
+      const aside = `${LS_PREFIX}unreadable:${this.name}:`;
+      try { if (!Object.keys(localStorage).some((k) => k.startsWith(aside) && localStorage.getItem(k) === raw)) localStorage.setItem(aside + Date.now(), raw); } catch {}
+      return [];
+    }
+    // a save the browser won't take (full) leaves the records here in the page, marked unsaved: the note at the top says
+    // so, today's copy takes them in (keepUnsaved), and the next save that goes through brings them along (retryUnsaved)
     saveLocal() {
       try { localStorage.setItem(LS_PREFIX + this.name, JSON.stringify(this.items)); }
-      catch { if (canStoreLocal) showError(); }
+      catch {
+        if (!canStoreLocal) return false;
+        this.unsaved = true;
+        showError(); renderSaveNote(); keepUnsaved();
+        return false;
+      }
+      this.unsaved = false;
+      if (storageFull || ALL_STORES.some((x) => x.unsaved)) { storageFull = false; retryUnsaved(); }
+      return true;
     }
     async add(data) { const id = uid(); this.items.push({ id, ...data }); this.saveLocal(); renderAll(); return id; }
     async set(id, data) {
       const i = this.items.findIndex((x) => x.id === id);
       if (i >= 0) this.items[i] = { id, ...data }; else this.items.push({ id, ...data });
+      undelete(this, id);
       this.saveLocal(); renderAll();
     }
     async update(id, patch) {
@@ -1642,7 +1681,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       if (it) Object.assign(it, patch);
       this.saveLocal(); renderAll();
     }
-    async remove(id) { this.items = this.items.filter((x) => x.id !== id); this.saveLocal(); renderAll(); }
+    async remove(id) {
+      const had = this.items.some((x) => x.id === id);
+      this.items = this.items.filter((x) => x.id !== id);
+      if (had) noteDeleted(this, id);
+      this.saveLocal(); renderAll();
+    }
     get(id) { return this.items.find((x) => x.id === id); }
   }
   const todos = new Store("todos");
@@ -1659,13 +1703,54 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const subjects = new Store("subjects"); // the user's subjects for study, with a colour each, like the labels
   const routines = new Store("routines"); // the user's own things to do every day: {name, createdAt}
   const routineDays = new Store("routineDays"); // one entry a day, id = the date: {date, done: [routine ids]}
-  const ALL_STORES = [todos, journal, meals, workouts, weights, expenses, goals, settings, events, labels, study, subjects, routines, routineDays];
+  const deleted = new Store("deleted"); // the records deleted here: {id: "store/id", store, rid, at}
+  const ALL_STORES = [todos, journal, meals, workouts, weights, expenses, goals, settings, events, labels, study, subjects, routines, routineDays, deleted];
+  // the names the notices use for each kind of record
+  const STORE_NAMES = { todos: "ToDo", journal: "日記", meals: "食事", workouts: "運動", weights: "体重", expenses: "家計簿", goals: "目標", events: "予定", labels: "予定のラベル", study: "勉強", subjects: "勉強の科目", routines: "ルーティーン", routineDays: "ルーティーンのチェック" };
+
+  // ---------- 消した記録 ----------
+  // each record deleted here is remembered (its kind, id and when), so a file or copy read in later doesn't bring it back
+  // (mergeRecords) and the check against the daily copies doesn't take it for lost (missingIn). One put back with the same
+  // id (元に戻す) is no longer counted as deleted. Settings aren't records and aren't remembered
+  const delKey = (st, id) => `${st.name}/${id}`;
+  const remembers = (st) => st !== settings && st !== deleted;
+  function noteDeleted(st, id) {
+    if (!remembers(st)) return;
+    const key = delKey(st, id), had = deleted.get(key);
+    if (had) had.at = Date.now(); else deleted.items.push({ id: key, store: st.name, rid: id, at: Date.now() });
+    deleted.saveLocal();
+  }
+  function undelete(st, id) {
+    if (!remembers(st) || !deleted.get(delKey(st, id))) return;
+    deleted.items = deleted.items.filter((t) => t.id !== delKey(st, id));
+    deleted.saveLocal();
+  }
+
+  // ---------- 保存できないとき ----------
+  // the note at the top while records can't be saved: from the start when the probe found storage full, and after a save
+  // the browser wouldn't take, until one goes through again
+  function renderSaveNote() { $("fullNote").hidden = !(storageFull || ALL_STORES.some((x) => x.unsaved)); }
+  // the kinds a save didn't reach, tried again (room was made); true when nothing is left unsaved
+  function retryUnsaved() {
+    for (const st of ALL_STORES) {
+      if (!st.unsaved) continue;
+      try { localStorage.setItem(LS_PREFIX + st.name, JSON.stringify(st.items)); st.unsaved = false; } catch {}
+    }
+    if (storageFull) { try { localStorage.setItem(LS_PREFIX + "probe", "1"); localStorage.removeItem(LS_PREFIX + "probe"); storageFull = false; } catch {} }
+    renderSaveNote();
+    if (journalDirty && !journal.unsaved) flushJournal(); // the 日記 field that said 保存できませんでした says 保存済み again
+    return !storageFull && !ALL_STORES.some((x) => x.unsaved);
+  }
+  // records the browser wouldn't take go into today's copy (IndexedDB has room of its own), so they can be brought back
+  let keepTimer = null;
+  function keepUnsaved() { clearTimeout(keepTimer); keepTimer = setTimeout(() => saveCopy(), 400); }
 
   const statusEl = $("status");
   let statusTimer = null;
   // where records live is said once, under バックアップ on the 記録 page (renderBackup), instead of at the foot of every page
   function showMode() {
     $("noSave").hidden = canStoreLocal;
+    renderSaveNote();
   }
   // a short message above the tab bar for a few seconds; role=status reads it out as well. The day sheet covers the
   // page, so while it is open the message shows in the sheet's own copy (on the page once the sheet is going down)
@@ -1686,6 +1771,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   function showError() { flash("保存できませんでした。端末の空き容量が足りているか確かめてください。"); }
   async function act(fn) { try { await fn(); } catch { showError(); } }
+  // a page drawn on its own: one that fails on a record it can't show leaves the others drawn (and the records as they
+  // are), and says so once
+  let drawFailed = false;
+  function draw(fn) {
+    try { fn(); }
+    catch (e) {
+      console.error(e);
+      if (!drawFailed) { drawFailed = true; flash("うまく表示できない記録がありました。記録そのものは消えていません。"); }
+    }
+  }
 
   // two-step delete: first press arms it, second press within 3 s deletes. List rows have no room for a label, so the ×
   // carries the name 削除 and a 44px target (DADS's exception for icon-only controls); armed, it spells the action out
@@ -1772,9 +1867,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     try { history.replaceState(null, "", "#" + key); } catch {}
     window.scrollTo(0, 0);
     watchTitle();
-    if (key === "weight") renderWeightChart();
-    if (key === "records") renderSummary();
-    if (key === "reclist") renderRecList();
+    if (key === "weight") draw(renderWeightChart);
+    if (key === "records") draw(renderSummary);
+    if (key === "reclist") draw(renderRecList);
   }
   $("backBtn").addEventListener("click", () => { const up = parentOf(tab); if (up) showTab(up); });
 
@@ -1967,9 +2062,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           // a mood from before the scale went stays in the entry (and its backups), unseen
           await journal.set(date, { ...journal.get(date), date, text, updatedAt: Date.now() });
         }
+        if (journal.unsaved) throw new Error("not saved"); // the browser didn't take it (full): kept, and tried again later
         if (!journalDirty && date === viewDate) journalState.textContent = text ? "保存済み" : "";
       } catch (e) {
-        showError(e);
+        if (!journal.unsaved) showError(e); // a full browser has said so already
         if (date === viewDate) { journalDirty = true; journalState.textContent = "保存できませんでした"; }
       }
     });
@@ -2683,6 +2779,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const extraDays = (e) => (e.endDate && e.endDate > e.date ? daysBetween(e.date, e.endDate) : 0);
   // the first days of e's turns that reach into from … to
   function turnStarts(e, from, to) {
+    if (typeof e.date !== "string") return [];
     const lo = addDays(from, -extraDays(e));
     if (!e.repeat) return e.date >= lo && e.date <= to ? [e.date] : [];
     const last = e.repeatUntil && e.repeatUntil < to ? e.repeatUntil : to, skip = new Set(e.skip || []), out = [];
@@ -4618,15 +4715,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const file = new File([blob], name, { type: "application/json" });
     // on phones the share sheet is the dependable way to keep a file (a home-screen app on iPhone cannot download)
     if (matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: name }); flash("記録を書き出しました。"); noteExport(); }
+      try { await navigator.share({ files: [file], title: name }); noteExport(); flash("記録を書き出しました。"); }
       catch (e) { if (e.name !== "AbortError") flash("書き出せませんでした。もう一度お試しください。"); }
       return;
     }
     const a = el("a", { href: URL.createObjectURL(blob), download: name });
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    flash(`「${name}」を書き出しました。`);
     noteExport();
+    flash(`「${name}」を書き出しました。`);
   }
   // 予定を書き出す: every plan in an iCalendar file (.ics) the iPhone's カレンダー takes in (the user's call): repeats as RRULE,
   // turns taken out as EXDATE, the memo as its description and the label as its category. Times carry no zone, so they
@@ -4705,13 +4802,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       flash("このファイルは読み込めません。「記録を書き出す」で作ったファイルを選んでください。");
       return;
     }
-    const { add, differ } = mergePlan(payload.data);
-    if (!add) { flash(differ ? `足す記録はありません。内容のちがう ${differ} 件は、この端末のほうのままにします。` : "このファイルの記録は、すべてこの端末にあります。"); return; }
+    const { add, differ, gone, odd } = mergePlan(payload.data);
+    const leftOut = (gone ? `消した ${gone} 件は、消したままにします。` : "") + (odd ? `中身が読み取れない ${odd} 件は読み込みません。` : "");
+    if (!add) { flash(differ || leftOut ? "足す記録はありません。" + (differ ? `内容のちがう ${differ} 件は、この端末のほうのままにします。` : "") + leftOut : "このファイルの記録は、すべてこの端末にあります。"); return; }
     const at = new Date(payload.exportedAt);
     const when = isNaN(at) ? "" : (at.getFullYear() !== new Date().getFullYear() ? `${at.getFullYear()}年` : "") + fmtMDW(ymd(at)) + "に書き出した";
     importPending = payload.data;
     $("importAskText").textContent = `${when}「${file.name}」から、この端末にない記録を ${add.toLocaleString("ja-JP")} 件足します。いまある記録は変わりません。`
-      + (differ ? `この端末にもあって内容のちがう ${differ} 件は、この端末のほうを残します。` : "");
+      + (differ ? `この端末にもあって内容のちがう ${differ} 件は、この端末のほうを残します。` : "") + leftOut;
     $("importAsk").hidden = false;
     $("importGo").focus();
   }
@@ -4727,25 +4825,53 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("importCancel").addEventListener("click", () => { hideImportAsk(); $("importBtn").focus(); });
   // a store's records in a set read in (a file, or a copy kept on this device): one to an id, the last if repeated
   const incomingOf = (data, s) => [...new Map((Array.isArray(data[s.name]) ? data[s.name] : []).filter((x) => x && typeof x.id === "string").map((x) => [x.id, x])).values()];
+  // what a record read in needs for the pages to show it; one without it is left out, so a single odd record in a file
+  // can't keep a page from being drawn
+  const isDay = (d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && ymd(parseYmd(d)) === d;
+  const isClock = (t) => t == null || t === "" || (typeof t === "string" && /^\d{2}:\d{2}$/.test(t));
+  const DATED = new Set(["journal", "meals", "workouts", "weights", "expenses", "study", "routineDays", "events"]);
+  function fits(s, x) {
+    if (DATED.has(s.name) && !isDay(x.date)) return false;
+    if (s === events) return typeof x.title === "string" && (!x.repeat || REPEATS.some(([k]) => k === x.repeat)) && (!x.endDate || isDay(x.endDate))
+      && (!x.repeatUntil || isDay(x.repeatUntil)) && (!x.skip || Array.isArray(x.skip)) && isClock(x.time) && isClock(x.endTime);
+    if (s === todos) return typeof x.text === "string";
+    if (s === labels || s === subjects || s === routines) return typeof x.name === "string";
+    if (s === deleted) return typeof x.store === "string" && typeof x.rid === "string" && x.id === `${x.store}/${x.rid}`;
+    return true;
+  }
+  // the records deleted here, and those the set read in says were deleted where it came from
+  const deadIn = (data) => new Set([...deleted.items, ...incomingOf(data, deleted)].map((t) => t.id));
   // what reading a set in would do, without doing it: the records it adds (none here with their id yet), and those here
-  // already whose contents differ, which stay as they are (settings aren't counted: this device keeps its own)
+  // already whose contents differ, which stay as they are (settings aren't counted: this device keeps its own); records
+  // deleted (gone) and odd ones are left out, and counted for the message
   function mergePlan(data) {
-    let add = 0, differ = 0;
+    let add = 0, differ = 0, gone = 0, odd = 0;
+    const dead = deadIn(data);
     for (const s of ALL_STORES) {
+      if (s === deleted) continue;
       const here = new Map(s.items.map((x) => [x.id, x]));
       for (const x of incomingOf(data, s)) {
         const h = here.get(x.id);
-        if (!h) add++; else if (s !== settings && JSON.stringify(h) !== JSON.stringify(x)) differ++;
+        if (h) { if (s !== settings && JSON.stringify(h) !== JSON.stringify(x)) differ++; }
+        else if (dead.has(delKey(s, x.id))) gone++;
+        else if (!fits(s, x)) odd++;
+        else add++;
       }
     }
-    return { add, differ };
+    return { add, differ, gone, odd };
   }
   // adds what is not on this device yet, matching by id. One already here is left as it is, even where the one read in
-  // differs (the same day's 日記 or 体重 from another phone, a setting), so nothing on this device is lost or changed
+  // differs (the same day's 日記 or 体重 from another phone, a setting), so nothing on this device is lost or changed.
+  // A record deleted here or where the set came from isn't brought back, and the set's deleted records (those not here)
+  // are remembered here too, so an older file can't bring them back later either
   function mergeRecords(data) {
     let count = 0;
+    const dead = deadIn(data);
+    const tomb = incomingOf(data, deleted).filter((t) => fits(deleted, t) && !deleted.get(t.id) && !ALL_STORES.find((s) => s.name === t.store)?.get(t.rid));
+    if (tomb.length) { deleted.items = [...deleted.items, ...tomb]; deleted.saveLocal(); }
     for (const s of ALL_STORES) {
-      const here = new Set(s.items.map((x) => x.id)), add = incomingOf(data, s).filter((x) => !here.has(x.id));
+      if (s === deleted) continue;
+      const here = new Set(s.items.map((x) => x.id)), add = incomingOf(data, s).filter((x) => !here.has(x.id) && !dead.has(delKey(s, x.id)) && fits(s, x));
       if (!add.length) continue;
       s.items = [...s.items, ...add];
       s.saveLocal();
@@ -4763,7 +4889,30 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // the latest copy, a notice offers to bring the copy back; (3) the home page reminds you to export now and then, since
   // only a file kept elsewhere survives the phone clearing everything.
   const SNAP_DB = "tsumikasane-copies", SNAP_KEEP = 7;
-  const recordCount = (data) => Object.values(data || {}).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0);
+  const recordCount = (data) => Object.entries(data || {}).reduce((n, [k, arr]) => n + (k !== "deleted" && Array.isArray(arr) ? arr.length : 0), 0);
+  // since when deletions are remembered on this device (the version that began it): a copy older than that may hold
+  // records deleted before, so it is judged by its count alone
+  const trackedSince = (() => {
+    try {
+      const v = Number(localStorage.getItem(LS_PREFIX + "trackedSince"));
+      if (v > 0) return v;
+      localStorage.setItem(LS_PREFIX + "trackedSince", String(Date.now()));
+    } catch {}
+    return Date.now();
+  })();
+  // a copy's records gone from here without being deleted here, kind by kind ([store, how many]); null for a copy made
+  // before deleted records were remembered
+  function missingIn(copy) {
+    if (!(copy.savedAt >= trackedSince)) return null;
+    const dead = new Set(deleted.items.map((t) => t.id)), out = [];
+    for (const s of ALL_STORES) {
+      if (!remembers(s)) continue;
+      const here = new Set(s.items.map((x) => x.id));
+      const n = incomingOf(copy.data, s).filter((x) => !here.has(x.id) && !dead.has(delKey(s, x.id)) && fits(s, x)).length;
+      if (n) out.push([s, n]);
+    }
+    return out;
+  }
   const allData = () => Object.fromEntries(ALL_STORES.map((st) => [st.name, st.items]));
   function openCopies() {
     return new Promise((resolve, reject) => {
@@ -4787,8 +4936,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     try {
       const copies = await readCopies();
       const same = copies.find((c) => c.day === todayKey);
-      // a sudden drop (as when storage came up empty) must not overwrite today's fuller copy
-      if (same && same.count >= 5 && count < same.count * 0.8) return;
+      // records gone from here without being deleted (all of them, as when storage came up empty, or one kind of them)
+      // must not overwrite today's copy that still has them; a copy from before deletions were remembered goes by count
+      const lost = same && missingIn(same);
+      if (same && (lost ? lost.length : same.count >= 5 && count < same.count * 0.8)) return;
       const db = await openCopies();
       await new Promise((resolve, reject) => {
         const tx = db.transaction("copies", "readwrite"), st = tx.objectStore("copies");
@@ -4805,11 +4956,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     try {
       const now = recordCount(allData());
       const skipped = num((settings.get("backup") || {}).restoreSkipped);
-      // the newest copy holding clearly more than is here now: all of it gone, or at least ten records and half missing
-      const pick = (await readCopies())
-        .filter((c) => c.savedAt !== skipped && c.count > 0 && (now === 0 || (c.count - now >= 10 && now < c.count / 2)))
-        .sort((a, b) => b.savedAt - a.savedAt)[0];
-      restoreCandidate = pick || null;
+      // the newest copy holding records that are gone from here. One made since deletions are remembered: any record in it
+      // not here and not deleted here, kind by kind, so one kind going missing shows too. An older one: all of it gone,
+      // or at least ten records and half missing
+      let pick = null, lost = null;
+      for (const c of (await readCopies()).filter((c) => c.savedAt !== skipped && c.count > 0).sort((a, b) => b.savedAt - a.savedAt)) {
+        const m = missingIn(c);
+        if (m ? m.length : now === 0 || (c.count - now >= 10 && now < c.count / 2)) { pick = c; lost = m; break; }
+      }
+      restoreCandidate = pick;
       $("restoreNote").hidden = !pick;
       if (!pick) return;
       const at = new Date(pick.savedAt);
@@ -4817,7 +4972,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       $("restoreTitle").textContent = now === 0 ? "記録が見つかりません" : "記録が減っているようです";
       $("restoreText").textContent = (now === 0
         ? `この端末の中に、${when} 時点の記録のコピー（${pick.count} 件）が残っています。`
-        : `${when} 時点のコピーには ${pick.count} 件ありますが、いまは ${now} 件です。`)
+        : lost
+          ? `${when} 時点のコピーにある${lost.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")} 件`).join("・")}が、いまは見当たりません。`
+          : `${when} 時点のコピーには ${pick.count} 件ありますが、いまは ${now} 件です。`)
         + "戻すと、いまある記録はそのままで、コピーにある記録が足されます。";
     } catch {}
   }
@@ -4868,6 +5025,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       + "端末の空き容量が少ないときなどに記録が消えることがあるので、ときどき書き出しておくと安心です。";
   }
   $("nudgeExport").addEventListener("click", () => exportRecords());
+  $("fullExport").addEventListener("click", () => exportRecords());
+  $("fullRetry").addEventListener("click", () => flash(retryUnsaved() ? "保存できました。" : "まだ保存できません。記録を書き出したうえで、端末の空き容量を増やすか、いらない記録を消してください。"));
   $("nudgeLater").addEventListener("click", () => act(() => settings.set("backup", { ...(settings.get("backup") || {}), snoozeUntil: addDays(todayKey, 3) })));
   $("exportBtn").addEventListener("click", () => exportRecords());
   $("importBtn").addEventListener("click", () => $("importFile").click());
@@ -4879,16 +5038,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    renderDateNavs(); renderHome(); renderTodos(); renderJournal(); renderMeals(); renderWorkouts(); renderStudy(); renderRoutine(); renderWeight(); renderMoney(); renderGoals(); renderCalendar(); renderLabels(); renderTileList(); renderBackup(); renderSummary(); paintChart(); if (tab === "reclist") renderRecList();
+    for (const fn of [renderDateNavs, renderHome, renderTodos, renderJournal, renderMeals, renderWorkouts, renderStudy, renderRoutine, renderWeight, renderMoney, renderGoals, renderCalendar, renderLabels, renderTileList, renderBackup, renderSummary, paintChart]) draw(fn);
+    if (tab === "reclist") draw(renderRecList);
   }
-  const initial = (location.hash || "").slice(1);
-  // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
-  setTab(initial === "reclist" ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home");
-  loadJournalForm();
-  renderAll();
+  // the safeguards first, so a page that can't be drawn doesn't keep them from running
   showMode();
   checkRestore().then(() => saveCopy());
   askPersist();
+  const initial = (location.hash || "").slice(1);
+  // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
+  draw(() => setTab(initial === "reclist" ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home"));
+  draw(loadJournalForm);
+  renderAll();
   // iOS only shows :active (the pressed look HIG asks for) once the page listens for touches
   document.addEventListener("touchstart", () => {}, { passive: true });
 
