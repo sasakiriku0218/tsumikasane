@@ -346,6 +346,8 @@ form.add input, form.add select, textarea, .inline input, .datenav input[type="d
 }
 select { -webkit-appearance: none; appearance: none; padding-right: 30px !important; background-image: var(--chev); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px 12px; }
 textarea { width: 100%; padding: 10px 12px; line-height: 1.6; resize: vertical; }
+/* a name that wraps onto as many lines as it needs, from one line as high as a one-line field (growField) */
+textarea.grow { padding: 10px 12px; line-height: 1.3; resize: none; overflow: hidden; }
 ::placeholder { color: var(--muted); opacity: 1; }
 .inline { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 .inline input { width: 7em; padding: 0 10px; text-align: right; font-variant-numeric: tabular-nums; }
@@ -534,9 +536,17 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .mandala { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .m-cell { aspect-ratio: 1; min-width: 0; display: flex; flex-direction: column; padding: 6px 6px 2px; border-radius: 12px; background: var(--surface); }
 .m-cell.done { background: color-mix(in srgb, var(--c-goal) 16%, var(--surface)); }
-/* 16px at least, or iPhone zooms the page in on a tap */
+/* 16px at least, or iPhone zooms the page in on a tap. While a cell isn't being written in, its text shows through .m-text
+   over it instead, fitted to the cell (the user's call: a long one was cut off mid-line): as large as the textarea's when
+   it fits, smaller down to 11px when it doesn't, and past that cut at its last whole line with … (fitCells) */
+.m-write { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
 .m-cell textarea { flex: 1 1 auto; width: 100%; min-height: 0; padding: 2px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; font-size: max(16px, var(--t-sub)); line-height: 1.3; text-align: center; resize: none; overflow: hidden; }
+.m-cell textarea:not(:focus) { color: transparent; }
+.m-cell textarea:focus { overflow-y: auto; }
 .m-cell textarea:focus-visible { outline-offset: 0 !important; }
+.m-text { position: absolute; inset: 0; padding: 2px; overflow: hidden; font-size: max(16px, var(--t-sub)); line-height: 1.3; text-align: center; white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; }
+.m-text.cut { display: -webkit-box; -webkit-box-orient: vertical; }
+.m-cell textarea:focus + .m-text { visibility: hidden; }
 /* an empty cell: a faint ＋ in its middle, gone while it is being written in; taps go through it to the cell */
 .m-cell[data-k] { position: relative; cursor: text; }
 .m-plus { position: absolute; inset: 0; display: none; place-items: center; color: var(--muted); opacity: .6; pointer-events: none; }
@@ -557,10 +567,13 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* 全体: the whole chart as one sheet of nine blocks of nine, like the paper chart. The goal's block is in the middle (the
    goal and its eight elements), and each element's block sits where the element does, the element in its middle and
    the eight under it around. Done cells are tinted as in 8マス. It is for looking: a block opens its element's 8マス */
-.mandala.whole { gap: 4px; }
+.mandala.whole { gap: 4px; container-type: inline-size; }
 .m-block { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; cursor: pointer; }
 .m-block:disabled { opacity: .55; cursor: default; }
-.m-mini { aspect-ratio: 1; min-width: 0; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: var(--surface); font-size: 9px; line-height: 1.2; text-align: center; overflow: hidden; }
+/* 11px, the smallest iPhone text that reads well (the user's call: 9px was too small to read). The cells are square (the
+   chart's width less its gaps, over nine), or a little taller where three lines of it need the room; what is longer ends
+   with … */
+.m-mini { min-width: 0; min-height: max(calc((100cqi - 20px) / 9), calc(3 * 1.2em + 4px)); display: grid; place-items: center; padding: 2px 1px; border-radius: 4px; background: var(--surface); font-size: 11px; line-height: 1.2; text-align: center; overflow: hidden; }
 .m-mini > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .m-mini.done { background: color-mix(in srgb, var(--c-goal) 16%, var(--surface)); }
 .m-mini.mid { background: color-mix(in srgb, var(--c-goal) 26%, var(--surface)); font-weight: 700; }
@@ -1522,7 +1535,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <!-- the name, 達成基準 and 期限 are all needed (the user's call); 達成基準 is one field where 目標値 and 単位 were two.
            分割 is how many levels the goal's mandala chart goes down (the user's call: chosen per goal) -->
       <form class="add" id="goalForm" autocomplete="off">
-        <input type="text" id="goalTitle" class="full" placeholder="新たな目標" aria-label="新たな目標" maxlength="200" required>
+        <textarea id="goalTitle" class="full grow" rows="1" placeholder="新たな目標" aria-label="新たな目標" maxlength="200" required></textarea>
         <label class="flabel" for="goalCriterion">達成基準</label>
         <div class="ffield"><input type="text" id="goalCriterion" maxlength="40" required></div>
         <label class="flabel" for="goalDeadline">期限</label>
@@ -1554,7 +1567,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <!-- the goal itself, changed in place (the user's call: goals can be put right after they're made) -->
         <h3 class="group-head">目標の内容</h3>
         <form class="add" id="mEdit" autocomplete="off">
-          <input type="text" id="mTitle" class="full" aria-label="目標の名前" maxlength="200" required>
+          <textarea id="mTitle" class="full grow" rows="1" aria-label="目標の名前" maxlength="200" enterkeyhint="done" required></textarea>
           <label class="flabel" for="mCriterion">達成基準</label>
           <div class="ffield"><input type="text" id="mCriterion" maxlength="40" required></div>
           <label class="flabel" for="mDeadline">期限</label>
@@ -2790,7 +2803,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const goalFields = ["goalTitle", "goalCriterion", "goalDeadline"];
   const syncGoalSave = () => { $("goalSave").disabled = goalFields.some((id) => !$(id).value.trim()); };
   for (const id of goalFields) for (const type of ["input", "change"]) $(id).addEventListener(type, syncGoalSave);
-  function clearGoalForm() { $("goalForm").reset(); syncGoalSave(); }
+  function clearGoalForm() { $("goalForm").reset(); syncGoalSave(); growField($("goalTitle")); }
   $("goalAdd").addEventListener("click", (ev) => openNewGoal(ev.detail === 0));
   $("goalForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -3642,7 +3655,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       // an empty cell shows only a faint ＋ (the user's call: the written ones stand out); the placeholder is a blank, there
       // only so CSS can tell the cell is empty. Its name for screen readers stays 要素 1 and so on
       : el("div", { class: "m-cell", "data-k": k },
-        el("textarea", { "data-k": k, rows: 3, maxlength: 40, placeholder: " ", "aria-label": `${word} ${k + 1}` }),
+        el("div", { class: "m-write" },
+          el("textarea", { "data-k": k, rows: 3, maxlength: 40, placeholder: " ", "aria-label": `${word} ${k + 1}` }),
+          el("span", { class: "m-text", "aria-hidden": "true" })),
         el("span", { class: "m-tools" }),
         el("span", { class: "m-plus", "aria-hidden": "true" }, icon("plus", 22)))));
     paintChart();
@@ -3672,12 +3687,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         const k = Number(box.dataset.k), cell = node.c?.[k] || null, text = cell?.t || "", filled = !!text.trim(), cname = oneLine(text);
         const ta = box.querySelector("textarea");
         if (ta !== document.activeElement && ta.value !== text) ta.value = text;
+        ta.nextElementSibling.textContent = ta.value;
         const inner = kidsOf(cell, left - 1), done = filled && cellDone(cell, left - 1);
         box.classList.toggle("done", done);
         setChildren(box.querySelector(".m-tools"),
           !filled ? null : inner.length ? el("span", { class: "m-count" }, `${inner.filter((x) => cellDone(x, left - 2)).length}/${inner.length}`) : chartCheck(cname, done, () => toggleCell(k)),
           filled && left > 1 ? el("button", { type: "button", class: "m-open", "data-role": "open", "aria-label": inner.length ? `「${cname}」の中を開く` : `「${cname}」を8つに分ける`, onclick: () => openCell(k) }, icon("next", 16)) : null);
       }
+      fitCells();
       if (keep) mGrid.querySelector(`${keep.k === "mid" ? ".m-center" : `.m-cell[data-k="${keep.k}"]`} [data-role="${keep.role}"]`)?.focus();
     }
     const trail = $("mTrail");
@@ -3694,6 +3711,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       // can stay in a field of a sheet that has closed until the browser next draws
       for (const [id, key] of GOAL_EDIT) if (mEditGoal !== g.id || document.activeElement !== $(id)) $(id).value = goalField(g, key);
       mEditGoal = g.id;
+      growField($("mTitle"));
       for (const r of document.querySelectorAll('input[name="chartSplit"]')) r.checked = Number(r.value) === depth;
     }
   }
@@ -3710,9 +3728,27 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         type: "button", class: "m-block", disabled: !name,
         "aria-label": centre ? `「${name}」の8マスに戻る` : name ? `「${name}」の8マスを開く` : `要素 ${k + 1}（まだ書いていません）`,
         onclick: () => { mOverview = false; if (!centre) mPath = [k]; showChartLevel(); },
-      }, GRID_ORDER.map((j) => (j < 0 ? mini(node, true, left) : mini(node?.c?.[j] || null, false, left - 1))));
+      }, GRID_ORDER.map((j) => (j < 0 ? mini(node, true, left) : mini(name ? node.c?.[j] || null : null, false, left - 1))));
     }));
   }
+  // a cell's text while it isn't being written in: the textarea's size when it fits, else 14, 12 or 11px (at the usual
+  // text size), and past that cut at its last whole line with … (the user's call: a long one was cut off mid-line)
+  const FIT_STEPS = [1, .875, .75, .6875];
+  function fitCells() {
+    for (const t of mGrid.querySelectorAll(".m-text")) {
+      const key = `${t.textContent}\n${t.clientWidth}x${t.clientHeight}`;
+      if (t.dataset.fit === key) continue;
+      t.dataset.fit = key;
+      t.classList.remove("cut"); t.style.fontSize = ""; t.style.removeProperty("-webkit-line-clamp");
+      if (!t.textContent.trim() || !t.clientHeight) continue;
+      const base = parseFloat(getComputedStyle(t).fontSize);
+      if (FIT_STEPS.some((f) => { t.style.fontSize = base * f + "px"; return t.scrollHeight <= t.clientHeight + 1; })) continue;
+      t.classList.add("cut");
+      t.style.setProperty("-webkit-line-clamp", String(Math.max(1, Math.floor((t.clientHeight - 4) / (parseFloat(t.style.fontSize) * 1.3)))));
+    }
+  }
+  // and again when the cells change size: the sheet opening, the phone turned
+  new ResizeObserver(() => { if (mandalaGoal && !mOverview) fitCells(); }).observe(mGrid);
   // 8マス or 全体, from the switch over the chart
   $("mView").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
     const whole = b.dataset.view === "whole";
@@ -3733,12 +3769,38 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const v = $(id).value.trim(), was = goalField(g, key);
       if (!v) $(id).value = was; else if (v !== was) patch[key] = v;
     }
+    growField($("mTitle")); // an emptied name has its old one back
     if (!Object.keys(patch).length) return;
     act(() => goals.update(g.id, patch));
     syncSheetHead(); // the bar's title is the goal's name
   }
   $("mEdit").addEventListener("change", saveGoalEdit);
   $("mEdit").addEventListener("submit", (ev) => { ev.preventDefault(); saveGoalEdit(); });
+  // a goal's name, here and in the ＋ sheet, wraps onto as many lines as it needs (the user's call: a long one was cut off
+  // in its one line), its field growing with it. It stays one line of text: 改行 moves on to the next empty field (or
+  // adds the goal once all are filled in) in the ＋ sheet, and here ends the typing
+  function growField(ta) {
+    const key = `${ta.value}\n${ta.clientWidth}`;
+    if (ta.dataset.fit === key) return; // as it was: measured again only when the name or the width changes
+    ta.style.height = "";
+    if (!ta.scrollHeight) { requestAnimationFrame(() => { if (ta.scrollHeight) growField(ta); }); return; } // not on the screen yet: once it is
+    ta.style.height = ta.scrollHeight + 2 + "px"; // and its border, top and bottom
+    ta.dataset.fit = key;
+  }
+  for (const ta of document.querySelectorAll("textarea.grow")) {
+    ta.addEventListener("input", () => {
+      if (/[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/\s*[\r\n]+\s*/g, " "); // pasted in on several lines
+      growField(ta);
+    });
+    ta.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" || ev.isComposing || ev.keyCode === 229) return;
+      ev.preventDefault();
+      if (ta.id !== "goalTitle") { saveGoalEdit(); ta.blur(); }
+      else if (!$("goalSave").disabled) $("goalSave").click();
+      else $(goalFields.find((id) => !$(id).value.trim()))?.focus();
+    });
+  }
+  addEventListener("resize", () => { for (const ta of document.querySelectorAll("textarea.grow")) growField(ta); });
   // a copy of the goal's chart to change, and the eight under the cell at path in it (made as needed)
   const editChart = (g) => JSON.parse(JSON.stringify(g.mandala || Array(8).fill(null)));
   function slotsAt(chart, path) {
@@ -3746,21 +3808,53 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const i of path) { const cell = slots[i] || (slots[i] = { t: "" }); slots = cell.c || (cell.c = Array(8).fill(null)); }
     return slots;
   }
-  // a changed chart is saved with the goal's 達成 worked out again (with nothing written around the goal, its own check)
-  function saveChart(g, chart, { selfDone = !!g.done, depth = goalDepth(g) } = {}) {
+  // a changed chart is saved with the goal's 達成 worked out again (with nothing written around the goal, its own check).
+  // A cell with something written inside it is done by that from then on, so its own check goes (the user's call: one
+  // given before the cell was split came back when 分割 went down). `said`: what the change did, with its 元に戻す
+  function saveChart(g, chart, { selfDone = !!g.done, depth = goalDepth(g), said = "", undo } = {}) {
+    dropOwnChecks(chart, depth - 1);
     const done = cellDone({ d: selfDone, c: chart }, depth);
     const patch = { mandala: chart, depth, done };
-    if (done && !g.done) { patch.doneAt = Date.now(); flash(`「${oneLine(g.title)}」を達成しました`); }
+    if (done && !g.done) { patch.doneAt = Date.now(); said = (said ? said + "。" : "") + `「${oneLine(g.title)}」を達成しました`; }
+    if (said) flash(said, undo);
     act(() => goals.update(g.id, patch));
+  }
+  // the checks of the cells with written ones inside them (`left`: the levels that may open below these cells)
+  function dropOwnChecks(slots, left) {
+    for (const cell of slots) if (kidsOf(cell, left).length) { delete cell.d; dropOwnChecks(cell.c, left - 1); }
+  }
+  // 分割 going down: the cells that become the last level (`levels` down, 1 for the eight around the goal) keep the 達成
+  // they showed from what is inside them (`extra` levels of it) as their own check, so the change alone neither achieves
+  // the goal nor undoes it
+  function keepDone(slots, levels, extra) {
+    for (const cell of slots) {
+      if (!cell?.t?.trim()) continue;
+      if (levels > 1) { if (Array.isArray(cell.c)) keepDone(cell.c, levels - 1, extra); }
+      else if (kidsOf(cell, extra).length) { if (cellDone(cell, extra)) cell.d = true; else delete cell.d; }
+    }
   }
   function setCellText(k, text) {
     const g = goals.get(mandalaGoal);
     if (!g) return;
     text = text.trim();
-    const chart = editChart(g), slots = slotsAt(chart, mPath), cell = slots[k];
-    if ((cell?.t || "") === text) return;
-    // an emptied cell keeps what is written inside it, out of sight, so writing its name again brings it back
-    slots[k] = text || cell?.c?.some(Boolean) ? { ...cell, t: text } : null;
+    const chart = editChart(g), slots = slotsAt(chart, mPath), cell = slots[k], name = cell?.t?.trim() || "";
+    if (name === text) return;
+    // a new name keeps what is inside the cell; a cell written where nothing was starts empty
+    if (text) { slots[k] = name ? { ...cell, t: text } : { t: text }; saveChart(g, chart); return; }
+    // emptied, the cell goes with all that is written inside it (the user's call: kept out of sight, it came back under
+    // whatever was written there next), and 元に戻す puts it back
+    slots[k] = null;
+    if (!kidsOf(cell, Infinity).length) { saveChart(g, chart); return; }
+    const id = g.id, path = [...mPath];
+    saveChart(g, chart, { said: `「${oneLine(name)}」を、中のマスごと消しました`, undo: () => putCellBack(id, path, k, cell) });
+  }
+  // 元に戻す for a cell emptied with things inside it: back where it was with all of them, while the cell it was in is
+  // still there
+  function putCellBack(id, path, k, cell) {
+    const g = goals.get(id), parent = g && nodeAt(g, path);
+    if (!parent || (path.length && !parent.t?.trim())) return;
+    const chart = editChart(g);
+    slotsAt(chart, path)[k] = cell;
     saveChart(g, chart);
   }
   function toggleCell(k) {
@@ -3829,10 +3923,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const ta = ev.target.closest("textarea");
     if (!ta) return;
     const k = Number(ta.dataset.k);
+    ta.nextElementSibling.textContent = ta.value; // as it will show once the typing is over
     if (chartDraft && chartDraft.k !== k) commitChartText();
     clearTimeout(chartDraft?.timer);
     const later = () => { if (composing) chartDraft.timer = setTimeout(later, 400); else commitChartText(); };
     chartDraft = { k, text: ta.value, timer: setTimeout(later, 700) };
+    if (!ta.value.trim()) commitChartText(); // emptied: the cell goes at once, with what is inside it (元に戻す brings it back)
   });
   mGrid.addEventListener("change", (ev) => { if (ev.target.closest("textarea")) commitChartText(); });
   // a tap anywhere on a cell, its foot too, starts writing in it (on an empty one, where the ＋ is)
@@ -3846,7 +3942,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const g = goals.get(mandalaGoal);
     if (!g || !r.checked) return;
     commitChartText();
-    saveChart(g, editChart(g), { depth: Number(r.value) });
+    const chart = editChart(g), depth = Number(r.value), was = goalDepth(g);
+    if (depth < was) keepDone(chart, depth, was - depth);
+    saveChart(g, chart, { depth });
   });
   // the goal goes with a second press, as an event does
   function disarmGoalDelete() { clearTimeout(mDelTimer); $("mDelete").classList.remove("armed"); $("mDelete").textContent = "この目標を削除"; }
