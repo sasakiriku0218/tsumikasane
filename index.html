@@ -463,6 +463,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 
 /* journal */
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1) var(--space-2); flex-wrap: wrap; }
+.row-tail { display: flex; align-items: center; gap: var(--space-2); }
 .label { font-weight: 600; }
 
 /* stats (weight, money): Health-style summary cards */
@@ -1123,7 +1124,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <section id="sec-journal" style="--sec-c: var(--c-journal)" hidden>
         <div class="sec-head"><h2>日記</h2><div class="datenav"></div></div>
         <div class="card pad">
-          <div class="row-between"><label class="label" for="journalText">ひとこと</label><span class="muted small" id="journalState"></span></div>
+          <div class="row-between"><label class="label" for="journalText">ひとこと</label><span class="row-tail"><span class="muted small" id="journalState"></span><button type="button" class="link-btn small" id="journalRevert" hidden>書き直す前に戻す</button></span></div>
           <textarea id="journalText" rows="6" placeholder="できごと、気づき、ひとこと。短くても大丈夫です。"></textarea>
           <div class="row-between">
             <span class="muted small">書くと自動で保存されます</span>
@@ -1719,6 +1720,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       noteDeleted(this, gone);
       this.saveLocal(); renderAll();
     }
+    // the whole store as it was a moment ago (元に戻す after an edit that changed more than one record); a record it
+    // brings back that had been deleted since isn't counted as deleted any more
+    async restore(list) {
+      const before = new Set(this.items.map((x) => x.id));
+      this.items = list;
+      undelete(this, ...list.map((x) => x.id).filter((id) => !before.has(id)));
+      this.saveLocal(); renderAll();
+    }
     // records deleted a moment ago, back as they were with their ids (元に戻す)
     async putBack(list) {
       const here = new Set(this.items.map((x) => x.id)), back = list.filter((x) => !here.has(x.id));
@@ -1920,6 +1929,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   function setTab(key) {
     if (tab === "journal" && key !== "journal") flushJournal();
+    if (key === "journal" && tab !== "journal") baseJournal(); // the day's 日記 as the page opens, for 書き直す前に戻す
     tab = key;
     document.documentElement.dataset.tab = key; // lets a page drop the top bar (the calendar does)
     if (isRecord(key)) lastRecord = key;
@@ -1971,6 +1981,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s) || s === viewDate) return;
     flushJournal();
     viewDate = s;
+    baseJournal();
     loadJournalForm();
     renderAll();
   }
@@ -2161,9 +2172,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     journalText.value = ""; journalState.textContent = "";
     removeWithUndo(journal, viewDate);
   });
+  // 書き直す前に戻す: the day's 日記 as it was when its page opened (or its day was picked) comes back, once something
+  // else has been saved over it (a slip of the finger, a paste in the wrong place)
+  let journalBase = null;
+  function baseJournal() { journalBase = { date: viewDate, text: journal.get(viewDate)?.text || "" }; }
+  $("journalRevert").addEventListener("click", () => {
+    if (!journalBase || journalBase.date !== viewDate) return;
+    journalText.value = journalBase.text;
+    markJournalDirty();
+    flushJournal();
+    flash("書き直す前に戻しました");
+  });
   function renderJournal() {
     if (!journalDirty) loadJournalForm();
     $("journalDelete").hidden = !journal.get(viewDate);
+    $("journalRevert").hidden = !(journalBase && journalBase.date === viewDate && journalBase.text && (journal.get(viewDate)?.text || "") !== journalBase.text);
     const list = $("journalList");
     const items = [...journal.items].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 30);
     list.replaceChildren();
@@ -3875,13 +3898,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (editFields() === editBase && date + "\n" + $("edEndDate").value === editDays) { showDayView(); return; }
     const labelId = edLabelChoice && labels.get(edLabelChoice) ? edLabelChoice : undefined;
     const { repeat, repeatUntil, ...rest } = planExtras("ed", date, time);
+    // the plans as they were before 保存, for 元に戻す (this turn alone and この回以降 change two plans at once)
+    const plansBefore = JSON.parse(JSON.stringify(events.items));
+    const saved = (msg) => flash(msg, () => act(async () => { await events.restore(plansBefore); flash("元に戻しました"); }));
     const fields = { title, date, time: time || undefined, labelId, endDate: undefined, endTime: undefined, memo: undefined, ...rest };
     if (e.repeat && editScope === "one") {
       // this turn alone: taken out of the plan, and kept as a plan of its own with what the form says
       const skip = [...new Set([...(e.skip || []), editingStart])], moved = date !== editingStart;
       showDayView();
       act(async () => { await events.update(e.id, { skip }); await events.add({ ...fields, createdAt: Date.now() }); });
-      if (moved) flash(`${fmtMDW(date)}に移しました`);
+      saved(moved ? `${fmtMDW(date)}に移しました` : "この回を保存しました");
       noteHidden(labelId);
       return;
     }
@@ -3895,6 +3921,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         await events.update(e.id, { repeatUntil: addDays(editingStart, -1), skip: skips.filter((d) => d < editingStart) });
         await events.add(next);
       });
+      saved("この回以降を保存しました");
       noteHidden(labelId);
       return;
     }
@@ -3902,7 +3929,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     Object.assign(fields, repeat ? { repeat, repeatUntil } : { repeat: undefined, repeatUntil: undefined, skip: undefined });
     showDayView();
     act(() => events.update(e.id, fields));
-    if (moved) flash(`${fmtMDW(date)}に移しました`);
+    saved(moved ? `${fmtMDW(date)}に移しました` : "予定を保存しました");
     noteHidden(labelId);
   });
   for (const type of ["input", "change"]) $("edTime").addEventListener(type, () => { $("edTimeClear").hidden = !$("edTime").value; });
@@ -4151,9 +4178,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const patch = spec.read(x);
     if (!patch) return;
     const moved = patch.date && patch.date !== x.date; // read before the update, which changes x in place
+    const before = JSON.parse(JSON.stringify(x)), st = spec.store;
     act(() => (spec.save ? spec.save(x, patch) : spec.store.update(x.id, patch)));
     closeSheet();
-    if (moved) flash(`${fmtMDW(patch.date)}に移しました`);
+    // 元に戻す for the seconds the message shows: the entry back as it was before 保存
+    flash(moved ? `${fmtMDW(patch.date)}に移しました` : "保存しました", () => act(async () => { await st.set(before.id, before); flash("元に戻しました"); }));
   });
   function disarmRecDelete() {
     clearTimeout(recDelTimer);
