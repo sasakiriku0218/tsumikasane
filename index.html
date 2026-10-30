@@ -970,6 +970,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <span>このブラウザは記録を保存できない設定になっています。プライベートブラウズをやめるか、別のブラウザで開いてください。</span>
       </div>
 
+      <!-- iPhone の Safari などで開いたとき：ホーム画面に追加したアプリとは記録の置き場所が別という案内 -->
+      <div class="notice" id="browserNote" role="status" hidden>
+        <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="注意"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg>ホーム画面のアプリとは記録が別です</strong>
+        <span>iPhone では、Safari などで開いたこのページと、ホーム画面に追加したアプリとで、記録の置き場所が分かれています。ここで書いた記録はアプリには出てきません。いつもの記録は、ホーム画面のアイコンから開いてください。</span>
+        <div class="notice-actions">
+          <button type="button" class="link-btn" id="browserNoteOk">このまま使う</button>
+        </div>
+      </div>
+
       <!-- 記録が急に空や少なくなったとき：この端末の中のコピーから戻す案内 -->
       <div class="notice" id="restoreNote" role="status" hidden>
         <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="警告"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg><span id="restoreTitle">記録が見つかりません</span></strong>
@@ -1773,7 +1782,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function showMode() {
     $("noSave").hidden = canStoreLocal;
     renderSaveNote();
+    renderBrowserNote();
   }
+  // an iPhone (or iPad) keeps a home-screen app's records apart from Safari's and other browsers': opened in one of
+  // those, the page says so, as records written in the app don't show here and those written here don't reach the app.
+  // このまま使う puts the note away in this browser
+  const appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const asApp = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  function renderBrowserNote() {
+    let ok = false;
+    try { ok = !!localStorage.getItem(LS_PREFIX + "browserNoteOk"); } catch {}
+    $("browserNote").hidden = !(appleTouch && !asApp && canStoreLocal && !ok);
+  }
+  $("browserNoteOk").addEventListener("click", () => {
+    try { localStorage.setItem(LS_PREFIX + "browserNoteOk", "1"); } catch {}
+    renderBrowserNote();
+  });
   // a short message above the tab bar for a few seconds; role=status reads it out as well. The day sheet covers the
   // page, so while it is open the message shows in the sheet's own copy (on the page once the sheet is going down)
   const sheetEl = $("daySheet"), sheetStatus = $("sheetStatus");
