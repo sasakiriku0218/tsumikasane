@@ -1125,7 +1125,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <section id="sec-trash" hidden>
         <div class="sec-head"><h2>最近削除した項目</h2><p class="sum-since" id="trashNote"></p></div>
         <ul class="list card" id="trashList"></ul>
-        <p class="group-foot">削除してから 30 日のあいだは、ここから戻せます。そのあとは自動で消えます。</p>
+        <div class="list-foot" id="trashFoot" hidden><button type="button" class="link-btn danger" id="trashPurgeAll">すべて完全に削除</button></div>
+        <p class="group-foot">削除してから 30 日のあいだは、ここから戻せます。そのあとは自動で消えます。「完全に削除」すると、この端末の中のコピーからも消えます（前に書き出したファイルには残ります）。</p>
       </section>
 
       <!-- 記録 › 端末の中のコピー: the copies made each day, newest first; one picked shows what it would bring back first -->
@@ -1893,15 +1894,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // two-step delete: first press arms it, second press within 3 s deletes. List rows have no room for a label, so the ×
   // carries the name 削除 and a 44px target (DADS's exception for icon-only controls); armed, it spells the action out
-  function delButton(onConfirm) {
+  function delButton(onConfirm, label = "削除") {
     const b = el("button", { type: "button", class: "del" });
-    const idle = () => { b.classList.remove("armed"); b.setAttribute("aria-label", "削除"); b.replaceChildren(icon("close", 24)); };
+    const idle = () => { b.classList.remove("armed"); b.setAttribute("aria-label", label); b.replaceChildren(icon("close", 24)); };
     idle();
     let t = null;
     b.addEventListener("click", (ev) => {
       ev.stopPropagation();
       if (b.classList.contains("armed")) { clearTimeout(t); idle(); onConfirm(); return; }
-      b.classList.add("armed"); b.removeAttribute("aria-label"); b.textContent = "削除する";
+      b.classList.add("armed"); b.removeAttribute("aria-label"); b.textContent = label + "する";
       t = setTimeout(idle, 3000);
     });
     return b;
@@ -5420,8 +5421,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       return el("li", {},
         el("span", { class: "body" }, el("span", { class: "text clamp" }, text || "（中身なし）"),
           el("span", { class: "sub" }, keepUnits(`${STORE_NAMES[t.store] || ""}・${when}削除・あと ${left} 日`))),
-        el("button", { type: "button", class: "link-btn", "aria-label": `「${text}」を戻す`, onclick: () => restoreFromTrash(t.id) }, "戻す"));
+        el("button", { type: "button", class: "link-btn", "aria-label": `「${text}」を戻す`, onclick: () => restoreFromTrash(t.id) }, "戻す"),
+        delButton(() => purgeTrash([t.id]), "完全に削除"));
     }) : el("li", { class: "empty" }, "最近削除した項目はありません。"));
+    $("trashFoot").hidden = !items.length;
   }
   function renderTrashRow() {
     const n = trashItems().length;
@@ -5433,6 +5436,47 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!st || !t.data || !fits(st, t.data)) { flash("この記録は戻せませんでした。"); return; }
     act(() => st.putBack([t.data]));
     flash(`${STORE_NAMES[st.name]}を戻しました`);
+  }
+  // 完全に削除: what deleted records held goes from 最近削除した項目 and from the copies kept on this device too (a file
+  // written out before still has it); their ids stay remembered, so nothing older brings them back
+  function purgeTrash(keys) {
+    const ts = keys.map((k) => deleted.get(k)).filter((t) => t?.data);
+    if (!ts.length) return;
+    for (const t of ts) delete t.data;
+    deleted.saveLocal();
+    renderAll();
+    scrubCopies(ts.map((t) => t.id));
+    flash(ts.length > 1 ? `${ts.length.toLocaleString("ja-JP")} 件を完全に削除しました` : "完全に削除しました");
+  }
+  armLink($("trashPurgeAll"), "すべて完全に削除", "もう一度押すと、すべて完全に削除します", () => purgeTrash(trashItems().map((t) => t.id)));
+  // those records out of every copy, as records and as what deleted ones held (in turn after a copy being made)
+  function scrubCopies(keys) {
+    const gone = new Set(keys);
+    return inQueue(async () => {
+      if (!canStoreLocal || !window.indexedDB) return;
+      try {
+        for (const day of await copyDays()) {
+          const c = await readCopy(day);
+          if (!c?.data) continue;
+          let changed = false;
+          for (const [name, arr] of Object.entries(c.data)) {
+            if (!Array.isArray(arr)) continue;
+            if (name === "deleted") { for (const t of arr) if (t && gone.has(t.id) && t.data) { delete t.data; changed = true; } continue; }
+            const kept = arr.filter((x) => !gone.has(`${name}/${x?.id}`));
+            if (kept.length !== arr.length) { c.data[name] = kept; changed = true; }
+          }
+          if (changed) { c.count = recordCount(c.data); await putCopy(c); }
+        }
+      } catch {}
+    });
+  }
+  function putCopy(c) {
+    return openCopies().then((db) => new Promise((resolve, reject) => {
+      const tx = db.transaction("copies", "readwrite");
+      tx.objectStore("copies").put(c);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    }));
   }
   // drawn before the page slides in, so it arrives whole
   $("trashBtn").addEventListener("click", () => { renderTrash(); showTab("trash"); });
