@@ -1019,6 +1019,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             <button type="button" class="link-btn" id="nudgeLater">あとで</button>
           </div>
         </div>
+        <!-- no records at all (a new phone, or all of them gone): the way back from a file written out before -->
+        <div class="card backup-nudge" id="emptyHint" hidden>
+          <strong>記録を戻すには</strong>
+          <span class="nudge-text">前に「記録を書き出す」で作ったファイルがあれば、読み込んで記録を戻せます。はじめて使うなら、このまま下から記録していけば大丈夫です。</span>
+          <div class="notice-actions">
+            <button type="button" class="btn sm" id="emptyImport">ファイルから読み込む</button>
+          </div>
+        </div>
         <!-- the tiles end the page: no 「この7日間のつみかさね」 card under them (the user's call) -->
         <div class="grid" id="homeTiles"></div>
       </section>
@@ -5123,6 +5131,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       }
       restoreCandidate = pick;
       $("restoreNote").hidden = !pick;
+      renderEmptyHint();
       if (!pick) return;
       const at = new Date(pick.savedAt);
       const when = `${fmtMDW(ymd(at))} ${at.getHours()}:${pad(at.getMinutes())}`;
@@ -5155,6 +5164,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     } else if (c) act(() => settings.set("backup", { ...(settings.get("backup") || {}), restoreSkipped: c.savedAt }));
     restoreCandidate = null;
     $("restoreNote").hidden = true;
+    renderEmptyHint();
   });
   // the backup line on 記録 and the reminder on the home page
   // the browser is asked to keep this site's storage even when the device runs low on space: storage not marked
@@ -5202,6 +5212,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       + "端末の空き容量が少ないときなどに記録が消えることがあるので、ときどき書き出しておくと安心です。";
   }
   $("nudgeExport").addEventListener("click", () => exportRecords());
+  // きょう with no records at all: the way back from a file written out before (the notice from this device's copies says
+  // so instead when they hold some). The file chosen is asked about on 記録, where reading in lives
+  function renderEmptyHint() {
+    const none = canStoreLocal && ALL_STORES.every((st) => !remembers(st) || !st.items.length);
+    $("emptyHint").hidden = !(none && $("restoreNote").hidden);
+  }
+  $("emptyImport").addEventListener("click", () => { showTab("records"); $("importFile").click(); });
   $("fullExport").addEventListener("click", () => exportRecords());
   $("fullRetry").addEventListener("click", () => flash(retryUnsaved() ? "保存できました。" : "まだ保存できません。記録を書き出したうえで、端末の空き容量を増やすか、いらない記録を消してください。"));
   $("nudgeLater").addEventListener("click", () => act(() => settings.set("backup", { ...(settings.get("backup") || {}), snoozeUntil: addDays(todayKey, 3) })));
@@ -5322,7 +5339,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- boot ----------
   function renderAll() {
-    for (const fn of [renderDateNavs, renderHome, renderTodos, renderJournal, renderMeals, renderWorkouts, renderStudy, renderRoutine, renderWeight, renderMoney, renderGoals, renderCalendar, renderLabels, renderTileList, renderBackup, renderTrashRow, renderSummary, paintChart]) draw(fn);
+    for (const fn of [renderDateNavs, renderHome, renderTodos, renderJournal, renderMeals, renderWorkouts, renderStudy, renderRoutine, renderWeight, renderMoney, renderGoals, renderCalendar, renderLabels, renderTileList, renderBackup, renderTrashRow, renderEmptyHint, renderSummary, paintChart]) draw(fn);
     if (tab === "reclist") draw(renderRecList);
     if (tab === "trash") draw(renderTrash);
   }
