@@ -3845,6 +3845,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const e = events.get(id);
     if (!e) return;
     editingId = id; editingStart = start || e.date; editScope = "one";
+    delete $("evEdit").dataset.typed;
     $("edTitle").value = e.title;
     $("edTime").value = e.time || ""; $("edEndTime").value = e.endTime || "";
     $("edTimeClear").hidden = !e.time;
@@ -4167,6 +4168,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (sheetEl.open || !x) return;
     resetSheet();
     recEdit = { kind, id }; recReturnId = id;
+    delete $("recForm").dataset.typed;
     setChildren($("recForm"), spec.fields(x).flat(Infinity)); // rows come as [label, field] pairs
     disarmRecDelete(); syncSheetHead();
     presentSheet(byKey, "rec");
@@ -5307,14 +5309,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- 書きかけ ----------
   // what was being typed into an add form and not yet added is kept as the app goes away, and put back when it opens
-  // again: after the reload a new day brings, or when the phone has closed the app meanwhile (日記 saves itself, and an
-  // entry being changed is still there as it was). Kept for two days; a form added or emptied lets go of it. The new
-  // plan, ToDo and goal forms are in the sheet: one open as the app went away opens again
+  // again: after the reload a new day brings, or when the phone has closed the app meanwhile (日記 saves itself). Kept
+  // for two days; a form added or emptied lets go of it. The new plan, ToDo and goal forms are in the sheet: one open as
+  // the app went away opens again. So does an entry or a plan being changed (EDIT_FORMS), kept only while its sheet is
+  // open, and with which one it was
   const DRAFT_KEY = LS_PREFIX + "draft", DRAFT_DAYS = 2;
   const DRAFT_FORMS = { mealForm: "meal", workoutForm: "workout", studyForm: "study", rtForm: "routine", exForm: "money", planForm: "plan", todoForm: "todo", goalForm: "goal" };
   const DRAFT_SHEETS = { plan: openNewPlan, todo: openNewTodo, goal: openNewGoal };
-  // a form counts as typed into from the user's first key in it (what the app fills in itself doesn't count)
-  for (const id of Object.keys(DRAFT_FORMS)) for (const type of ["input", "change"]) $(id).addEventListener(type, () => { $(id).dataset.typed = "1"; });
+  const EDIT_FORMS = { evEdit: "edit", recForm: "rec" };
+  // a form counts as typed into from the user's first key in it (what the app fills in itself doesn't count; an edit
+  // form starts over each time it opens)
+  for (const id of [...Object.keys(DRAFT_FORMS), ...Object.keys(EDIT_FORMS)]) for (const type of ["input", "change"]) $(id).addEventListener(type, () => { $(id).dataset.typed = "1"; });
   const fieldsOf = (f) => [...f.querySelectorAll("input, select, textarea")].filter((x) => x.type !== "submit" && x.type !== "button");
   function draftOf(f) {
     if (f.dataset.typed !== "1" || !fieldsOf(f).some((x) => /^(text|number|textarea)$/.test(x.type) && x.value.trim())) return null;
@@ -5326,14 +5331,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     return out;
   }
   function keepDraft() {
-    const forms = {};
+    const forms = {}, mode = sheetEl.open && !sheetClosing ? sheetMode() : null;
     for (const id of Object.keys(DRAFT_FORMS)) { const d = draftOf($(id)); if (d) forms[id] = d; }
-    const open = sheetEl.open && !sheetClosing && DRAFT_SHEETS[sheetMode()] ? sheetMode() : null;
+    let edit = null;
+    if (mode === "edit" && editingId) { const f = draftOf($("evEdit")); if (f) edit = { form: "evEdit", id: editingId, start: editingStart, scope: editScope, fields: f }; }
+    if (mode === "rec" && recEdit) { const f = draftOf($("recForm")); if (f) edit = { form: "recForm", kind: recEdit.kind, id: recEdit.id, fields: f }; }
+    const open = DRAFT_SHEETS[mode] ? mode : null;
     try {
-      if (Object.keys(forms).length) localStorage.setItem(DRAFT_KEY, JSON.stringify({ at: Date.now(), tab, open, forms }));
+      if (Object.keys(forms).length || edit) localStorage.setItem(DRAFT_KEY, JSON.stringify({ at: Date.now(), tab, open, forms, edit }));
       else localStorage.removeItem(DRAFT_KEY);
     } catch {}
   }
+  // a goal chart's text and its name, 達成基準 and 期限 go in at once as the app goes away, not when the moment passes
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && mandalaGoal) { commitChartText(); saveGoalEdit(); } });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") keepDraft(); });
   window.addEventListener("pagehide", keepDraft);
   // choices first, as other fields follow them (a workout's fields, 家計簿's 費目 for 支出 or 収入, a plan's repeat words
@@ -5350,15 +5360,32 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   // at start: the forms filled in again; the sheet that was open opens again, or, the app starting at きょう, the page of
   // the form being typed into comes up
+  // an entry or a plan being changed, its sheet open again with what was typed (the entry still there); for a plan, on
+  // its day and for the same turns (この回だけ, この回以降, すべての回)
+  function reopenEdit(e) {
+    if (e.form === "recForm") {
+      if (!REC_EDIT[e.kind]?.store.get(e.id)) return false;
+      openRecEdit(e.kind, e.id, false);
+    } else {
+      const ev = events.get(e.id);
+      if (!ev) return false;
+      openDay(e.start || ev.date, false);
+      editEvent(e.id, e.start);
+      if (e.scope && e.scope !== "one") $("edScope").querySelector(`button[data-scope="${e.scope}"]`)?.click();
+    }
+    fillForm($(e.form), e.fields);
+    return true;
+  }
   function restoreDraft(atHome) {
     let d = null;
     try { d = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch {}
-    if (!d || !d.forms || !(Date.now() - num(d.at) < DRAFT_DAYS * 864e5)) return;
-    const ids = Object.keys(d.forms).filter((id) => DRAFT_FORMS[id] && $(id));
-    if (!ids.length) return;
-    const sheetForm = d.open && ids.find((id) => DRAFT_FORMS[id] === d.open);
+    if (!d || !(d.forms || d.edit) || !(Date.now() - num(d.at) < DRAFT_DAYS * 864e5)) return;
+    const ids = Object.keys(d.forms || {}).filter((id) => DRAFT_FORMS[id] && $(id));
+    const edited = !!d.edit && reopenEdit(d.edit);
+    if (!ids.length && !edited) return;
+    const sheetForm = !edited && d.open && ids.find((id) => DRAFT_FORMS[id] === d.open);
     if (sheetForm) DRAFT_SHEETS[d.open](false);
-    else if (atHome) {
+    else if (atHome && !edited) {
       const page = ids.map((id) => DRAFT_FORMS[id]).find((k) => k === d.tab && isRecord(k)) || ids.map((id) => DRAFT_FORMS[id]).find(isRecord);
       if (page) setTab(page);
     }
