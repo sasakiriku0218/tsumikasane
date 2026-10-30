@@ -635,8 +635,8 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* the weekdays boxed in by lines like the days under them (the user's call, after a calendar app they showed) */
 .cal-week span { padding: 6px 0; text-align: center; font-size: var(--t-cap); line-height: 1.2; font-weight: 600; color: var(--muted); }
 .cal-week span:not(:last-child) { border-inline-end: .5px solid var(--separator); }
-.cal-week span:first-child, .cal-day.sun .n { color: var(--warn); }
-.cal-week span:last-child, .cal-day.sat .n { color: var(--sat); }
+.cal-week .sun, .cal-day.sun .n { color: var(--warn); }
+.cal-week .sat, .cal-day.sat .n { color: var(--sat); }
 /* national holidays (祝日) are red like Sundays, a Saturday one too, and the holiday's name comes first among the plans */
 .cal-day.hol .n { color: var(--warn); }
 /* tall squares (the user wanted a portrait calendar with more plans showing), 108px each from 768px; on iPhone they
@@ -1019,7 +1019,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           </div>
         </div>
         <div class="card cal">
-          <div class="cal-week" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+          <div class="cal-week" id="calWeek" aria-hidden="true"><span class="sun">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="sat">土</span></div>
           <div class="cal-grid" id="calGrid"></div>
         </div>
       </section>
@@ -1350,18 +1350,30 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="ffield" id="edLabels"></div>
         <input type="text" id="edMemo" class="full" placeholder="メモ" aria-label="メモ" maxlength="200">
       </form>
+      <div class="card"><button type="button" class="link-btn sheet-row" id="edCopy">この予定を複製</button></div>
       <div class="card"><button type="button" class="link-btn danger sheet-del" id="edDelete">この予定を削除</button></div>
     </div>
     <!-- the calendar's settings, opened from the gear on the month bar (or from a day when there are no labels yet) -->
     <div class="sheet-view" id="settingsView" hidden>
       <!-- one group shows at a time: the calendar's labels, 勉強's subjects, or きょう's tiles -->
       <div class="sheet-view" id="labelsGroup">
+        <h3 class="group-head">週のはじまり</h3>
+        <div class="seg" role="group" aria-label="週のはじまり" id="weekStart">
+          <button type="button" data-ws="0" aria-pressed="true">日曜</button>
+          <button type="button" data-ws="1" aria-pressed="false">月曜</button>
+        </div>
         <h3 class="group-head">ラベル</h3>
         <div class="card">
           <ul class="list" id="labelList"></ul>
           <div class="label-tools"><button type="button" class="link-btn" id="labelAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>ラベルを追加</button></div>
         </div>
         <p class="group-foot"><span class="phrase">予定に付けて色分けできます。</span><span class="phrase">丸を押すと、その予定をカレンダーで隠せます。</span><span class="phrase">ラベルを消すと、付いていた予定は「ラベルなし」になります。</span></p>
+        <!-- every plan as a file for the iPhone's カレンダー (the user's call) -->
+        <h3 class="group-head">iPhoneのカレンダーへ</h3>
+        <ul class="list card">
+          <li class="btn-row"><button type="button" class="row-btn" id="icsExport"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>予定を書き出す</button></li>
+        </ul>
+        <p class="group-foot"><span class="phrase">iPhoneの「カレンダー」に取り込めるファイル（.ics）を作ります。</span><span class="phrase">保存して「ファイル」アプリで開くと、追加できます。</span></p>
       </div>
       <div class="sheet-view" id="subjectsGroup" hidden>
         <h3 class="group-head">科目</h3>
@@ -2655,8 +2667,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // every day, week, month or year from its first day, up to repeatUntil, less the turns taken out of it, skip); the
   // user's call. The month, a day's list and きょう read plans as turns: { e, start, day, days } — the turn's first day,
   // which of its days this one is (0 for the first) and how many it has. Plans from before have none of these: one day
-  const REPEATS = [["", "しない"], ["daily", "毎日"], ["weekly", "毎週"], ["monthly", "毎月"], ["yearly", "毎年"]];
-  const repeatName = (r) => (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
+  // the repeats: every day, Monday to Friday, every week or every other week on its weekday, every month on its date or
+  // on its weekday of the same week (the second Monday), every year (the user's call, after the first four)
+  const REPEATS = [["", "しない"], ["daily", "毎日"], ["weekdays", "平日"], ["weekly", "毎週"], ["biweekly", "隔週"], ["monthly", "毎月"], ["monthlyNth", "毎月"], ["yearly", "毎年"]];
+  const nthOf = (d) => Math.ceil(Number(d.slice(8, 10)) / 7); // which of its weekday in the month a day is: 2 for the second Monday
+  // a repeat in words: short in the lists (毎週, 毎月第2月曜), and in the forms' menus with the day the plan's date gives it
+  // (毎週（月曜日）, 毎月（第2月曜日）, 毎年（11月9日）)
+  function repeatName(r, date, long) {
+    const dt = date ? parseYmd(date) : null, wd = dt ? WD[dt.getDay()] : "";
+    if (!dt) return (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
+    if (!long) return r === "monthlyNth" ? `毎月第${nthOf(date)}${wd}曜` : (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
+    return { "": "しない", daily: "毎日", weekdays: "平日（月〜金）", weekly: `毎週（${wd}曜日）`, biweekly: `隔週（${wd}曜日）`, monthly: `毎月（${dt.getDate()}日）`,
+      monthlyNth: `毎月（第${nthOf(date)}${wd}曜日）`, yearly: `毎年（${dt.getMonth() + 1}月${dt.getDate()}日）` }[r] || "しない";
+  }
   const extraDays = (e) => (e.endDate && e.endDate > e.date ? daysBetween(e.date, e.endDate) : 0);
   // the first days of e's turns that reach into from … to
   function turnStarts(e, from, to) {
@@ -2664,11 +2687,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!e.repeat) return e.date >= lo && e.date <= to ? [e.date] : [];
     const last = e.repeatUntil && e.repeatUntil < to ? e.repeatUntil : to, skip = new Set(e.skip || []), out = [];
     const take = (d) => { if (d >= lo && d <= last && !skip.has(d)) out.push(d); };
-    if (e.repeat === "daily" || e.repeat === "weekly") {
-      const step = e.repeat === "daily" ? 1 : 7;
+    if (e.repeat === "daily" || e.repeat === "weekly" || e.repeat === "biweekly") {
+      const step = e.repeat === "daily" ? 1 : e.repeat === "weekly" ? 7 : 14;
       let d = e.date;
       if (lo > d) d = addDays(d, Math.ceil(daysBetween(d, lo) / step) * step);
       for (; d <= last; d = addDays(d, step)) take(d);
+    } else if (e.repeat === "weekdays") {
+      // Monday to Friday
+      for (let d = lo > e.date ? lo : e.date; d <= last; d = addDays(d, 1)) { const wd = parseYmd(d).getDay(); if (wd > 0 && wd < 6) take(d); }
+    } else if (e.repeat === "monthlyNth") {
+      // the same weekday of the same week each month (the second Monday); a month without a fifth one is passed over
+      const [y0, m0] = e.date.split("-").map(Number), n = nthOf(e.date), wd = parseYmd(e.date).getDay(), [ly, lm] = lo.split("-").map(Number);
+      for (let k = Math.max(0, (ly - y0) * 12 + lm - m0 - 1); ; k++) {
+        const y = y0 + Math.floor((m0 - 1 + k) / 12), m = ((m0 - 1 + k) % 12) + 1, ym = `${y}-${pad(m)}`;
+        if (ym + "-01" > last) break;
+        const day = 1 + ((wd - new Date(y, m - 1, 1).getDay() + 7) % 7) + 7 * (n - 1);
+        if (day <= daysInMonth(ym)) take(`${ym}-${pad(day)}`);
+      }
     } else {
       // the same date each month or year; a month without it (the 31st, the 29th of February) is passed over
       const [y0, m0, d0] = e.date.split("-").map(Number), every = e.repeat === "yearly" ? 12 : 1, [ly, lm] = lo.split("-").map(Number);
@@ -2736,6 +2771,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const key = labelId && labels.get(labelId) ? labelId : "";
     if (calHidden().has(key)) flash(`「${key ? labels.get(key).name : "ラベルなし"}」は隠しているので、カレンダーには出ません。`);
   }
+  // the calendar's first weekday: 0 Sunday (as before), 1 Monday
+  const weekStart = () => (settings.get("calendar")?.weekStart === 1 ? 1 : 0);
+  $("weekStart").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-ws]");
+    if (b) act(() => settings.set("calendar", { ...(settings.get("calendar") || {}), weekStart: Number(b.dataset.ws), updatedAt: Date.now() }));
+  });
   function toggleCalLabel(key) {
     const h = calHidden();
     if (h.has(key)) h.delete(key); else h.add(key);
@@ -2814,7 +2855,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a new plan from the ＋ beside the gear (openNewPlan): any day, 追加 grey until it has its text and a day
   const syncPlanSave = () => { $("planSave").disabled = !$("planTitle").value.trim() || !$("planDate").value; };
   for (const id of ["planTitle", "planDate"]) for (const type of ["input", "change"]) $(id).addEventListener(type, syncPlanSave);
-  function clearPlanForm() { $("planForm").reset(); syncPlanSave(); syncPlanRows("plan"); }
+  // a form's first day and start time as last set, so a run keeps its length as its first day moves and the end time
+  // keeps its distance from the start (the user's call: an hour after it at first)
+  const lastDate = {}, lastTime = {};
+  const remember = (f) => { lastDate[f] = $(f + "Date").value; lastTime[f] = $(f + "Time").value; };
+  function clearPlanForm() { $("planForm").reset(); syncPlanSave(); syncPlanRows("plan"); remember("plan"); }
   for (const id of ["planRepeat", "edRepeat"]) setChildren($(id), REPEATS.map(([k, name]) => el("option", { value: k }, name)));
   // a plan form's rows that come and go (f: "plan" for a new one, "ed" for a change): the end time once there is a start
   // time, the repeat's end once it repeats. No end may come before its start (min), so 追加 and 保存 wait until it's right
@@ -2827,8 +2872,29 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $(f + "UntilRow").hidden = !rep; $(f + "Until").disabled = !rep;
     if (!rep) $(f + "Until").value = "";
     $(f + "Until").min = date;
+    // the menu's words follow the day: 毎週（月曜日）, 毎月（第2月曜日）
+    for (const o of $(f + "Repeat").options) o.textContent = repeatName(o.value, date, true);
   }
   for (const f of ["plan", "ed"]) for (const id of ["Date", "EndDate", "Time", "Repeat"]) for (const type of ["input", "change"]) $(f + id).addEventListener(type, () => syncPlanRows(f));
+  const minOf = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const atMin = (n) => `${pad(Math.floor(n / 60))}:${pad(n % 60)}`;
+  for (const f of ["plan", "ed"]) {
+    // the first day moved: a run's last day moves with it
+    $(f + "Date").addEventListener("change", () => {
+      const d = $(f + "Date").value, was = lastDate[f], end = $(f + "EndDate");
+      lastDate[f] = d;
+      if (d && was && end.value > was) { end.value = addDays(end.value, daysBetween(was, d)); syncPlanRows(f); }
+    });
+    // the start time set or moved: on one day, the end an hour after it, or as long after it as it was (to 23:59 at most)
+    $(f + "Time").addEventListener("change", () => {
+      const t = $(f + "Time").value, end = $(f + "EndTime"), was = lastTime[f];
+      lastTime[f] = t;
+      if (!t || $(f + "EndDate").value > $(f + "Date").value) return;
+      const len = end.value && was && minOf(end.value) > minOf(was) ? minOf(end.value) - minOf(was) : 60;
+      end.value = atMin(Math.min(minOf(t) + len, 23 * 60 + 59));
+      syncPlanRows(f);
+    });
+  }
   // what a form adds to a plan: its last day, its end time and its repeat, each only when it says something
   function planExtras(f, date, time) {
     const x = {}, endDate = $(f + "EndDate").value, endTime = $(f + "EndTime").value, rep = $(f + "Repeat").value, until = $(f + "Until").value;
@@ -2844,7 +2910,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("calAdd").addEventListener("click", (ev) => openNewPlan(ev.detail === 0));
   $("planForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    const title = $("planTitle").value.trim(), date = $("planDate").value, time = $("planTime").value;
+    const title = $("planTitle").value.trim(), date = $("planDate").value, time = $("planTime").value, copied = planCopy;
     if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     const item = { date, title, createdAt: Date.now(), ...planExtras("plan", date, time) };
     if (time) item.time = time;
@@ -2852,7 +2918,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(() => events.add(item));
     clearPlanForm();
     // begun from a day's list: back to the list of the plan's day, the month left as it was
-    if (planFromDay) { calDay = date; renderCalendar(); backToDay(); noteHidden(item.labelId); return; }
+    if (planFromDay) {
+      calDay = date; renderCalendar(); backToDay();
+      if (copied) flash(`${fmtMDW(date)}に複製しました`);
+      noteHidden(item.labelId);
+      return;
+    }
     setCalDay(date); // the month turns to the plan's day and picks it, so it shows where the plan went
     closeSheet();
     noteHidden(item.labelId);
@@ -2978,6 +3049,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let goalNew = false; // the sheet holds a new goal's form, opened from 目標's ＋
   let planNew = false; // the sheet holds a new plan's form, opened from the ＋ beside the calendar's gear
   let planFromDay = false; // that form was opened from a day's list (予定を追加), which キャンセル and 追加 go back to
+  let planCopy = false; // that form holds a copy of a plan (この予定を複製)
   let findOpen = false, dayFromFind = false; // the sheet holds 予定 (the magnifier); a day was opened from it, which 戻る goes back to
   let findPages = 1; // how many three months これからの予定 shows (もっと見る adds three more)
   let monthPick = false, pickYear = 0; // the sheet holds the month picker, opened from the month's name; the year it shows
@@ -3003,7 +3075,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("sheetCancel").hidden = !(changing || adding || (mode === "chart" && (mPath.length || chartFromDay)) || (mode === "settings" && settingsFrom === "day") || (mode === "day" && dayFromFind));
     $("sheetCancel").textContent = changing || adding ? "キャンセル" : "戻る";
     const rel = mode === "day" ? relLabel(calDay) : "";
-    $("sheetTitle").textContent = mode === "find" ? "予定" : mode === "month" ? "月を選ぶ" : mode === "goal" ? "新しい目標" : mode === "plan" ? "新しい予定" : mode === "todo" ? "新しいToDo" : mode === "chart" ? chartTitle()
+    $("sheetTitle").textContent = mode === "find" ? "予定" : mode === "month" ? "月を選ぶ" : mode === "goal" ? "新しい目標" : mode === "plan" ? (planCopy ? "予定を複製" : "新しい予定") : mode === "todo" ? "新しいToDo" : mode === "chart" ? chartTitle()
       : mode === "settings" ? "設定" : mode === "rec" ? REC_EDIT[recEdit.kind].title : mode === "edit" ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay) + (holidayName(calDay) ? "・" + holidayName(calDay) : "");
   }
   // a closed sheet's starting state: no animation or drag left over, the day's list showing
@@ -3014,7 +3086,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; chartFromDay = false; mOverview = false;
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; chartFromDay = false; mOverview = false;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   // a grey day of the month before or after opens its sheet too, without turning the month (the user's call)
@@ -3027,12 +3099,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // 予定を追加 under a day's list: the new plan's form in the same sheet, on that day; a text typed before stays
   function openPlanFromDay() {
     if (!$("planTitle").value.trim()) clearPlanForm();
-    $("planDate").value = calDay; syncPlanRows("plan");
+    $("planDate").value = calDay; syncPlanRows("plan"); remember("plan");
     planNew = true; planFromDay = true; renderPlanLabels(); syncSheetHead(); syncPlanSave();
     sheetEl.scrollTop = 0;
     $("planTitle").focus();
   }
-  function backToDay() { planNew = false; planFromDay = false; showDayView(); }
+  function backToDay() { planNew = false; planFromDay = false; planCopy = false; showDayView(); }
+  // この予定を複製: the new plan's form in the same sheet holding this plan's name, days, times, label and memo, on this
+  // turn's day, to set on another day (the user's call); a copy doesn't repeat. 追加 and キャンセル come back to the list
+  function copyPlan() {
+    const e = events.get(editingId);
+    if (!e) return;
+    const start = editingStart || e.date, extra = extraDays(e);
+    clearPlanForm();
+    $("planTitle").value = e.title; $("planDate").value = start; $("planEndDate").value = extra ? addDays(start, extra) : "";
+    $("planTime").value = e.time || ""; $("planEndTime").value = e.time && e.endTime ? e.endTime : ""; $("planMemo").value = e.memo || "";
+    planLabelChoice = labelOf(e) ? e.labelId : "";
+    editingId = null; planNew = true; planFromDay = true; planCopy = true;
+    disarmDelete(); renderPlanLabels(); syncPlanRows("plan"); remember("plan"); syncPlanSave(); syncSheetHead();
+    sheetEl.scrollTop = 0;
+    $("sheetTitle").focus();
+  }
+  $("edCopy").addEventListener("click", copyPlan);
   // the day before or after, from a sideways swipe on the sheet, its ‹ ›, or the arrow keys; the month behind stays
   function stepDay(n) {
     calDay = addDays(calDay, n);
@@ -3198,7 +3286,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function openNewPlan(byKey) {
     if (sheetEl.open) return;
     resetSheet();
-    if (!$("planTitle").value.trim()) { clearPlanForm(); $("planDate").value = planDay(); syncPlanRows("plan"); }
+    if (!$("planTitle").value.trim()) { clearPlanForm(); $("planDate").value = planDay(); syncPlanRows("plan"); remember("plan"); }
     planNew = true; renderPlanLabels(); syncSheetHead(); syncPlanSave();
     presentSheet(byKey, "plan", $("planTitle"));
   }
@@ -3588,6 +3676,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // the repeat's fields left out of one turn's change are switched off, so the browser doesn't check them
     if (!whole) $("edUntil").disabled = true;
     $("edRepeat").disabled = !whole;
+    remember("ed");
     editDays = $("edDate").value + "\n" + $("edEndDate").value; // what the days say for this choice before any change
   }
   $("edScope").addEventListener("click", (ev) => {
@@ -3645,7 +3734,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("edTimeClear").addEventListener("click", (ev) => {
     $("edTime").value = "";
     $("edTimeClear").hidden = true;
-    syncPlanRows("ed");
+    syncPlanRows("ed"); remember("ed");
     if (ev.detail === 0) $("edTime").focus(); // pressed from the keyboard: keep focus in the form
   });
   // opening another event starts the delete over, so one press can never delete the wrong event
@@ -3942,7 +4031,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
     // whole weeks from Sunday, padded with the neighbouring months' days
     const first = calMonth + "-01";
-    const lead = parseYmd(first).getDay();
+    // Sunday first, or Monday (the user's call, in the settings); the weekday names above follow
+    const ws0 = weekStart(), lead = (parseYmd(first).getDay() - ws0 + 7) % 7;
+    setChildren($("calWeek"), Array.from({ length: 7 }, (_, i) => { const wd = (i + ws0) % 7; return el("span", { class: wd === 0 ? "sun" : wd === 6 ? "sat" : null }, WD[wd]); }));
+    for (const b of $("weekStart").children) b.setAttribute("aria-pressed", String(Number(b.dataset.ws) === ws0));
     const start = addDays(first, -lead), count = Math.ceil((lead + daysInMonth(calMonth)) / 7) * 7;
     const hidden = calHidden(), turnsBy = turnsByDay(start, addDays(start, count - 1)), weeks = count / 7;
     for (const [d, list] of turnsBy) turnsBy.set(d, list.filter((t) => onCalendar(t.e, hidden)));
@@ -4040,7 +4132,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // repeat, then its memo
   function planRow(t, onclick, verb) {
     const { e } = t, l = labelOf(e), when = turnTimeText(t);
-    const sub = [l ? l.name : "", t.days > 1 ? `${fmtMD(t.start)}〜${fmtMD(addDays(t.start, t.days - 1))}` : "", e.repeat ? repeatName(e.repeat) : ""].filter(Boolean).join("・");
+    const sub = [l ? l.name : "", t.days > 1 ? `${fmtMD(t.start)}〜${fmtMD(addDays(t.start, t.days - 1))}` : "", e.repeat ? repeatName(e.repeat, e.date) : ""].filter(Boolean).join("・");
     return el("li", { class: "btn-row", style: labelStyle(l) },
       el("button", { type: "button", class: "row-btn nav", "aria-label": `「${e.title}」${verb}（${when}${sub ? "・" + sub : ""}${e.memo ? "・" + e.memo : ""}）`, onclick },
         el("span", { class: "chip when", style: "--chip-c: var(--lc)" }, when),
@@ -4536,6 +4628,71 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     flash(`「${name}」を書き出しました。`);
     noteExport();
   }
+  // 予定を書き出す: every plan in an iCalendar file (.ics) the iPhone's カレンダー takes in (the user's call): repeats as RRULE,
+  // turns taken out as EXDATE, the memo as its description and the label as its category. Times carry no zone, so they
+  // stay the clock times they were written in; a plan with a start time and no end lasts an hour there
+  function icsOf() {
+    const esc = (t) => String(t).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+    const day = (d) => d.replace(/-/g, ""), at = (d, t) => `${day(d)}T${t.replace(":", "")}00`;
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const RULES = { daily: "FREQ=DAILY", weekdays: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", weekly: "FREQ=WEEKLY", biweekly: "FREQ=WEEKLY;INTERVAL=2", monthly: "FREQ=MONTHLY", yearly: "FREQ=YEARLY" };
+    const DAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tsumikasane//calendar//JA", "CALSCALE:GREGORIAN", "X-WR-CALNAME:つみかさね"];
+    for (const e of events.items) {
+      if (!e.date || !e.title || (e.repeat && !turnStarts(e, e.date, addDays(e.date, 3660)).length)) continue; // a repeat with every turn taken out has nothing left
+      // a 平日 repeat begins on its first weekday, as the calendar here shows it
+      let first = e.date;
+      if (e.repeat === "weekdays") while ([0, 6].includes(parseYmd(first).getDay())) first = addDays(first, 1);
+      const last = addDays(first, extraDays(e));
+      lines.push("BEGIN:VEVENT", `UID:${e.id}@tsumikasane`, `DTSTAMP:${stamp}`, `SUMMARY:${esc(e.title)}`);
+      if (e.time) {
+        lines.push(`DTSTART:${at(first, e.time)}`);
+        if (e.endTime && (last > first || e.endTime > e.time)) lines.push(`DTEND:${at(last, e.endTime)}`);
+        else lines.push(last > first ? `DTEND:${at(addDays(last, 1), "00:00")}` : "DURATION:PT1H");
+      } else lines.push(`DTSTART;VALUE=DATE:${day(first)}`, `DTEND;VALUE=DATE:${day(addDays(last, 1))}`);
+      const rule = e.repeat === "monthlyNth" ? `FREQ=MONTHLY;BYDAY=${nthOf(e.date)}${DAYS[parseYmd(e.date).getDay()]}` : RULES[e.repeat];
+      if (rule) {
+        lines.push(`RRULE:${rule}${e.repeatUntil ? ";UNTIL=" + day(e.repeatUntil) + (e.time ? "T235959" : "") : ""}`);
+        for (const d of e.skip || []) lines.push(e.time ? `EXDATE:${at(d, e.time)}` : `EXDATE;VALUE=DATE:${day(d)}`);
+      }
+      if (e.memo) lines.push(`DESCRIPTION:${esc(e.memo)}`);
+      if (labelOf(e)) lines.push(`CATEGORIES:${esc(labelOf(e).name)}`);
+      lines.push("END:VEVENT");
+    }
+    lines.push("END:VCALENDAR");
+    return lines.map(foldIcs).join("\r\n") + "\r\n";
+  }
+  // a line over 75 bytes goes on in lines that start with a space (RFC 5545), never splitting a character
+  function foldIcs(line) {
+    const enc = new TextEncoder();
+    if (enc.encode(line).length <= 75) return line;
+    const out = [];
+    let cur = "", n = 0;
+    for (const ch of line) {
+      const b = enc.encode(ch).length;
+      if (n + b > (out.length ? 74 : 75)) { out.push(cur); cur = ""; n = 0; }
+      cur += ch; n += b;
+    }
+    out.push(cur);
+    return out.join("\r\n ");
+  }
+  async function exportIcs() {
+    if (!events.items.length) { flash("書き出す予定がありません。"); return; }
+    const name = `tsumikasane-calendar-${todayKey}.ics`;
+    const blob = new Blob([icsOf()], { type: "text/calendar" });
+    const file = new File([blob], name, { type: "text/calendar" });
+    // on phones the share sheet keeps the file (保存 to ファイル), as for the records' backup
+    if (matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); flash("予定を書き出しました。"); }
+      catch (e) { if (e.name !== "AbortError") flash("書き出せませんでした。もう一度お試しください。"); }
+      return;
+    }
+    const a = el("a", { href: URL.createObjectURL(blob), download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    flash(`「${name}」を書き出しました。`);
+  }
+  $("icsExport").addEventListener("click", exportIcs);
   function noteExport() { act(() => settings.set("backup", { ...(settings.get("backup") || {}), lastExport: Date.now() })); }
   // a file chosen is only looked at first (the user's call): the card under the buttons says when it was written out and
   // how many records it adds, and nothing changes until 読み込む
