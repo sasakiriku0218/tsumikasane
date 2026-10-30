@@ -4958,9 +4958,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const skipped = num((settings.get("backup") || {}).restoreSkipped);
       // the newest copy holding records that are gone from here. One made since deletions are remembered: any record in it
       // not here and not deleted here, kind by kind, so one kind going missing shows too. An older one: all of it gone,
-      // or at least ten records and half missing
+      // or at least ten records and half missing. このままでいい set aside the copy it was shown for and every older one
+      // (they hold the same records), so only a copy made after it can bring the notice back
       let pick = null, lost = null;
-      for (const c of (await readCopies()).filter((c) => c.savedAt !== skipped && c.count > 0).sort((a, b) => b.savedAt - a.savedAt)) {
+      for (const c of (await readCopies()).filter((c) => c.savedAt > skipped && c.count > 0).sort((a, b) => b.savedAt - a.savedAt)) {
         const m = missingIn(c);
         if (m ? m.length : now === 0 || (c.count - now >= 10 && now < c.count / 2)) { pick = c; lost = m; break; }
       }
