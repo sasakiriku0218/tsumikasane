@@ -5071,6 +5071,67 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (file) importRecords(file);
   });
 
+  // ---------- 書きかけ ----------
+  // what was being typed into an add form and not yet added is kept as the app goes away, and put back when it opens
+  // again: after the reload a new day brings, or when the phone has closed the app meanwhile (日記 saves itself, and an
+  // entry being changed is still there as it was). Kept for two days; a form added or emptied lets go of it. The new
+  // plan, ToDo and goal forms are in the sheet: one open as the app went away opens again
+  const DRAFT_KEY = LS_PREFIX + "draft", DRAFT_DAYS = 2;
+  const DRAFT_FORMS = { mealForm: "meal", workoutForm: "workout", studyForm: "study", rtForm: "routine", exForm: "money", planForm: "plan", todoForm: "todo", goalForm: "goal" };
+  const DRAFT_SHEETS = { plan: openNewPlan, todo: openNewTodo, goal: openNewGoal };
+  // a form counts as typed into from the user's first key in it (what the app fills in itself doesn't count)
+  for (const id of Object.keys(DRAFT_FORMS)) for (const type of ["input", "change"]) $(id).addEventListener(type, () => { $(id).dataset.typed = "1"; });
+  const fieldsOf = (f) => [...f.querySelectorAll("input, select, textarea")].filter((x) => x.type !== "submit" && x.type !== "button");
+  function draftOf(f) {
+    if (f.dataset.typed !== "1" || !fieldsOf(f).some((x) => /^(text|number|textarea)$/.test(x.type) && x.value.trim())) return null;
+    const out = {};
+    for (const x of fieldsOf(f)) {
+      if (x.type === "radio") { if (x.checked) out["radio:" + x.name] = x.value; }
+      else if (x.id) out[x.id] = x.value;
+    }
+    return out;
+  }
+  function keepDraft() {
+    const forms = {};
+    for (const id of Object.keys(DRAFT_FORMS)) { const d = draftOf($(id)); if (d) forms[id] = d; }
+    const open = sheetEl.open && !sheetClosing && DRAFT_SHEETS[sheetMode()] ? sheetMode() : null;
+    try {
+      if (Object.keys(forms).length) localStorage.setItem(DRAFT_KEY, JSON.stringify({ at: Date.now(), tab, open, forms }));
+      else localStorage.removeItem(DRAFT_KEY);
+    } catch {}
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") keepDraft(); });
+  window.addEventListener("pagehide", keepDraft);
+  // choices first, as other fields follow them (a workout's fields, 家計簿's 費目 for 支出 or 収入, a plan's repeat words
+  // for its day), then what was typed, then the menus once more in case the days redrew them
+  function fillForm(f, fields) {
+    const set = (x, v) => { x.value = v; x.dispatchEvent(new Event("input", { bubbles: true })); x.dispatchEvent(new Event("change", { bubbles: true })); };
+    for (const x of fieldsOf(f)) {
+      if (x.type === "radio") { if (fields["radio:" + x.name] === x.value && !x.checked) { x.checked = true; x.dispatchEvent(new Event("change", { bubbles: true })); } }
+      else if (x.tagName === "SELECT" && x.id in fields && x.value !== fields[x.id]) set(x, fields[x.id]);
+    }
+    for (const x of fieldsOf(f)) if (x.type !== "radio" && x.tagName !== "SELECT" && x.id in fields && x.value !== fields[x.id]) set(x, fields[x.id]);
+    for (const x of fieldsOf(f)) if (x.tagName === "SELECT" && x.id in fields && x.value !== fields[x.id]) set(x, fields[x.id]);
+    f.dataset.typed = "1";
+  }
+  // at start: the forms filled in again; the sheet that was open opens again, or, the app starting at きょう, the page of
+  // the form being typed into comes up
+  function restoreDraft(atHome) {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch {}
+    if (!d || !d.forms || !(Date.now() - num(d.at) < DRAFT_DAYS * 864e5)) return;
+    const ids = Object.keys(d.forms).filter((id) => DRAFT_FORMS[id] && $(id));
+    if (!ids.length) return;
+    const sheetForm = d.open && ids.find((id) => DRAFT_FORMS[id] === d.open);
+    if (sheetForm) DRAFT_SHEETS[d.open](false);
+    else if (atHome) {
+      const page = ids.map((id) => DRAFT_FORMS[id]).find((k) => k === d.tab && isRecord(k)) || ids.map((id) => DRAFT_FORMS[id]).find(isRecord);
+      if (page) setTab(page);
+    }
+    for (const id of ids) fillForm($(id), d.forms[id]);
+    flash("書きかけの入力を戻しました。");
+  }
+
   // ---------- boot ----------
   function renderAll() {
     for (const fn of [renderDateNavs, renderHome, renderTodos, renderJournal, renderMeals, renderWorkouts, renderStudy, renderRoutine, renderWeight, renderMoney, renderGoals, renderCalendar, renderLabels, renderTileList, renderBackup, renderSummary, paintChart]) draw(fn);
@@ -5085,6 +5146,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   draw(() => setTab(initial === "reclist" ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home"));
   draw(loadJournalForm);
   renderAll();
+  draw(() => restoreDraft(!initial || initial === "home"));
   // iOS only shows :active (the pressed look HIG asks for) once the page listens for touches
   document.addEventListener("touchstart", () => {}, { passive: true });
 
