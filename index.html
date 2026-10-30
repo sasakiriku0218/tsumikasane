@@ -4907,10 +4907,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // ---------- 記録を守る仕組み ----------
   // Records live only in this browser's storage, which a phone may clear (for example when space runs low), and an app that
   // starts up seeing nothing would then save over the real records. So: (1) every day a full copy goes into IndexedDB, a
-  // second storage separate from localStorage, keeping a week of copies; (2) if the records come up empty or far fewer than
+  // second storage separate from localStorage, keeping a week of daily copies and, further back, one a week and one a
+  // month (copiesKept); (2) if the records come up empty or far fewer than
   // the latest copy, a notice offers to bring the copy back; (3) the home page reminds you to export now and then, since
   // only a file kept elsewhere survives the phone clearing everything.
-  const SNAP_DB = "tsumikasane-copies", SNAP_KEEP = 7;
+  const SNAP_DB = "tsumikasane-copies", SNAP_DAYS = 7, SNAP_WEEKS = 4, SNAP_MONTHS = 6;
+  // the copies that stay (their days, newest first): the last seven days', then the newest one of each of four weeks
+  // before that and of each of six months, so a loss noticed weeks later can still be put right
+  function copiesKept(days) {
+    const keep = new Set(days.slice(0, SNAP_DAYS)), weeks = new Set(), months = new Set();
+    for (const d of days.slice(SNAP_DAYS)) {
+      const w = addDays(d, -((parseYmd(d).getDay() + 6) % 7)), m = d.slice(0, 7); // its week by the Monday it starts on
+      if (!weeks.has(w) && weeks.size < SNAP_WEEKS) { weeks.add(w); keep.add(d); }
+      if (!months.has(m) && months.size < SNAP_MONTHS) { months.add(m); keep.add(d); }
+    }
+    return keep;
+  }
   const recordCount = (data) => Object.entries(data || {}).reduce((n, [k, arr]) => n + (k !== "deleted" && Array.isArray(arr) ? arr.length : 0), 0);
   // since when deletions are remembered on this device (the version that began it): a copy older than that may hold
   // records deleted before, so it is judged by its count alone
@@ -4966,7 +4978,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       await new Promise((resolve, reject) => {
         const tx = db.transaction("copies", "readwrite"), st = tx.objectStore("copies");
         st.put({ day: todayKey, savedAt: Date.now(), count, data });
-        for (const c of copies.map((c) => c.day).filter((d) => d !== todayKey).sort().reverse().slice(SNAP_KEEP - 1)) st.delete(c);
+        const keep = copiesKept([todayKey, ...copies.map((c) => c.day).filter((d) => d !== todayKey).sort().reverse()]);
+        for (const c of copies) if (!keep.has(c.day)) st.delete(c.day);
         tx.oncomplete = () => { db.close(); resolve(); };
         tx.onerror = () => { db.close(); reject(tx.error); };
       });
