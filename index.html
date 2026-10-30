@@ -4872,24 +4872,27 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       flash("このファイルは読み込めません。「記録を書き出す」で作ったファイルを選んでください。");
       return;
     }
-    const { add, differ, gone, odd } = mergePlan(payload.data);
+    const { add, differ, gone, odd, adds } = mergePlan(payload.data);
     const leftOut = (gone ? `消した ${gone} 件は、消したままにします。` : "") + (odd ? `中身が読み取れない ${odd} 件は読み込みません。` : "");
     if (!add) { flash(differ || leftOut ? "足す記録はありません。" + (differ ? `内容のちがう ${differ} 件は、この端末のほうのままにします。` : "") + leftOut : "このファイルの記録は、すべてこの端末にあります。"); return; }
     const at = new Date(payload.exportedAt);
     const when = isNaN(at) ? "" : (at.getFullYear() !== new Date().getFullYear() ? `${at.getFullYear()}年` : "") + fmtMDW(ymd(at)) + "に書き出した";
     importPending = payload.data;
-    $("importAskText").textContent = `${when}「${file.name}」から、この端末にない記録を ${add.toLocaleString("ja-JP")} 件足します。いまある記録は変わりません。`
+    $("importAskText").textContent = `${when}「${file.name}」から、この端末にない記録を ${add.toLocaleString("ja-JP")} 件（${adds.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")}`).join("・")}）足します。いまある記録は変わりません。`
       + (differ ? `この端末にもあって内容のちがう ${differ} 件は、この端末のほうを残します。` : "") + leftOut;
     $("importAsk").hidden = false;
     $("importGo").focus();
   }
   function hideImportAsk() { importPending = null; $("importAsk").hidden = true; }
+  // 元に戻す shows a little longer than other messages, to look the records over first; taken back, they go from today's
+  // copy too, so the check against the copies doesn't offer them again
   $("importGo").addEventListener("click", () => {
     if (!importPending) return;
-    const count = mergeRecords(importPending);
+    const added = mergeRecords(importPending), count = addedCount(added);
     hideImportAsk();
-    flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を足しました。` : "足す記録はありませんでした。");
-    saveCopy();
+    const saving = saveCopy();
+    flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を足しました。` : "足す記録はありませんでした。",
+      count ? () => { unmerge(added); saving.then(() => dropFromCopy(added)); flash("読み込みを取り消しました。"); } : null, 10000);
     $("importBtn").focus();
   });
   $("importCancel").addEventListener("click", () => { hideImportAsk(); $("importBtn").focus(); });
@@ -4914,42 +4917,57 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // what reading a set in would do, without doing it: the records it adds (none here with their id yet), and those here
   // already whose contents differ, which stay as they are (settings aren't counted: this device keeps its own); records
   // deleted (gone) and odd ones are left out, and counted for the message
+  // records are counted kind by kind (adds), settings not at all: they come along with the records, this device's own kept
   function mergePlan(data) {
     let add = 0, differ = 0, gone = 0, odd = 0;
-    const dead = deadIn(data);
+    const dead = deadIn(data), adds = [];
     for (const s of ALL_STORES) {
-      if (s === deleted) continue;
+      if (!remembers(s)) continue;
       const here = new Map(s.items.map((x) => [x.id, x]));
+      let n = 0;
       for (const x of incomingOf(data, s)) {
         const h = here.get(x.id);
-        if (h) { if (s !== settings && JSON.stringify(h) !== JSON.stringify(x)) differ++; }
+        if (h) { if (JSON.stringify(h) !== JSON.stringify(x)) differ++; }
         else if (dead.has(delKey(s, x.id))) gone++;
         else if (!fits(s, x)) odd++;
-        else add++;
+        else n++;
       }
+      if (n) { adds.push([s, n]); add += n; }
     }
-    return { add, differ, gone, odd };
+    return { add, differ, gone, odd, adds };
   }
   // adds what is not on this device yet, matching by id. One already here is left as it is, even where the one read in
   // differs (the same day's 日記 or 体重 from another phone, a setting), so nothing on this device is lost or changed.
   // A record deleted here or where the set came from isn't brought back, and the set's deleted records (those not here)
   // are remembered here too, so an older file can't bring them back later either
+  // what it added comes back as [store, ids], for 元に戻す (unmerge)
   function mergeRecords(data) {
-    let count = 0;
-    const dead = deadIn(data);
+    const added = [], dead = deadIn(data);
     const tomb = incomingOf(data, deleted).filter((t) => fits(deleted, t) && !deleted.get(t.id) && !ALL_STORES.find((s) => s.name === t.store)?.get(t.rid));
-    if (tomb.length) { deleted.items = [...deleted.items, ...tomb]; deleted.saveLocal(); }
+    if (tomb.length) { deleted.items = [...deleted.items, ...tomb]; deleted.saveLocal(); added.push([deleted, tomb.map((t) => t.id)]); }
     for (const s of ALL_STORES) {
       if (s === deleted) continue;
       const here = new Set(s.items.map((x) => x.id)), add = incomingOf(data, s).filter((x) => !here.has(x.id) && !dead.has(delKey(s, x.id)) && fits(s, x));
       if (!add.length) continue;
       s.items = [...s.items, ...add];
       s.saveLocal();
-      count += add.length;
+      added.push([s, add.map((x) => x.id)]);
     }
     loadJournalForm();
     renderAll();
-    return count;
+    return added;
+  }
+  // how many records that was (settings and deleted ones aside)
+  const addedCount = (added) => added.reduce((n, [s, ids]) => n + (remembers(s) ? ids.length : 0), 0);
+  // a reading-in taken back (元に戻す): what it added goes again, not remembered as deleted, as if it had never been read in
+  function unmerge(added) {
+    for (const [s, ids] of added) {
+      const gone = new Set(ids);
+      s.items = s.items.filter((x) => !gone.has(x.id));
+      s.saveLocal();
+    }
+    loadJournalForm();
+    renderAll();
   }
 
   // ---------- 記録を守る仕組み ----------
@@ -5033,6 +5051,26 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       });
     } catch {}
   }
+  // records taken back after a reading-in (元に戻す) leave today's copy as well, so the check against the copies doesn't
+  // offer them back
+  async function dropFromCopy(added) {
+    if (!canStoreLocal || !window.indexedDB) return;
+    try {
+      const db = await openCopies();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("copies", "readwrite"), st = tx.objectStore("copies"), r = st.get(todayKey);
+        r.onsuccess = () => {
+          const c = r.result;
+          if (!c) return;
+          for (const [s, ids] of added) { const gone = new Set(ids); if (Array.isArray(c.data[s.name])) c.data[s.name] = c.data[s.name].filter((x) => !gone.has(x.id)); }
+          c.count = recordCount(c.data);
+          st.put(c);
+        };
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    } catch {}
+  }
   let restoreCandidate = null;
   async function checkRestore() {
     if (!canStoreLocal || !window.indexedDB) return;
@@ -5062,13 +5100,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         + "戻すと、いまある記録はそのままで、コピーにある記録が足されます。";
     } catch {}
   }
+  // taken back with 元に戻す, the records are missing again and the notice says so again
   $("restoreBtn").addEventListener("click", () => {
     if (!restoreCandidate) return;
-    const count = mergeRecords(restoreCandidate.data);
+    const added = mergeRecords(restoreCandidate.data), count = addedCount(added);
     restoreCandidate = null;
     $("restoreNote").hidden = true;
-    flash(`${count} 件の記録を戻しました。`);
     saveCopy();
+    flash(`${count.toLocaleString("ja-JP")} 件の記録を戻しました。`, () => { unmerge(added); flash("取り消しました。"); checkRestore(); }, 10000);
   });
   $("restoreSkip").addEventListener("click", () => {
     if (restoreCandidate) act(() => settings.set("backup", { ...(settings.get("backup") || {}), restoreSkipped: restoreCandidate.savedAt }));
