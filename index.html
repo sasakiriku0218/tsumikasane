@@ -901,6 +901,8 @@ ul.list.rec-list > li.one { flex-wrap: wrap; column-gap: 12px; }
 /* in red once a week has gone by since the last export (or there has been none), when きょう's reminder comes too */
 .backup-last { font-weight: 600; word-break: keep-all; }
 .backup-last.due { color: var(--warn); }
+.usage-line { word-break: keep-all; }
+.usage-line.due { color: var(--warn); font-weight: 600; }
 .backup-nudge, .import-ask { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); }
 .backup-nudge strong, .import-ask strong { font-weight: 600; }
 .backup-nudge .nudge-text, .import-ask .nudge-text { font-size: var(--t-sub); line-height: 1.45; color: var(--muted); }
@@ -1101,6 +1103,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           </div>
         </div>
         <p class="group-foot" id="storeNote"></p>
+        <p class="group-foot usage-line" id="usageLine" hidden></p>
         <input type="file" id="importFile" accept=".json,application/json" hidden>
       </section>
 
@@ -1975,7 +1978,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     window.scrollTo(0, 0);
     watchTitle();
     if (key === "weight") draw(renderWeightChart);
-    if (key === "records") draw(renderSummary);
+    if (key === "records") { draw(renderSummary); draw(renderUsage); }
     if (key === "reclist") draw(renderRecList);
     if (key === "trash") draw(renderTrash);
     if (key === "copies") draw(renderCopies);
@@ -5345,6 +5348,43 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // drawn before the page slides in, so it arrives with its days
   $("copiesBtn").addEventListener("click", async () => { copyPending = null; $("copyAsk").hidden = true; await renderCopies(); showTab("copies"); });
 
+  // ---------- 保存できる量 ----------
+  // how much the records take in the browser's storage, against the most a site may keep there (about 5 MB on an iPhone;
+  // counted as two bytes a character, which errs on the full side). Past 60 % the line turns red: time to write them out,
+  // and to move them somewhere roomier (IndexedDB), which this app doesn't do yet
+  const STORAGE_LIMIT = 5 * 1024 * 1024;
+  function storageUsed() {
+    let n = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(LS_PREFIX)) n += k.length + (localStorage.getItem(k) || "").length;
+      }
+    } catch {}
+    return n * 2;
+  }
+  function renderUsage() {
+    const line = $("usageLine");
+    line.hidden = !canStoreLocal;
+    if (!canStoreLocal) return;
+    const used = storageUsed(), mb = used / 1024 / 1024, near = used > STORAGE_LIMIT * 0.6;
+    line.textContent = `この端末で使っている量：${mb < 0.1 ? "0.1 MB 未満" : `約 ${mb.toFixed(1)} MB`}（ブラウザの上限はおよそ 5 MB）`
+      + (near ? "。上限に近づいています。いまのうちに記録を書き出しておいてください。" : "");
+    line.classList.toggle("due", near);
+  }
+  // at start: the text kept aside for a store that couldn't be read goes after 30 days, and a draft too old to put back
+  function tidyStorage() {
+    try {
+      const old = Date.now() - 30 * 864e5;
+      for (const k of Object.keys(localStorage)) {
+        const m = k.startsWith(LS_PREFIX + "unreadable:") && k.match(/:(\d+)$/);
+        if (m && Number(m[1]) < old) localStorage.removeItem(k);
+      }
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      if (d && !(Date.now() - num(d.at) < DRAFT_DAYS * 864e5)) localStorage.removeItem(DRAFT_KEY);
+    } catch {}
+  }
+
   // ---------- 最近削除した項目 ----------
   // what deleted records held in the last 30 days, newest first, each back with 戻す as it was (its id too, so what pointed
   // at it, a plan's label or a day's checks, is right again)
@@ -5483,9 +5523,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tab === "reclist") draw(renderRecList);
     if (tab === "trash") draw(renderTrash);
     if (tab === "copies") draw(renderCopies);
+    if (tab === "records") draw(renderUsage);
   }
   // the safeguards first, so a page that can't be drawn doesn't keep them from running
   pruneTrash();
+  tidyStorage();
   showMode();
   checkRestore().then(() => saveCopy());
   askPersist();
