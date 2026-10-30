@@ -4841,9 +4841,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- 記録の書き出し・読み込み ----------
   // one JSON file with every store; reading it back adds what is not on this device yet (once the user says so), so
-  // nothing already here is lost or changed
+  // nothing already here is lost or changed. Its version goes up when its shape changes, so an app older than the file
+  // knows not to read it (a file without one is from the first version)
+  const FILE_VERSION = 1;
   async function exportRecords() {
-    const payload = { app: "tsumikasane", version: 1, exportedAt: new Date().toISOString(), data: Object.fromEntries(ALL_STORES.map((s) => [s.name, s.items])) };
+    const payload = { app: "tsumikasane", version: FILE_VERSION, exportedAt: new Date().toISOString(), data: Object.fromEntries(ALL_STORES.map((s) => [s.name, s.items])) };
     const name = `tsumikasane-${todayKey}.json`;
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const file = new File([blob], name, { type: "application/json" });
@@ -4934,6 +4936,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     hideImportAsk();
     if (!payload || payload.app !== "tsumikasane" || !payload.data || typeof payload.data !== "object") {
       flash("このファイルは読み込めません。「記録を書き出す」で作ったファイルを選んでください。");
+      return;
+    }
+    if (num(payload.version) > FILE_VERSION) {
+      flash("このアプリより新しい版で書き出したファイルです。アプリを開き直して新しくしてから、もう一度読み込んでください。");
       return;
     }
     const { add, differ, gone, odd, adds } = mergePlan(payload.data);
