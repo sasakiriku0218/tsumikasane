@@ -1658,16 +1658,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a short message above the tab bar for a few seconds; role=status reads it out as well. The day sheet covers the
   // page, so while it is open the message shows in the sheet's own copy (on the page once the sheet is going down)
   const sheetEl = $("daySheet"), sheetStatus = $("sheetStatus");
-  // with undo (a plan just deleted), a 元に戻す button in it for those seconds
-  function flash(msg, undo) {
+  // with undo (a plan just deleted), a 元に戻す button in it for those seconds. One showing in the sheet as it closes
+  // carries on under the page for the rest of its time (flashed, handOverFlash), 元に戻す and all
+  let flashed = null;
+  function flash(msg, undo, ms = 6000) {
     clearTimeout(statusTimer);
     const t = sheetEl.open && !sheetClosing ? sheetStatus : statusEl;
     (t === statusEl ? sheetStatus : statusEl).classList.remove("show");
     t.replaceChildren(msg);
-    if (undo) t.append(el("button", { type: "button", class: "toast-undo", onclick: () => { clearTimeout(statusTimer); t.classList.remove("show"); undo(); } }, "元に戻す"));
+    if (undo) t.append(el("button", { type: "button", class: "toast-undo", onclick: () => { clearTimeout(statusTimer); t.classList.remove("show"); flashed = null; undo(); } }, "元に戻す"));
     t.classList.toggle("has-undo", !!undo);
     t.classList.add("show");
-    statusTimer = setTimeout(() => t.classList.remove("show"), 6000);
+    flashed = { msg, undo, until: Date.now() + ms };
+    statusTimer = setTimeout(() => { t.classList.remove("show"); flashed = null; }, ms);
   }
   function showError() { flash("保存できませんでした。端末の空き容量が足りているか確かめてください。"); }
   async function act(fn) { try { await fn(); } catch { showError(); } }
@@ -2728,6 +2731,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // settings); "" stands for ラベルなし. 予定 and きょう still show every plan
   const calHidden = () => new Set(settings.get("calendar")?.hidden || []);
   const onCalendar = (e, hidden) => !hidden.has(labelOf(e) ? e.labelId : "");
+  // a plan saved with a label the calendar hides isn't drawn there: said so as it goes in (the user's call)
+  function noteHidden(labelId) {
+    const key = labelId && labels.get(labelId) ? labelId : "";
+    if (calHidden().has(key)) flash(`「${key ? labels.get(key).name : "ラベルなし"}」は隠しているので、カレンダーには出ません。`);
+  }
   function toggleCalLabel(key) {
     const h = calHidden();
     if (h.has(key)) h.delete(key); else h.add(key);
@@ -2844,9 +2852,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(() => events.add(item));
     clearPlanForm();
     // begun from a day's list: back to the list of the plan's day, the month left as it was
-    if (planFromDay) { calDay = date; renderCalendar(); backToDay(); return; }
+    if (planFromDay) { calDay = date; renderCalendar(); backToDay(); noteHidden(item.labelId); return; }
     setCalDay(date); // the month turns to the plan's day and picks it, so it shows where the plan went
     closeSheet();
+    noteHidden(item.labelId);
   });
 
   // ---------- turning the month: a sideways swipe on the calendar (the user's call), or the ‹ › buttons ----------
@@ -2970,6 +2979,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let planNew = false; // the sheet holds a new plan's form, opened from the ＋ beside the calendar's gear
   let planFromDay = false; // that form was opened from a day's list (予定を追加), which キャンセル and 追加 go back to
   let findOpen = false, dayFromFind = false; // the sheet holds 予定 (the magnifier); a day was opened from it, which 戻る goes back to
+  let findPages = 1; // how many three months これからの予定 shows (もっと見る adds three more)
   let monthPick = false, pickYear = 0; // the sheet holds the month picker, opened from the month's name; the year it shows
   let todoNew = false; // the sheet holds a new ToDo's form, opened from the ＋ beside ToDo's title
   let recEdit = null, recReturnId = null; // the entry being changed in the sheet ({ kind, id }), and its row for focus after
@@ -3073,39 +3083,54 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function openFind(byKey) {
     if (sheetEl.open) return;
     resetSheet();
-    findOpen = true; $("findText").value = ""; $("findClear").hidden = true;
+    findOpen = true; findPages = 1; $("findText").value = ""; $("findClear").hidden = true;
     renderFind(); syncSheetHead();
     presentSheet(byKey, "find");
   }
+  // a ToDo's or a goal's deadline in 予定, as the day's list has it; it opens its day
+  const dueRow = (x) => el("li", { class: "btn-row" },
+    el("button", { type: "button", class: "row-btn nav", "aria-label": `「${x.text}」の日を開く（${x.sub}）`, onclick: () => openDayFromFind(x.date) },
+      el("span", { class: "chip", style: `--chip-c: ${x.hue}` }, x.chip),
+      el("span", { class: "body" }, el("span", { class: "text" }, x.text), el("span", { class: "sub" }, x.sub)),
+      el("span", { class: "chev" }, icon("next", 16))));
+  // the ToDo and goal deadlines still to do, as items of 予定 (the calendar shows these too): { date, text, … }
+  const dueItems = () => [
+    ...todos.items.filter((t) => !t.done && t.due).map((t) => ({ date: t.due, text: t.text, chip: "ToDo", hue: "var(--c-todo)", sub: "ToDo の期限" })),
+    ...goals.items.filter((g) => !g.done && g.deadline).map((g) => ({ date: g.deadline, text: g.title, chip: "目標", hue: "var(--c-goal)", sub: "目標の期限" })),
+  ];
+  // anything after a day: a plan's turn (five years ahead) or a deadline, for もっと見る
+  const anyAfter = (d) => dueItems().some((x) => x.date > d) || events.items.some((e) => turnStarts(e, addDays(d, 1), addDays(d, 1830)).some((s) => s > d));
   function renderFind() {
     const q = foldText($("findText").value.trim()), groups = [];
     const dayHead = (d) => el("h3", { class: "group-head" }, (relLabel(d) ? relLabel(d) + "・" : "") + fmtMDW(d));
-    const rowsOf = (turns) => el("ul", { class: "list card" }, turns.map((t) => planRow(t, () => openDayFromFind(t.start), "の日を開く")));
+    // a day's rows: its plans, then its deadlines
+    const dayGroup = (d, turns, dues) => [dayHead(d), el("ul", { class: "list card" },
+      turns.map((t) => planRow(t, () => openDayFromFind(t.start), "の日を開く")), dues.map(dueRow))];
     if (!q) {
-      // the next three months, by day, sixty plans at most
-      const by = turnsByDay(todayKey, addDays(todayKey, 92));
-      let n = 0;
-      for (const d of [...by.keys()].sort()) {
-        if (n >= 60) break;
-        const turns = by.get(d).filter((t) => t.day === 0 || d === todayKey); // a run once, on its first day (or today)
-        if (!turns.length) continue;
-        groups.push(dayHead(d), rowsOf(turns));
-        n += turns.length;
+      // what is coming, by day: the plans (a run once, on its first day or today) and the ToDo and goal deadlines; three
+      // months at first, three more each time もっと見る is pressed
+      const end = addDays(todayKey, 92 * findPages - 1), by = turnsByDay(todayKey, end);
+      const dues = groupBy(dueItems().filter((x) => x.date >= todayKey && x.date <= end), (x) => x.date);
+      for (const d of [...new Set([...by.keys(), ...dues.keys()])].sort()) {
+        const turns = (by.get(d) || []).filter((t) => t.day === 0 || d === todayKey), dd = dues.get(d) || [];
+        if (turns.length || dd.length) groups.push(...dayGroup(d, turns, dd));
       }
-      setChildren($("findList"), groups.length ? [el("h3", { class: "group-head" }, "これからの予定"), ...groups] : el("div", { class: "card empty" }, "これから3か月の予定はありません。"));
+      const more = anyAfter(end) ? el("div", { class: "card" }, el("button", { type: "button", class: "link-btn sheet-row", id: "findMore", onclick: () => { findPages++; renderFind(); } }, "もっと見る")) : null;
+      setChildren($("findList"), groups.length ? [el("h3", { class: "group-head" }, "これからの予定"), ...groups] : el("div", { class: "card empty" }, findPages > 1 ? "この先の予定はありません。" : "これから3か月の予定はありません。"), more);
       return;
     }
-    // what was found: each plan once, at its next turn (or its last, if they are all past); the ones to come first
-    const found = events.items.filter((e) => foldText(e.title + "\n" + (e.memo || "")).includes(q)).map((e) => {
+    // what was found: each plan once, at its next turn (or its last, if they are all past), and the deadlines; its name,
+    // memo or label's name has the words (the user's call); the ones to come first
+    const found = events.items.filter((e) => foldText(e.title + "\n" + (e.memo || "") + "\n" + (labelOf(e)?.name || "")).includes(q)).map((e) => {
       const next = turnStarts(e, todayKey, addDays(todayKey, 3660)).find((d) => d >= addDays(todayKey, -extraDays(e)));
       const start = next || turnStarts(e, e.date, todayKey).pop() || e.date;
-      return { e, start, day: 0, days: extraDays(e) + 1, past: !next };
-    });
-    const coming = found.filter((t) => !t.past).sort((a, b) => a.start.localeCompare(b.start)), past = found.filter((t) => t.past).sort((a, b) => b.start.localeCompare(a.start));
+      return { date: start, turn: { e, start, day: 0, days: extraDays(e) + 1 }, past: !next };
+    }).concat(dueItems().filter((x) => foldText(x.text).includes(q)).map((x) => ({ date: x.date, due: x, past: x.date < todayKey })));
+    const coming = found.filter((x) => !x.past).sort((a, b) => a.date.localeCompare(b.date)), past = found.filter((x) => x.past).sort((a, b) => b.date.localeCompare(a.date));
     for (const [head, list] of [["これから", coming], ["過ぎた予定", past]]) {
       if (!list.length) continue;
       groups.push(el("h3", { class: "group-head" }, head));
-      for (const [d, turns] of groupBy(list, (t) => t.start)) groups.push(dayHead(d), rowsOf(turns));
+      for (const [d, xs] of groupBy(list, (x) => x.date)) groups.push(...dayGroup(d, xs.filter((x) => x.turn).map((x) => x.turn), xs.filter((x) => x.due).map((x) => x.due)));
     }
     setChildren($("findList"), groups.length ? groups : el("div", { class: "card empty" }, "見つかりませんでした。"));
   }
@@ -3213,12 +3238,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       : field ? [{ opacity: 0, transform: "translateY(40px)" }, { opacity: 1, transform: "none" }]
       : [{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 320, easing: "cubic-bezier(.25, .9, .3, 1)" });
   }
+  // a message still showing in the sheet as it goes carries on under the page for the rest of its time, 元に戻す too (once
+  // the sheet is closing, flash puts it there)
+  function handOverFlash() {
+    if (!flashed || !sheetStatus.classList.contains("show")) return;
+    sheetStatus.classList.remove("show");
+    const left = flashed.until - Date.now();
+    if (left > 300) flash(flashed.msg, flashed.undo, left);
+  }
   // it slides back down (fades on wide screens) before it closes; instant when the page under it needs focus at once
   function closeSheet(instant) {
     if (!sheetEl.open || sheetClosing) return;
     commitChartText(); saveGoalEdit(); // what was typed last is saved now, not when the close event comes (it can come late)
-    if (instant === true || reduceMotion.matches) { sheetEl.close(); return; }
+    if (instant === true || reduceMotion.matches) { sheetEl.close(); handOverFlash(); return; }
     sheetClosing = true;
+    handOverFlash();
     const opts = { duration: 220, easing: "cubic-bezier(.4, 0, 1, 1)", fill: "forwards" };
     try { sheetAnims.push(sheetEl.animate([{ opacity: 1 }, { opacity: 0 }], { ...opts, pseudoElement: "::backdrop" })); } catch {}
     const away = sheetEl.animate([{ transform: sheetEl.style.transform || "none" },
@@ -3584,6 +3618,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       showDayView();
       act(async () => { await events.update(e.id, { skip }); await events.add({ ...fields, createdAt: Date.now() }); });
       if (moved) flash(`${fmtMDW(date)}に移しました`);
+      noteHidden(labelId);
       return;
     }
     if (e.repeat && editScope === "after" && editingStart > e.date) {
@@ -3596,6 +3631,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         await events.update(e.id, { repeatUntil: addDays(editingStart, -1), skip: skips.filter((d) => d < editingStart) });
         await events.add(next);
       });
+      noteHidden(labelId);
       return;
     }
     const moved = !e.repeat && !repeat && date !== e.date; // read before the update, which changes e in place
@@ -3603,6 +3639,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     showDayView();
     act(() => events.update(e.id, fields));
     if (moved) flash(`${fmtMDW(date)}に移しました`);
+    noteHidden(labelId);
   });
   for (const type of ["input", "change"]) $("edTime").addEventListener(type, () => { $("edTimeClear").hidden = !$("edTime").value; });
   $("edTimeClear").addEventListener("click", (ev) => {
