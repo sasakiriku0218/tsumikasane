@@ -1742,7 +1742,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // ---------- 消した記録 ----------
   // each record deleted here is remembered (its kind, id and when, and for 30 days what it held, for 最近削除した項目), so a
   // file or copy read in later doesn't bring it back (mergeRecords) and the check against the daily copies doesn't take it
-  // for lost (missingIn). One put back with the same id (元に戻す, 戻す) is no longer counted as deleted. Settings aren't
+  // for lost (lostIn). One put back with the same id (元に戻す, 戻す) is no longer counted as deleted. Settings aren't
   // records and aren't remembered
   const delKey = (st, id) => `${st.name}/${id}`;
   const remembers = (st) => st !== settings && st !== deleted;
@@ -4890,9 +4890,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!importPending) return;
     const added = mergeRecords(importPending), count = addedCount(added);
     hideImportAsk();
-    const saving = saveCopy();
+    saveCopy();
     flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を足しました。` : "足す記録はありませんでした。",
-      count ? () => { unmerge(added); saving.then(() => dropFromCopy(added)); flash("読み込みを取り消しました。"); } : null, 10000);
+      count ? () => { unmerge(added); dropFromCopy(added); flash("読み込みを取り消しました。"); } : null, 10000);
     $("importBtn").focus();
   });
   $("importCancel").addEventListener("click", () => { hideImportAsk(); $("importBtn").focus(); });
@@ -5000,16 +5000,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     } catch {}
     return Date.now();
   })();
-  // a copy's records gone from here without being deleted here, kind by kind ([store, how many]); null for a copy made
+  // a copy's records gone from here without being deleted here, kind by kind ([store, records]); null for a copy made
   // before deleted records were remembered
-  function missingIn(copy) {
+  function lostIn(copy) {
     if (!(copy.savedAt >= trackedSince)) return null;
     const dead = new Set(deleted.items.map((t) => t.id)), out = [];
     for (const s of ALL_STORES) {
       if (!remembers(s)) continue;
       const here = new Set(s.items.map((x) => x.id));
-      const n = incomingOf(copy.data, s).filter((x) => !here.has(x.id) && !dead.has(delKey(s, x.id)) && fits(s, x)).length;
-      if (n) out.push([s, n]);
+      const lost = incomingOf(copy.data, s).filter((x) => !here.has(x.id) && !dead.has(delKey(s, x.id)) && fits(s, x));
+      if (lost.length) out.push([s, lost]);
     }
     return out;
   }
@@ -5029,31 +5029,62 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       r.onerror = () => { db.close(); reject(r.error); };
     }));
   }
-  async function saveCopy() {
+  // the copies are written one after another, so a copy being made and records taken out of it can't cross
+  let copyQueue = Promise.resolve();
+  const inQueue = (fn) => (copyQueue = copyQueue.then(fn, fn));
+  // the copies' days alone (newest first), and one copy by its day: neither reads every copy whole
+  function copyDays() {
+    return openCopies().then((db) => new Promise((resolve, reject) => {
+      const r = db.transaction("copies").objectStore("copies").getAllKeys();
+      r.onsuccess = () => { db.close(); resolve((r.result || []).sort().reverse()); };
+      r.onerror = () => { db.close(); reject(r.error); };
+    }));
+  }
+  function readCopy(day) {
+    return openCopies().then((db) => new Promise((resolve, reject) => {
+      const r = db.transaction("copies").objectStore("copies").get(day);
+      r.onsuccess = () => { db.close(); resolve(r.result || null); };
+      r.onerror = () => { db.close(); reject(r.error); };
+    }));
+  }
+  // the first time, every copy is looked through once: those made before only held what was here on their own day
+  const CARRY_KEY = LS_PREFIX + "copiesCarry";
+  const carriedAll = () => { try { return !!localStorage.getItem(CARRY_KEY); } catch { return true; } };
+  // today's copy: what is here now, and what the newest copy holds that is gone from here without being deleted here
+  // (kept on, so the newest copy always has all of it and is the one copy checkRestore reads). For the rest only the days
+  // are read, not every copy whole (the user's call: with years of records, switching apps had become slow)
+  function saveCopy() { return inQueue(makeCopy); }
+  async function makeCopy() {
     if (!canStoreLocal || !window.indexedDB) return;
     const data = allData(), count = recordCount(data);
     if (!count) return; // an empty set never replaces a real copy
     try {
-      const copies = await readCopies();
-      const same = copies.find((c) => c.day === todayKey);
-      // records gone from here without being deleted (all of them, as when storage came up empty, or one kind of them)
-      // must not overwrite today's copy that still has them; a copy from before deletions were remembered goes by count
-      const lost = same && missingIn(same);
-      if (same && (lost ? lost.length : same.count >= 5 && count < same.count * 0.8)) return;
+      const days = await copyDays(), all = !carriedAll();
+      const from = all ? await readCopies() : days.length ? [await readCopy(days[0])].filter(Boolean) : [];
+      const extra = {}, seen = new Set();
+      for (const c of from) {
+        const lost = lostIn(c);
+        // today's copy from before deletions were remembered, holding clearly more, isn't overwritten by a sudden drop
+        if (!lost) { if (c.day === todayKey && c.count >= 5 && count < c.count * 0.8) return; continue; }
+        for (const [st, xs] of lost) for (const x of xs) if (!seen.has(delKey(st, x.id))) { seen.add(delKey(st, x.id)); (extra[st.name] ||= []).push(x); }
+      }
+      const copy = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, extra[k] ? [...v, ...extra[k]] : v]));
       const db = await openCopies();
       await new Promise((resolve, reject) => {
         const tx = db.transaction("copies", "readwrite"), st = tx.objectStore("copies");
-        st.put({ day: todayKey, savedAt: Date.now(), count, data });
-        const keep = copiesKept([todayKey, ...copies.map((c) => c.day).filter((d) => d !== todayKey).sort().reverse()]);
-        for (const c of copies) if (!keep.has(c.day)) st.delete(c.day);
+        st.put({ day: todayKey, savedAt: Date.now(), count: recordCount(copy), data: copy });
+        const keep = copiesKept([todayKey, ...days.filter((d) => d !== todayKey)]);
+        for (const d of days) if (!keep.has(d)) st.delete(d);
         tx.oncomplete = () => { db.close(); resolve(); };
         tx.onerror = () => { db.close(); reject(tx.error); };
       });
+      if (all) try { localStorage.setItem(CARRY_KEY, "1"); } catch {}
     } catch {}
   }
   // records taken back after a reading-in (元に戻す) leave today's copy as well, so the check against the copies doesn't
-  // offer them back
-  async function dropFromCopy(added) {
+  // offer them back (in turn after a copy being made)
+  function dropFromCopy(added) { return inQueue(() => dropFromToday(added)); }
+  async function dropFromToday(added) {
     if (!canStoreLocal || !window.indexedDB) return;
     try {
       const db = await openCopies();
@@ -5076,15 +5107,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!canStoreLocal || !window.indexedDB) return;
     try {
       const now = recordCount(allData());
-      const skipped = num((settings.get("backup") || {}).restoreSkipped);
-      // the newest copy holding records that are gone from here. One made since deletions are remembered: any record in it
-      // not here and not deleted here, kind by kind, so one kind going missing shows too. An older one: all of it gone,
-      // or at least ten records and half missing. このままでいい set aside the copy it was shown for and every older one
-      // (they hold the same records), so only a copy made after it can bring the notice back
+      const skipped = num((settings.get("backup") || {}).restoreSkipped), all = !carriedAll();
+      // a copy holding records that are gone from here. One made since deletions are remembered: any record in it not here
+      // and not deleted here, kind by kind, so one kind going missing shows too; the newest such copy has them all
+      // (saveCopy keeps them on), so it is the only one read, but for the first time. One from before: all of it gone,
+      // or at least ten records and half missing. このままでいい set aside a copy from before and every older one
       let pick = null, lost = null;
-      for (const c of (await readCopies()).filter((c) => c.savedAt > skipped && c.count > 0).sort((a, b) => b.savedAt - a.savedAt)) {
-        const m = missingIn(c);
-        if (m ? m.length : now === 0 || (c.count - now >= 10 && now < c.count / 2)) { pick = c; lost = m; break; }
+      for (const day of await copyDays()) {
+        const c = await readCopy(day);
+        if (!c) continue;
+        if (!(c.savedAt > skipped)) break;
+        const m = lostIn(c);
+        if (c.count > 0 && (m ? m.length : now === 0 || (c.count - now >= 10 && now < c.count / 2))) { pick = c; lost = m; break; }
+        if (m && !all) break;
       }
       restoreCandidate = pick;
       $("restoreNote").hidden = !pick;
@@ -5095,7 +5130,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       $("restoreText").textContent = (now === 0
         ? `この端末の中に、${when} 時点の記録のコピー（${pick.count} 件）が残っています。`
         : lost
-          ? `${when} 時点のコピーにある${lost.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")} 件`).join("・")}が、いまは見当たりません。`
+          ? `${when} 時点のコピーにある${lost.map(([st, xs]) => `${STORE_NAMES[st.name]} ${xs.length.toLocaleString("ja-JP")} 件`).join("・")}が、いまは見当たりません。`
           : `${when} 時点のコピーには ${pick.count} 件ありますが、いまは ${now} 件です。`)
         + "戻すと、いまある記録はそのままで、コピーにある記録が足されます。";
     } catch {}
@@ -5109,8 +5144,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     saveCopy();
     flash(`${count.toLocaleString("ja-JP")} 件の記録を戻しました。`, () => { unmerge(added); flash("取り消しました。"); checkRestore(); }, 10000);
   });
+  // このままでいい: the records gone from here go to 最近削除した項目 (from there they can still come back for 30 days), so no
+  // copy brings the notice back for them; a copy from before deletions were remembered is set aside by its time instead
   $("restoreSkip").addEventListener("click", () => {
-    if (restoreCandidate) act(() => settings.set("backup", { ...(settings.get("backup") || {}), restoreSkipped: restoreCandidate.savedAt }));
+    const c = restoreCandidate, lost = c && lostIn(c);
+    if (lost?.length) {
+      for (const [st, xs] of lost) noteDeleted(st, xs);
+      renderAll();
+      flash("見当たらない記録を「最近削除した項目」に移しました。30 日のあいだは、そこから戻せます。");
+    } else if (c) act(() => settings.set("backup", { ...(settings.get("backup") || {}), restoreSkipped: c.savedAt }));
     restoreCandidate = null;
     $("restoreNote").hidden = true;
   });
