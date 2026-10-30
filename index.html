@@ -3283,6 +3283,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let chartFromDay = false; // the chart was opened from a day's list (its goal falls due that day), which 戻る goes back to
   let mOverview = false; // the chart shows 全体, the whole of it at a glance, rather than the eight to write in
   let chartDraft = null, composing = false, mDelTimer = null; // a cell's text not saved yet; a kana conversion under way
+  let mEditGoal = null; // the goal whose name, 達成基準 and 期限 the fields under its chart were filled from
   // what the sheet holds, one view at a time: a new goal, a goal's chart, the settings, a new plan, an entry of a record
   // page, an event's edit form, or (by default) a day's plans. The settings come before a new plan, which can lead to
   // them to make its first label
@@ -3310,7 +3311,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; chartFromDay = false; mOverview = false;
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   // a grey day of the month before or after opens its sheet too, without turning the month (the user's call)
@@ -3689,7 +3690,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         : "まわりの8マスに書き出して、できたら ○ をタップして達成にします。";
     $("mRoot").hidden = !!mPath.length;
     if (!mPath.length) {
-      for (const [id, key] of GOAL_EDIT) if (document.activeElement !== $(id)) $(id).value = goalField(g, key);
+      // a field being typed in keeps its text when the same goal is drawn again, but another goal always fills it: focus
+      // can stay in a field of a sheet that has closed until the browser next draws
+      for (const [id, key] of GOAL_EDIT) if (mEditGoal !== g.id || document.activeElement !== $(id)) $(id).value = goalField(g, key);
+      mEditGoal = g.id;
       for (const r of document.querySelectorAll('input[name="chartSplit"]')) r.checked = Number(r.value) === depth;
     }
   }
@@ -3723,7 +3727,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const goalField = (g, key) => (key === "criterion" ? criterionText(g) : g[key] || "");
   function saveGoalEdit() {
     const g = goals.get(mandalaGoal);
-    if (!g || mPath.length) return;
+    if (!g || mPath.length || mEditGoal !== g.id) return; // only ever into the goal the fields were filled from
     const patch = {};
     for (const [id, key] of GOAL_EDIT) {
       const v = $(id).value.trim(), was = goalField(g, key);
