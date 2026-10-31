@@ -53,6 +53,7 @@
   --c-cal: #b02fc2;         /* purple */
   --c-journal: #956d51;     /* brown */
   --c-meal: #c55300;        /* orange */
+  --flag: var(--c-meal);    /* a ToDo marked 重要: orange, as Reminders' flag */
   --c-workout: #007eae;     /* cyan */
   --c-study: #e7124d;       /* pink */
   --c-weight: #564ade;      /* indigo */
@@ -346,6 +347,11 @@ form.add > .full, form.add > .actions { grid-column: 1 / -1; }
 .quick-days { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
 .quick-days button { position: relative; min-height: 32px; padding: 0 12px; background: var(--fill); border: 0; border-radius: 999px; color: var(--fg); font-size: var(--t-sub); line-height: 1.2; cursor: pointer; }
 .quick-days button::after { content: ""; position: absolute; inset: -6px 0; }  /* a 44px reach */
+/* an on/off as iOS draws it (a ToDo's 重要): a track with a thumb that slides over, the tint when on */
+form.add input.switch { -webkit-appearance: none; appearance: none; position: relative; flex: none; width: 51px; height: 31px; min-height: 0; margin: 6px 0; padding: 0; border: 0; border-radius: 999px; background: var(--fill-press); cursor: pointer; transition: background-color .2s; }
+form.add input.switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #ffffff; box-shadow: 0 3px 8px rgba(0, 0, 0, .15), 0 1px 1px rgba(0, 0, 0, .16); transition: transform .2s; }
+form.add input.switch:checked { background: var(--accent-fill); }
+form.add input.switch:checked::before { transform: translateX(20px); }
 /* a note under a field, in the fields' column (a goal's 期限 and how far off it is) */
 .field-note { grid-column: -2 / -1; margin-top: -6px; }
 .field-note:empty { display: none; }
@@ -470,13 +476,22 @@ ul.list > li > .check, ul.list > li > .del { z-index: 1; }
 .check path { fill: none; }
 li.done .check circle { fill: var(--f-todo); stroke: var(--f-todo); }
 li.done .check path { fill: #ffffff; }
-li.done .text { color: var(--muted); text-decoration: line-through; }
+li.done .text { color: var(--muted); }  /* done: grey, not struck through (the user's call), as Reminders has it */
 /* a ToDo just added, lit for a moment in the list as the sheet goes down (spotTodos), and scrolled into sight clear of
    the bars over the list and the message above them */
 #todoList > li { scroll-margin: calc(44px + env(safe-area-inset-top, 0px) + 8px) 0 calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + var(--space-1) + var(--pagebar) + 64px); }
 #todoList > li.spot { animation: td-spot 2.4s ease-out; }
 @keyframes td-spot { 0%, 45% { background-color: color-mix(in srgb, var(--c-todo) 16%, transparent); } 100% { background-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { #todoList > li.spot { animation: none; background-color: color-mix(in srgb, var(--c-todo) 16%, transparent); } }
+/* a ToDo's ○ and × level with its first line, as high as a line of body text (the user's call: with a memo or a long
+   name the ○ sat lower down, at the middle of the row) */
+#todoList > li:has(> .check) { align-items: flex-start; }
+#todoList > li > .check { margin-block-start: calc((var(--t-body) * 1.41 - 24px) / 2); }
+#todoList > li > .del { margin-block: calc((var(--t-body) * 1.41 - 44px) / 2) 0; }
+#todoList > li > .del.armed { margin-block: calc((var(--t-body) * 1.41 - 32px) / 2) 0; }
+/* 重要's mark after the name, on the page and on its day */
+.todo-flag { display: inline-block; margin-inline-start: 6px; color: var(--flag); vertical-align: -1px; }
+.todo-flag .icon { width: .9em; height: .9em; }  /* as large as the text it follows */
 /* ルーティーン: a done item fills its check in the record's colour; no strike-through, it's a habit kept, not a task gone */
 #rtList li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
 /* ルーティーン on きょう: the day's items, each a row that checks or unchecks it right there (the user's call). The rows sit
@@ -490,12 +505,11 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .rt-tile li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
 .rt-tile li.done .check path { fill: #ffffff; }
 .rt-tile li.done .rt-label { color: var(--muted); }
-/* ToDo's tile: each on one line (cut short in half a row), the check in ToDo's colour, done ones struck through as on the
-   page, and one past its 期限 in red */
+/* ToDo's tile: each on one line (cut short in half a row), the check in ToDo's colour, done ones grey as on the page, and
+   one past its 期限 in red */
 .td-tile .rt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .td-tile .rt-label.warn { color: var(--warn); font-weight: 600; }
 .td-tile li.done .check circle { fill: var(--f-todo); stroke: var(--f-todo); }
-.td-tile li.done .rt-label { text-decoration: line-through; }
 /* 運動: the fields for the kind picked sit in the form's grid as if loose; the other kind's are hidden (and switched off) */
 .wo-group, .form-rows { display: contents; }
 .wo-group[hidden], .form-rows[hidden] { display: none; }
@@ -810,6 +824,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .label-row select { flex: none; }
 .label-tools { padding: 0 var(--space-2) 6px; }
 #settingsView .label-tools, #dayView .label-tools { margin-inline-start: var(--space-2); padding-inline-start: 0; border-top: .5px solid var(--separator); }
+#dayView .label-tools { display: flex; flex-wrap: wrap; column-gap: var(--space-3); }  /* 予定を追加 and ToDoを追加 */
 /* large text: the name keeps the first line to itself and the colour and × move under it, so the name stays readable */
 @container (max-width: 17.5em) {
   .label-row { flex-wrap: wrap; row-gap: var(--space-1); }
@@ -972,7 +987,7 @@ ul.list.rec-list > li.one { flex-wrap: wrap; column-gap: 12px; }
   position: fixed; z-index: 30; left: 50%; bottom: calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + 12px);
   width: max-content; max-width: min(420px, calc(100vw - 32px)); padding: 10px 18px; border-radius: 18px;
   background: var(--toast-bg); color: #ffffff; box-shadow: var(--shadow);
-  font-size: var(--t-sub); line-height: 1.35; text-align: center;
+  font-size: var(--t-sub); line-height: 1.35; text-align: center; text-wrap: balance;  /* two lines of a like length, not one word left over */
   opacity: 0; transform: translate(-50%, 8px); pointer-events: none; transition: opacity .2s, transform .2s;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
@@ -1037,6 +1052,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-study" viewBox="0 0 24 24"><path d="M3.4 20.6 4.5 15.9 15 5.4 18.6 9 8.1 19.5Z"/><path d="M16.1 4.3 17.3 3.1A1.7 1.7 0 0 1 19.7 3.1L20.9 4.3A1.7 1.7 0 0 1 20.9 6.7L19.7 7.9Z"/></symbol>
   <!-- ルーティーン: a turning arrow round a check, drawn for this app -->
   <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4.75 11.5v-2A2.5 2.5 0 0 1 7.25 7H18m-2.75-2.75L18 7l-2.75 2.75M19.25 12.5v2a2.5 2.5 0 0 1-2.5 2.5H6m2.75 2.75L6 17l2.75-2.75" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M6 2.75a1 1 0 0 1 1 1v.53l11.2 3.9a.75.75 0 0 1 0 1.42L7 13.47v6.78a1 1 0 1 1-2 0V3.75a1 1 0 0 1 1-1Z"/></symbol>
   <symbol id="i-routine" viewBox="0 0 24 24"><path d="M20.22 9.01A8.75 8.75 0 1 1 12 3.25V5.25A6.75 6.75 0 1 0 18.34 9.69Z"/><path d="M12 .9 16 4.25 12 7.6Z"/><path d="M10.6 15.6 7.6 12.6l1.2-1.2 1.8 1.8 4.6-4.6 1.2 1.2-5.8 5.8Z"/></symbol>
   <symbol id="i-weight" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm1.25 7.5h7.5a3.75 3.75 0 0 0-7.5 0Z"/><path d="m11.4 10.1 1.6-2.75a.6.6 0 0 1 1.04.6l-1.6 2.75a.6.6 0 0 1-1.04-.6Z"/></symbol>
   <symbol id="i-money" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19ZM8.3 6.9l1.3-.9 2.4 3.5 2.4-3.5 1.3.9-2.6 3.8H15v1.5h-2.25v1.2H15v1.5h-2.25V18h-1.5v-3.1H9v-1.5h2.25v-1.2H9v-1.5h1.9L8.3 6.9Z"/></symbol>
@@ -1158,7 +1174,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
              as on 目標 -->
         <div class="sec-head">
           <div class="title-row"><h2>ToDo</h2><button type="button" class="icon-btn" id="todoAdd" aria-label="ToDoを追加" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button></div>
-          <span class="muted small" id="todoCount"></span>
         </div>
         <!-- すべて・未完了・完了 are in the page's own bar, over the tab bar (see .pagebar, after the pages) -->
         <ul class="list card" id="todoList"></ul>
@@ -1474,7 +1489,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       </div>
       <div class="card">
         <ul class="list" id="calDayList"></ul>
-        <div class="label-tools"><button type="button" class="link-btn" id="dayAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>予定を追加</button></div>
+        <div class="label-tools"><button type="button" class="link-btn" id="dayAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>予定を追加</button><button type="button" class="link-btn" id="dayTodoAdd"><svg class="icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>ToDoを追加</button></div>
       </div>
     </div>
     <div class="sheet-view" id="editView" hidden>
@@ -1607,6 +1622,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <label class="flabel" for="todoRepeat">繰り返し</label>
           <div class="ffield"><select id="todoRepeat"></select></div>
         </div>
+        <label class="flabel" for="todoFlag">重要</label>
+        <div class="ffield"><input type="checkbox" id="todoFlag" class="switch" role="switch"></div>
         <textarea id="todoMemo" class="full grow memo" rows="1" placeholder="メモ" aria-label="メモ" maxlength="1000"></textarea>
       </form>
     </div>
@@ -2192,15 +2209,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!text) return;
     // a new one isn't done, so with 完了 picked it would not show and seem not added: the list goes back to すべて
     if (todoFilter === "done") setTodoFilter("all");
-    const due = $("todoDue").value || "", repeat = due && $("todoRepeat").value, memo = $("todoMemo").value.trim();
+    const due = $("todoDue").value || "", repeat = due && $("todoRepeat").value, memo = $("todoMemo").value.trim(), flag = $("todoFlag").checked;
     act(async () => {
-      const id = await todos.add({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(memo ? { memo } : {}), createdAt: Date.now() });
+      const id = await todos.add({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(memo ? { memo } : {}), ...(flag ? { flag: true } : {}), createdAt: Date.now() });
       todoNewIds.push(id); // lit in the list as the sheet goes down
       flash(`「${text}」を追加しました`, () => unmerge([[todos, [id]]]));
     });
     // the sheet stays, empty, with the typing ready for the next one (the user's call: it had to be opened again for each);
     // the bar's キャンセル becomes 閉じる
     clearTodoForm();
+    if (todoFromDay) { $("todoDue").value = calDay; syncTodoDue(); } // begun from a day: the next one is for that day too
     todoAdded = true; syncSheetHead();
     $("todoText").focus();
   });
@@ -2233,13 +2251,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtShort(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : null;
     return t.due ? untilText(t.due, t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, t.due)) : null) : null;
   }
-  // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): the 期限
-  // soonest first, which puts those past it first and today's next, then those without one, each oldest first. Done
-  // ones go after the rest, the last done first (the user's call); those done before the day was kept, after them
-  const todoOrder = (a, b) => Number(!!a.done) - Number(!!b.done)
-    || (a.done ? num(b.doneAt) - num(a.doneAt) : (a.due || "9999").localeCompare(b.due || "9999"))
-    || num(a.createdAt) - num(b.createdAt);
+  // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): by section
+  // (期限切れ, きょう, これから, 期限なし), each with its 重要 ones first (the user's call), then the 期限 soonest, then the
+  // oldest. Done ones go after the rest, the last done first (the user's call); those done before the day was kept, after them
+  const TODO_SECTIONS = ["期限切れ", "きょう", "これから", "期限なし", "完了"];
   const todoSection = (t) => (t.done ? "完了" : !t.due ? "期限なし" : t.due < todayKey ? "期限切れ" : t.due === todayKey ? "きょう" : "これから");
+  const todoOrder = (a, b) => TODO_SECTIONS.indexOf(todoSection(a)) - TODO_SECTIONS.indexOf(todoSection(b))
+    || (a.done ? num(b.doneAt) - num(a.doneAt) : Number(!!b.flag) - Number(!!a.flag) || (a.due || "9999").localeCompare(b.due || "9999"))
+    || num(a.createdAt) - num(b.createdAt);
+  // a ToDo's name as a button, with 重要's mark after it while it is still to do, and said in its name (the user's call)
+  function flagged(t, button) {
+    if (!t.flag || t.done) return button;
+    button.append(el("span", { class: "todo-flag" }, icon("flag", 15)));
+    button.setAttribute("aria-label", button.getAttribute("aria-label") + "（重要）");
+    return button;
+  }
   // a ToDo checked off stays where it was for a moment, done, then fades and goes down to 完了 (the user's call: a
   // mistaken tap shows, and is undone right there). It is saved as done at once, so きょう's tile and the calendar have it;
   // only this list holds it in its old place. Unchecked, it goes straight back among the rest
@@ -2260,8 +2286,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   async function setTodoDone(t, done) {
     if (done) {
       const due = t.repeat && t.due ? nextDue(t) : null;
-      const next = due ? await todos.add({ text: t.text, done: false, due, repeat: t.repeat, ...(t.memo ? { memo: t.memo } : {}), createdAt: Date.now() }) : null;
+      const next = due ? await todos.add({ text: t.text, done: false, due, repeat: t.repeat, ...(t.memo ? { memo: t.memo } : {}), ...(t.flag ? { flag: true } : {}), createdAt: Date.now() }) : null;
       await todos.update(t.id, { done: true, doneAt: Date.now(), ...(next ? { repeat: undefined, next } : {}) });
+      // and says when that is (the user's call: it just went, its next turn far down the list), with 元に戻す
+      if (next) flash(`「${t.text}」の次は ${fmtShort(due)}です`, () => { const x = todos.get(t.id); if (x?.done) toggleTodo(x); });
       return;
     }
     const next = t.next ? todos.get(t.next) : null, back = next && !next.done;
@@ -2303,8 +2331,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function renderTodos() {
     const items = [...todos.items].sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? todoPlaced(t).done : !todoPlaced(t).done));
-    const remaining = items.filter((t) => !t.done).length;
-    $("todoCount").textContent = `残り ${remaining} 件 ／ 全 ${items.length} 件`;
     $("todoFoot").hidden = !items.some((t) => t.done); // only while there is something done to clear
     const list = $("todoList");
     const focusId = list.contains(document.activeElement) ? document.activeElement.dataset.check : null; // a check pressed from the keyboard
@@ -2336,7 +2362,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       // user's call: VoiceOver read every one as just 完了にする and 削除)
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
-        el("span", { class: "body" }, editLink("todo", t.id, t.text), dueText(t), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null),
+        el("span", { class: "body" }, flagged(t, editLink("todo", t.id, t.text)), dueText(t), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null),
         delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
       ));
     }
@@ -3566,6 +3592,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let todoAdded = false; // a ToDo has been added from it since it opened, so its キャンセル reads 閉じる
   let todoNewIds = []; // and which, to be lit in the list as the sheet goes down
   let recEdit = null, recReturnId = null; // the entry being changed in the sheet ({ kind, id }), and its row for focus after
+  let recFromDay = false; // that entry is a ToDo opened from a day's list, which キャンセル, 保存 and 削除 go back to
+  let todoFromDay = false; // the new ToDo's form was opened from a day's list (ToDoを追加), which キャンセル and 閉じる go back to
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
   let chartFromDay = false; // the chart was opened from a day's list (its goal falls due that day), which 戻る goes back to
   let mOverview = false; // the chart shows 全体, the whole of it at a glance, rather than the eight to write in
@@ -3601,7 +3629,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; todoAdded = false; todoNewIds = []; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
+    dropDayTodo();
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; todoAdded = false; todoNewIds = []; todoFromDay = false; recEdit = null; recFromDay = false; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   // a grey day of the month before or after opens its sheet too, without turning the month (the user's call)
@@ -3620,6 +3649,31 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("planTitle").focus();
   }
   function backToDay() { planNew = false; planFromDay = false; planCopy = false; showDayView(); }
+  // a day's ToDo opens its edit form in the same sheet (the user's call: it could only be checked there), and ToDoを追加
+  // under the list opens a new one's with that day as its 期限, kept for the next one; both come back to the list
+  function openTodoFromDay(id) {
+    const x = todos.get(id);
+    if (!x) return;
+    recEdit = { kind: "todo", id }; recReturnId = id; recFromDay = true;
+    delete $("recForm").dataset.typed;
+    setChildren($("recForm"), REC_EDIT.todo.fields(x).flat(Infinity));
+    disarmRecDelete(); syncSheetHead();
+    sheetEl.scrollTop = 0;
+    $("sheetTitle").focus();
+  }
+  function backFromRec() { recEdit = null; recFromDay = false; disarmRecDelete(); showDayView(); }
+  function openNewTodoFromDay() {
+    if (!$("todoText").value.trim()) clearTodoForm();
+    $("todoDue").value = calDay; syncTodoDue();
+    todoNew = true; todoFromDay = true; todoAdded = false; syncSheetHead(); syncTodoSave();
+    sheetEl.scrollTop = 0;
+    $("todoText").focus();
+    growField($("todoText")); growField($("todoMemo"));
+  }
+  function backFromTodo() { dropDayTodo(); todoNew = false; todoFromDay = false; todoAdded = false; todoNewIds = []; showDayView(); }
+  // leaving a new ToDo begun from a day: the day's 期限 put in for it goes too, unless something typed goes with it, so
+  // ToDo's own ＋ doesn't open on that day later
+  function dropDayTodo() { if (todoFromDay && !$("todoText").value.trim()) clearTodoForm(); }
   // この予定を複製: the new plan's form in the same sheet holding this plan's name, days, times, label and memo, on this
   // turn's day, to set on another day (the user's call); a copy doesn't repeat. 追加 and キャンセル come back to the list
   function copyPlan() {
@@ -3754,6 +3808,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("findText").addEventListener("input", () => { $("findClear").hidden = !$("findText").value; renderFind(); });
   $("findClear").addEventListener("click", () => { $("findText").value = ""; $("findClear").hidden = true; renderFind(); $("findText").focus(); });
   $("dayAdd").addEventListener("click", openPlanFromDay);
+  $("dayTodoAdd").addEventListener("click", openNewTodoFromDay);
   // the month picker: the months of the year on show, the one on the calendar filled; a month or 今月に戻る closes it
   function openMonthPicker(byKey) {
     if (sheetEl.open) return;
@@ -3887,7 +3942,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     ev.preventDefault();
     if (menuFor !== null) { closeMenu(); return; } // a menu open goes first, then a cell picked up
     if (mSwap !== null) { endSwap(); return; }
-    if (mandalaGoal && (mPath.length || chartFromDay)) chartBack(); else if (editingId || settingsFrom === "day") showDayView(); else if (planFromDay) backToDay(); else if (dayFromFind) backToFind(); else closeSheet();
+    if (mandalaGoal && (mPath.length || chartFromDay)) chartBack(); else if (editingId || settingsFrom === "day") showDayView(); else if (planFromDay) backToDay(); else if (todoFromDay) backFromTodo(); else if (recFromDay) backFromRec(); else if (dayFromFind) backToFind(); else closeSheet();
   });
   // a tap on the dimmed page above the sheet puts it away
   sheetEl.addEventListener("click", (ev) => {
@@ -3901,8 +3956,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("sheetCancel").addEventListener("click", () => {
     const mode = sheetMode();
     if (mode === "goal") { clearGoalForm(); closeSheet(); } else if (mode === "plan") { clearPlanForm(); if (planFromDay) backToDay(); else closeSheet(); }
-    else if (mode === "todo") { if (!todoAdded) clearTodoForm(); closeSheet(); } // 閉じる keeps what was typed, as a pull down does
-    else if (mode === "rec") closeSheet(); else if (mode === "chart") chartBack(); else if (mode === "day" && dayFromFind) backToFind(); else showDayView();
+    else if (mode === "todo") { if (!todoAdded) clearTodoForm(); if (todoFromDay) backFromTodo(); else closeSheet(); } // 閉じる keeps what was typed, as a pull down does
+    else if (mode === "rec") { if (recFromDay) backFromRec(); else closeSheet(); } else if (mode === "chart") chartBack(); else if (mode === "day" && dayFromFind) backToFind(); else showDayView();
   });
   $("calSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0));
   // iPhone: the bar on top can be pulled down to put the sheet away, as iOS sheets can
@@ -4677,11 +4732,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         const memo = el("textarea", { id: "reMemo", class: "full grow memo", rows: 1, placeholder: "メモ", "aria-label": "メモ", maxlength: 1000 }, t.memo || "");
         memo.addEventListener("input", () => growField(memo)); // keeping its line breaks
         requestAnimationFrame(() => { growField(text); growField(memo); });
-        return [text, recRow("期限", due, { opt: true, after: [quick, clear], below: true }), repeatRow, memo];
+        const flag = el("input", { type: "checkbox", id: "reFlag", class: "switch", role: "switch", checked: !!t.flag });
+        return [text, recRow("期限", due, { opt: true, after: [quick, clear], below: true }), repeatRow, recRow("重要", flag), memo];
       },
       read: () => {
         const text = $("reText").value.trim(), due = $("reDue").value || "", memo = $("reMemo").value.trim();
-        return text ? { text, due, repeat: (due && $("reRepeat").value) || undefined, memo: memo || undefined } : recBad("reText");
+        return text ? { text, due, repeat: (due && $("reRepeat").value) || undefined, memo: memo || undefined, flag: $("reFlag").checked || undefined } : recBad("reText");
       },
     },
     meal: {
@@ -4850,7 +4906,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const moved = patch.date && patch.date !== x.date; // read before the update, which changes x in place
     const before = JSON.parse(JSON.stringify(x)), st = spec.store;
     act(() => (spec.save ? spec.save(x, patch) : spec.store.update(x.id, patch)));
-    closeSheet();
+    if (recFromDay) backFromRec(); else closeSheet();
     // 元に戻す for the seconds the message shows: the entry back as it was before 保存
     flash(moved ? `${fmtMDW(patch.date)}に移しました` : "保存しました", () => act(async () => { await st.set(before.id, before); flash("元に戻しました"); }));
   });
@@ -4866,7 +4922,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       return;
     }
     const { kind, id } = recEdit;
-    closeSheet();
+    if (recFromDay) backFromRec(); else closeSheet();
     removeWithUndo(REC_EDIT[kind].store, id);
   });
   // Japan's national holidays (国民の祝日) by the rules in force since 2020: the fixed days, the Mondays (ハッピーマンデー),
@@ -4989,7 +5045,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const t of todosDue) {
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => act(() => setTodoDone(t, !t.done)) }, checkMark()),
-        el("span", { class: "body" }, el("span", { class: "text" }, t.text), el("span", { class: "sub" }, "ToDo の期限"))
+        el("span", { class: "body" }, flagged(t, el("button", { type: "button", class: "text row-link", "aria-label": `「${t.text}」を編集`, onclick: () => openTodoFromDay(t.id) }, t.text)), el("span", { class: "sub" }, "ToDo の期限"))
       ));
     }
     // a goal falling due opens its chart right here, as an event opens its form
@@ -6143,6 +6199,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const out = {};
     for (const x of fieldsOf(f)) {
       if (x.type === "radio") { if (x.checked) out["radio:" + x.name] = x.value; }
+      else if (x.type === "checkbox") { if (x.id) out[x.id] = x.checked; }
       else if (x.id) out[x.id] = x.value;
     }
     return out;
@@ -6169,9 +6226,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const set = (x, v) => { x.value = v; x.dispatchEvent(new Event("input", { bubbles: true })); x.dispatchEvent(new Event("change", { bubbles: true })); };
     for (const x of fieldsOf(f)) {
       if (x.type === "radio") { if (fields["radio:" + x.name] === x.value && !x.checked) { x.checked = true; x.dispatchEvent(new Event("change", { bubbles: true })); } }
+      else if (x.type === "checkbox") { if (x.id in fields && x.checked !== !!fields[x.id]) { x.checked = !!fields[x.id]; x.dispatchEvent(new Event("change", { bubbles: true })); } }
       else if (x.tagName === "SELECT" && x.id in fields && x.value !== fields[x.id]) set(x, fields[x.id]);
     }
-    for (const x of fieldsOf(f)) if (x.type !== "radio" && x.tagName !== "SELECT" && x.id in fields && x.value !== fields[x.id]) set(x, fields[x.id]);
+    for (const x of fieldsOf(f)) if (x.type !== "radio" && x.type !== "checkbox" && x.tagName !== "SELECT" && x.id in fields && x.value !== fields[x.id]) set(x, fields[x.id]);
     for (const x of fieldsOf(f)) if (x.tagName === "SELECT" && x.id in fields && x.value !== fields[x.id]) set(x, fields[x.id]);
     f.dataset.typed = "1";
   }
