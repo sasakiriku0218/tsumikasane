@@ -795,6 +795,9 @@ li.done .text { color: var(--muted); }  /* done: grey, not struck through (the u
 }
 /* a plan's memo, under its title in the lists */
 .ev-memo { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* a ToDo's memo set off from its 期限 above it, which is the same grey (the user's call: きょうまで and the memo's first
+   line read as one), by a thin bar at its start, as a note is */
+#todoList .ev-memo { margin-block-start: 2px; padding-inline-start: 8px; border-inline-start: 2px solid var(--line); }
 /* 予定 (the magnifier on the month bar): a field to look for plans, and under it the next three months or what it found */
 .find-groups { display: flex; flex-direction: column; gap: var(--space-2); }
 /* the labels' rings in the settings show or hide their plans on the calendar, as the iPhone's list of calendars does */
