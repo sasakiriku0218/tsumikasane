@@ -420,6 +420,7 @@ ul.list li.dayhead::before, ul.list li.dayhead + li::before { display: none; }
 ul.list li.dayhead.warn { color: var(--warn); }  /* ToDo's 期限切れ, red as the 期限 under it */
 /* 期限切れ's きょうに移す, at the end of its line, with a 44px reach */
 ul.list li.dayhead .dayhead-btn { position: relative; min-height: 0; padding: 0; font-size: inherit; font-weight: 600; }
+ul.list li.dayhead .dayhead-count { margin-inline-start: auto; }  /* at the end, with a button between it and the name */
 ul.list li.dayhead .dayhead-btn::after { content: ""; position: absolute; inset: -12px -10px; }
 /* 完了's last row under すべて: the rest of them, under 完了 */
 ul.list li.more-done { padding-block: 0; }
@@ -2383,10 +2384,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       if (cut.has(t) || (todoPlaced(t).done && !group.has(t))) continue;
       if (todoFilter !== "done" && todoSection(todoPlaced(t)) !== section) {
         section = todoSection(todoPlaced(t));
-        list.append(section === "期限切れ"
-          ? el("li", { class: "dayhead warn" }, el("span", {}, `${section} ${counts.get(section)} 件`),
-            el("button", { type: "button", class: "link-btn dayhead-btn", "aria-label": "期限切れのToDoをすべてきょうに移す", onclick: overdueToToday }, "きょうに移す"))
-          : el("li", { class: "dayhead" }, el("span", {}, section), el("span", {}, `${counts.get(section)} 件`)));
+        // every heading its name at the start and its count at the end (the user's call: 期限切れ had its count by its name);
+        // 期限切れ's きょうに移す comes right after the name
+        list.append(el("li", { class: "dayhead" + (section === "期限切れ" ? " warn" : "") }, el("span", {}, section),
+          section === "期限切れ" ? el("button", { type: "button", class: "link-btn dayhead-btn", "aria-label": "期限切れのToDoをすべてきょうに移す", onclick: overdueToToday }, "きょうに移す") : null,
+          el("span", { class: "dayhead-count" }, `${counts.get(section)} 件`)));
       }
       // its memo under the 期限, two lines at most; the check and × say which ToDo they are for, as on きょう's tile (the
       // user's call: VoiceOver read every one as just 完了にする and 削除). A repeat's row in 完了: its check takes the last
