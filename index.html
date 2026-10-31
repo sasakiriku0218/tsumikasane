@@ -2252,10 +2252,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // the day a ToDo was checked off (doneAt), for those done since it was kept
   const doneDay = (t) => (num(t.doneAt) > 0 ? ymd(new Date(num(t.doneAt))) : "");
   // a done one says the day it was done (the user's call), the days left meaning nothing now; one done before that was
-  // kept, its 期限. One that repeats says how after its 期限, with a mark of its own (毎週, 毎月第2土曜)
-  function dueText(t) {
+  // kept, its 期限. One that repeats says how after its 期限, with a mark of its own (毎週, 毎月第2土曜). Under the きょう
+  // heading (inToday) one due today says only its repeat: きょうまで would just say the heading again (the user's call)
+  function dueText(t, inToday = false) {
     if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtShort(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : null;
-    return t.due ? untilText(t.due, t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, repeatBase(t))) : null) : null;
+    const rep = t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, repeatBase(t))) : null;
+    if (inToday && t.due === todayKey) return rep && el("span", { class: "sub due" }, el("span", { class: "due-parts" }, rep));
+    return t.due ? untilText(t.due, rep) : null;
   }
   // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): by section
   // (期限切れ, きょう, これから, 期限なし), each with its 重要 ones first (the user's call), then the 期限 soonest, then the
@@ -2387,7 +2390,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
         el("span", { class: "body" }, flagged(t, editLink("todo", t.id, t.text)),
           filed ? (when || n > 1 ? el("span", { class: "done-day" }, keepUnits([n > 1 ? `${n} 回` : "", when].filter(Boolean).join("・"))) : null)
-            : [dueText(t), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null]),
+            : [dueText(t, section === "きょう"), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null]),
         n > 1 ? delButton(() => removeWithUndo(todos, turns.map((x) => x.id), `「${t.text}」の完了を ${n} 件削除しました`), "削除", `${t.text}（完了 ${n} 件）`)
           : delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
       ));
