@@ -1189,6 +1189,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="sec-head">
           <div class="title-row"><h2>ToDo</h2><button type="button" class="icon-btn" id="todoAdd" aria-label="ToDoを追加" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button></div>
         </div>
+        <!-- the list narrowed to the words typed (the user's call), in a ToDo's name or memo, as 記録's lists have it -->
+        <div class="rec-search" id="todoSearchBox">
+          <svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>
+          <input type="search" id="todoSearch" autocomplete="off" enterkeyhint="search" placeholder="名前やメモで探す" aria-label="ToDoを名前やメモで探す">
+          <button type="button" class="rec-search-clear" id="todoSearchClear" aria-label="探す言葉を消す" hidden><svg class="icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+        </div>
         <!-- すべて・未完了・完了 are in the page's own bar, over the tab bar (see .pagebar, after the pages) -->
         <ul class="list card" id="todoList"></ul>
         <!-- it acts on the list, so it sits right under it -->
@@ -1746,6 +1752,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const fmtMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return `${y}年${m}月`; };
   const daysInMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(y, m, 0).getDate(); };
   const fmtYen = (n) => (n < 0 ? "−" : "") + Math.abs(Math.round(n)).toLocaleString("ja-JP") + " 円";
+  // words looked for (記録's lists, ToDo): full- and half-width, upper and lower case, and hiragana and katakana count as
+  // the same (かれー, カレー)
+  const foldText = (t) => String(t || "").normalize("NFKC").toLowerCase().replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
   // a number keeps its unit on its line (63,800 円, −2.4 kg, 1 時間 45 分, 30 分): the space between them doesn't break
   const keepUnits = (s) => s.replace(/(\d) (?=円|kcal|kg|km|分|時間|日|件|回|項目|セット)/g, "$1\u00a0");
   const fmtKg = (n) => num(n).toFixed(1);
@@ -1829,6 +1838,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let viewDate = todayKey;
   let viewMonth = monthOf(todayKey);
   let todoFilter = "all";
+  let todoQuery = ""; // the words ToDo's list is narrowed to, each of them in a ToDo's name or memo (none: all of it)
   let calMonth = monthOf(todayKey), calDay = todayKey;
 
   // ---------- storage: this device's browser (localStorage) ----------
@@ -2231,6 +2241,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!text) return;
     // a new one isn't done, so with 完了 picked it would not show and seem not added: the list goes back to すべて
     if (todoFilter === "done") setTodoFilter("all");
+    if (todoQuery) { todoQuery = ""; $("todoSearch").value = ""; } // nor would it if it lacked the words looked for
     const due = $("todoDue").value || "", repeat = due && $("todoRepeat").value, memo = $("todoMemo").value.trim(), flag = $("todoFlag").checked;
     act(async () => {
       const id = await todos.add({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(memo ? { memo } : {}), ...(flag ? { flag: true } : {}), createdAt: Date.now() });
@@ -2394,15 +2405,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function renderTodos() {
     renderTodoBadge();
     const held = todoHeldBack();
-    const items = [...todos.items].filter((t) => !held.has(t.id)).sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
+    // with words to look for, only those holding all of them, every one of them (no ten-row cut in 完了), and no button
+    // to delete all done, which would take more than are showing
+    const words = foldText(todoQuery).split(/\s+/).filter(Boolean), hits = (t) => { const x = foldText(`${t.text} ${t.memo || ""}`); return words.every((w) => x.includes(w)); };
+    $("todoSearchClear").hidden = !todoQuery;
+    const items = [...todos.items].filter((t) => !held.has(t.id) && (!words.length || hits(t))).sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? todoPlaced(t).done : !todoPlaced(t).done));
-    $("todoFoot").hidden = !items.some((t) => t.done); // only while there is something done to clear
+    $("todoFoot").hidden = words.length > 0 || !todos.items.some((t) => t.done); // only while there is something done to clear
     if (!$("clearDone").classList.contains("armed")) $("clearDone").textContent = clearDoneLabel();
     const list = $("todoList");
     const focusId = list.contains(document.activeElement) ? document.activeElement.dataset.check : null; // a check pressed from the keyboard
     list.replaceChildren();
     if (!shown.length) {
-      list.append(el("li", { class: "empty" }, items.length
+      list.append(el("li", { class: "empty" }, words.length ? `「${todoQuery.trim()}」に合うToDoはありません。` : items.length
         ? (todoFilter === "done" ? "完了したものはまだありません" : "すべて完了しました")
         : [el("span", { class: "phrase" }, "まだ何もありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。")]));
       return;
@@ -2422,7 +2437,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       if (row) group.get(row).push(t); else { rowFor.set(k, t); group.set(t, [t]); }
     }
     // under すべて, 完了 shows the last ten done (the user's call) and its count; the rest are a press away, under 完了
-    const more = todoFilter === "all" ? [...group.keys()].slice(TODO_DONE_SHOWN) : [], cut = new Set(more);
+    const more = todoFilter === "all" && !words.length ? [...group.keys()].slice(TODO_DONE_SHOWN) : [], cut = new Set(more);
     let section = null;
     for (const t of shown) {
       if (cut.has(t) || (todoPlaced(t).done && !group.has(t))) continue;
@@ -2455,6 +2470,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // the check keeps keyboard focus as the list is drawn again, and follows its ToDo down to 完了
     if (focusId) list.querySelector(`[data-check="${focusId}"]`)?.focus();
   }
+  $("todoSearch").addEventListener("input", (ev) => { todoQuery = ev.target.value; renderTodos(); });
+  $("todoSearch").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing) ev.target.blur(); }); // 検索 puts the keyboard away
+  $("todoSearchClear").addEventListener("pointerdown", (ev) => ev.preventDefault());
+  $("todoSearchClear").addEventListener("click", () => { todoQuery = ""; $("todoSearch").value = ""; renderTodos(); $("todoSearch").focus(); });
   // the rest of 完了: the bar's 完了, from the top of the list
   function showAllDone(byKey) {
     setTodoFilter("done");
@@ -5620,8 +5639,6 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     renderRecList();
     showTab("reclist");
   }
-  // words looked for: full- and half-width, upper and lower case, and hiragana and katakana count as the same (かれー, カレー)
-  const foldText = (t) => String(t || "").normalize("NFKC").toLowerCase().replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
   // up to today, as the cards count; with words to look for, only the entries holding all of them, and no day's totals
   // (a day shows only some of its entries then)
   function renderRecList() {
