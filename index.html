@@ -806,6 +806,8 @@ li.done .text { color: var(--muted); }  /* done: grey, not struck through (the u
 /* a web address in it opens that page, above the row's tap that opens the ToDo; underlined, so it reads as a link, not
    just green text */
 #todoList .ev-memo a { position: relative; z-index: 1; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+/* the words looked for, lit where they are in the names and memos found (lightWords), as iOS lights what it finds */
+::highlight(todo-hit) { background-color: rgba(255, 204, 0, .42); color: var(--fg); }
 /* one reached from the keyboard: the memo shows whole while it has the focus, or its two lines would be scrolled to it,
    and left so */
 #todoList .ev-memo.clamp:focus-within { display: block; -webkit-line-clamp: none; overflow: visible; }
@@ -2496,6 +2498,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         ? (todoFilter === "done" ? "完了したものはまだありません" : "すべて完了しました")
         : [el("span", { class: "phrase" }, "まだ何もありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。")]));
       if (focused) list.lastChild.focus(); // the last one gone: what the list says now
+      lightWords(list, []);
       return;
     }
     // in sections, each under its name with its count (the user's call): 期限切れ, きょう, これから, 期限なし, then 完了, which
@@ -2538,7 +2541,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
         el("span", { class: "body" }, flagged(todoPlaced(t), editLink("todo", t.id, t.text)),
           filed ? (when || n > 1 ? el("span", { class: "done-day" }, keepUnits([n > 1 ? `${n} 回` : "", when].filter(Boolean).join("・"))) : null)
-            : [dueText(todoPlaced(t), section === "きょう"), t.memo ? el("span", { class: "sub ev-memo clamp" }, linkedText(t.memo)) : null]),
+            : [dueText(todoPlaced(t), section === "きょう"), t.memo ? el("span", { class: "sub ev-memo" + (words.length ? "" : " clamp") }, linkedText(t.memo)) : null]),
         n > 1 ? delButton(() => removeWithUndo(todos, turns.map((x) => x.id), `「${t.text}」の完了を ${n} 件削除しました`), "削除", `${t.text}（完了 ${n} 件）`)
           : t.repeat && t.due && !t.done ? delButton(() => skipTurn(t), "削除", `${t.text}（この回）`, "この回を削除")
           : delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
@@ -2547,6 +2550,33 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (more.length) list.append(el("li", { class: "more-done" }, el("button", { type: "button", class: "link-btn", onclick: (ev) => showAllDone(ev.detail === 0) },
       `ほか ${sum(more, (t) => group.get(t).length)} 件を見る`)));
     if (focused) refocus(list, focused);
+    lightWords(list, words);
+  }
+  // the words looked for, lit in the names and memos that hold them (the user's call: a word found past a memo's two
+  // lines didn't show, so why a ToDo was found didn't either; the memo shows whole while looking, too). CSS highlights
+  // leave the rows as they are (重要's mark, a memo's links); where there are none, nothing is lit. Each letter is folded
+  // on its own (foldText), so a place in the folded text maps back to the letter it came from
+  function lightWords(root, words) {
+    if (!window.CSS?.highlights || typeof Highlight === "undefined") return;
+    const ranges = [];
+    for (const box of words.length ? root.querySelectorAll(".row-link, .ev-memo") : []) {
+      const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT), at = []; // a folded letter's [text node, offset, length]
+      let folded = "";
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+        let i = 0;
+        for (const ch of n.data) {
+          const f = foldText(ch);
+          for (let k = 0; k < f.length; k++) at.push([n, i, ch.length]);
+          folded += f; i += ch.length;
+        }
+      }
+      for (const w of words) for (let k = folded.indexOf(w); k >= 0; k = folded.indexOf(w, k + w.length)) {
+        const [a, ai] = at[k], [b, bi, bl] = at[k + w.length - 1], r = new Range();
+        r.setStart(a, ai); r.setEnd(b, bi + bl);
+        ranges.push(r);
+      }
+    }
+    if (ranges.length) CSS.highlights.set("todo-hit", new Highlight(...ranges)); else CSS.highlights.delete("todo-hit");
   }
   // keyboard focus stays in ToDo's list as it is drawn again (the user's call: after ×, この回を削除 or きょうに移す it was
   // lost, and VoiceOver started over from the top). listFocus notes where it is: which ToDo (its check's id), which of the
