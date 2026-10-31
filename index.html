@@ -445,13 +445,14 @@ ul.list li.more-done .link-btn { width: 100%; }
 .empty { display: block; padding: var(--space-3) var(--space-2); text-align: center; color: var(--muted); }
 .phrase { display: inline-block; }  /* a sentence kept whole, so the line breaks between sentences */
 /* a 期限 in parts (4 日過ぎています, 10/27（火）, a repeat), a narrow row breaking between them. The ・ before each part is
-   its own and sits in a margin the line cuts off, so a part that starts a line drops it: no line ends or starts with a ・
-   (the user's call). A repeat has its mark after a space instead */
+   its own, a whole em with the dot in its middle as in running text, and sits in a margin the line cuts off, so a part
+   that starts a line drops it: no line ends or starts with a ・ (the user's call). (It was half an em, the dot pushed
+   against the next part and showing half at a line's start.) A repeat has its mark after a space instead */
 .sub.due { display: block; overflow: hidden; }
-.due-parts { display: flex; flex-wrap: wrap; margin-inline-start: -.5em; }
+.due-parts { display: flex; flex-wrap: wrap; margin-inline-start: -1em; }
 .due-parts > * { flex: 0 1 auto; min-width: 0; }
-.due-parts > .phrase::before { content: "・"; display: inline-block; width: .5em; text-align: center; }
-.due-rep { display: inline-flex; align-items: center; gap: 2px; padding-inline-start: .5em; }
+.due-parts > .phrase::before { content: "・"; display: inline-flex; justify-content: center; width: 1em; }
+.due-rep { display: inline-flex; align-items: center; gap: 2px; padding-inline-start: 1em; }
 .due-rep .icon { width: 1em; height: 1em; }
 .note { padding: var(--space-1) var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 /* delete: × first, then a red 削除する capsule to confirm (destructive role) */
@@ -2181,12 +2182,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("todoText").addEventListener("input", syncTodoSave);
   // a ToDo's 期限, here and in its edit form: きょう, あした and 来週 (a week on) under the date put that day in at a tap
   // (the user's call), and 期限なしにする empties it again, a day once picked being hard to empty on iPhone. The 繰り返し
-  // row shows once there is a 期限, its words following the day (毎週（土曜日）). Gives back what puts the rows right
-  function wireTodoDue(due, quick, clear, repeatRow, repeat) {
+  // row shows once there is a 期限, its words following the day (毎週（土曜日）), or the day its turns count from while the
+  // 期限 is the one きょうに移す gave it (base). Gives back what puts the rows right
+  function wireTodoDue(due, quick, clear, repeatRow, repeat, base = null) {
     const sync = () => {
-      const none = !due.value;
+      const none = !due.value, from = base && due.value === due.defaultValue ? base : due.value;
       clear.hidden = none; repeatRow.hidden = none; repeat.disabled = none;
-      for (const o of repeat.options) o.textContent = repeatName(o.value, due.value, true);
+      for (const o of repeat.options) o.textContent = repeatName(o.value, from, true);
     };
     for (const type of ["input", "change"]) due.addEventListener(type, sync);
     const put = (day) => { due.value = day; due.dispatchEvent(new Event("change", { bubbles: true })); };
@@ -2249,7 +2251,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // kept, its 期限. One that repeats says how after its 期限, with a mark of its own (毎週, 毎月第2土曜)
   function dueText(t) {
     if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtShort(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : null;
-    return t.due ? untilText(t.due, t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, t.due)) : null) : null;
+    return t.due ? untilText(t.due, t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, repeatBase(t))) : null) : null;
   }
   // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): by section
   // (期限切れ, きょう, これから, 期限なし), each with its 重要 ones first (the user's call), then the 期限 soonest, then the
@@ -2297,10 +2299,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     await todos.update(t.id, { done: false, doneAt: undefined, next: undefined, ...(back ? { repeat: next.repeat } : {}) });
   }
   // a repeating ToDo's next 期限: the first turn of its repeat after both its 期限 and today, so one done late doesn't come
-  // back past it already. The turns are the calendar's (turnStarts), from its 期限; four years on finds a 29th of February
+  // back past it already. The turns are the calendar's (turnStarts), from its 期限, or from the day it had before
+  // きょうに移す moved it (repeatBase); four years on finds a 29th of February
+  const repeatBase = (t) => t.repeatFrom || t.due;
   function nextDue(t) {
     const after = t.due > todayKey ? t.due : todayKey;
-    return turnStarts({ date: t.due, repeat: t.repeat }, addDays(after, 1), addDays(after, 1500))[0] || null;
+    return turnStarts({ date: repeatBase(t), repeat: t.repeat }, addDays(after, 1), addDays(after, 1500))[0] || null;
   }
   function settleTodo(id) {
     // its row on the page and on きょう's tile, whichever it was checked on
@@ -2312,12 +2316,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   // 期限切れ, all moved to きょう at once (the user's call: each had to be opened and its day picked again); 元に戻す puts
   // back the days they had, on the ones still due today
+  // A repeating one keeps the day its turns count from (repeatFrom), so the turns after it stay on their days (the user's
+  // call: 毎週月曜's ゴミ出し moved on a Saturday came round on Saturdays after)
   function overdueToToday() {
-    const moved = new Map(todos.items.filter((t) => !t.done && t.due && t.due < todayKey).map((t) => [t.id, t.due]));
+    const moved = new Map(todos.items.filter((t) => !t.done && t.due && t.due < todayKey).map((t) => [t.id, t]));
     if (!moved.size) return;
-    act(() => todos.restore(todos.items.map((t) => (moved.has(t.id) ? { ...t, due: todayKey } : t))));
+    act(() => todos.restore(todos.items.map((t) => (moved.has(t.id) ? { ...t, due: todayKey, ...(t.repeat ? { repeatFrom: repeatBase(t) } : {}) } : t))));
     flash(`期限切れのToDoを ${moved.size} 件、きょうに移しました`, () =>
-      act(() => todos.restore(todos.items.map((t) => (moved.has(t.id) && t.due === todayKey ? { ...t, due: moved.get(t.id) } : t)))));
+      act(() => todos.restore(todos.items.map((t) => (moved.has(t.id) && t.due === todayKey ? { ...t, due: moved.get(t.id).due, repeatFrom: moved.get(t.id).repeatFrom } : t)))));
   }
   // the ToDos just added in the sheet, lit for a moment in the list it uncovers as it goes down, the first scrolled into
   // sight (the user's call: a new one didn't stand out among the rest)
@@ -4724,7 +4730,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         const clear = el("button", { type: "button", class: "link-btn" }, "期限なしにする");
         const repeat = el("select", { id: "reRepeat" }, REPEATS.map(([k]) => el("option", { value: k, selected: k === (t.repeat || "") }, k)));
         const repeatRow = el("div", { class: "form-rows" }, recRow("繰り返し", repeat));
-        wireTodoDue(due, quick, clear, repeatRow, repeat)();
+        wireTodoDue(due, quick, clear, repeatRow, repeat, t.repeatFrom)();
         // the text wraps onto as many lines as it needs, as in the ＋ sheet (the user's call), one line of text still: 改行 saves
         const text = el("textarea", { id: "reText", class: "full grow", rows: 1, placeholder: "やること", "aria-label": "やること", maxlength: 200, required: true }, t.text);
         text.addEventListener("input", () => { if (/[\r\n]/.test(text.value)) text.value = text.value.replace(/\s*[\r\n]+\s*/g, " "); growField(text); });
@@ -4735,9 +4741,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         const flag = el("input", { type: "checkbox", id: "reFlag", class: "switch", role: "switch", checked: !!t.flag });
         return [text, recRow("期限", due, { opt: true, after: [quick, clear], below: true }), repeatRow, recRow("重要", flag), memo];
       },
-      read: () => {
-        const text = $("reText").value.trim(), due = $("reDue").value || "", memo = $("reMemo").value.trim();
-        return text ? { text, due, repeat: (due && $("reRepeat").value) || undefined, memo: memo || undefined, flag: $("reFlag").checked || undefined } : recBad("reText");
+      // a 期限 changed here is the repeat's new day; left as it was, the day its turns count from stays too
+      read: (t) => {
+        const text = $("reText").value.trim(), due = $("reDue").value || "", memo = $("reMemo").value.trim(), repeat = (due && $("reRepeat").value) || undefined;
+        return text ? { text, due, repeat, repeatFrom: repeat && due === t.due ? t.repeatFrom : undefined, memo: memo || undefined, flag: $("reFlag").checked || undefined } : recBad("reText");
       },
     },
     meal: {
