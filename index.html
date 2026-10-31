@@ -2296,16 +2296,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   // a ToDo checked off stays where it was for a moment, done, then fades and goes down to 完了 (the user's call: a
   // mistaken tap shows, and is undone right there). It is saved as done at once, so きょう's tile and the calendar have it;
-  // only this list holds it in its old place. Unchecked, it goes straight back among the rest
+  // only this list holds it in its old place. Unchecked, it goes straight back among the rest. Those checked one after
+  // another wait together and go down together, a moment after the last (the user's call: one going while the next was
+  // being tapped moved the rows under the finger); while they wait, each keeps the look it had (its 期限, its repeat's
+  // mark, 重要), so its row keeps its height, and a repeat's next turn shows only once they have gone
   const TODO_SETTLE = 1500;
   const TODO_DONE_SHOWN = 10; // 完了 under すべて: the last ten done, the rest under 完了
-  const todoSettling = new Map(); // id → the timer that sends it down
-  const todoPlaced = (t) => (todoSettling.has(t.id) ? { ...t, done: false } : t); // where the list puts it
+  const todoSettling = new Set(); // the ToDos checked off, waiting in their places
+  let todoSettleTimer = null;
+  // where the list puts it, and how it looks there: as it was before the check
+  const todoPlaced = (t) => (todoSettling.has(t.id) ? { ...t, done: false, repeat: t.repeat || todos.get(t.next)?.repeat } : t);
+  const todoHeldBack = () => new Set([...todoSettling].map((id) => todos.get(id)?.next).filter(Boolean)); // their next turns
   function toggleTodo(t) {
     const done = !t.done;
-    clearTimeout(todoSettling.get(t.id));
     todoSettling.delete(t.id);
-    if (done) todoSettling.set(t.id, setTimeout(() => settleTodo(t.id), TODO_SETTLE));
+    if (done) todoSettling.add(t.id);
+    clearTimeout(todoSettleTimer);
+    if (todoSettling.size) todoSettleTimer = setTimeout(settleTodos, TODO_SETTLE);
     act(() => setTodoDone(t, done));
   }
   // checked off, from the page, きょう's tile or its day: a ToDo keeps when (doneAt). One that repeats comes back as a new
@@ -2342,10 +2349,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const after = t.due > todayKey ? t.due : todayKey;
     return turnStarts({ date: repeatBase(t), repeat: t.repeat }, addDays(after, 1), addDays(after, 1500))[0] || null;
   }
-  function settleTodo(id) {
-    // its row on the page and on きょう's tile, whichever it was checked on
-    const rows = [...document.querySelectorAll(`#todoList [data-check="${id}"], #homeTiles [data-td="${id}"]`)].map((b) => b.closest("li"));
-    const move = () => { todoSettling.delete(id); renderTodos(); renderHome(); };
+  function settleTodos() {
+    // their rows on the page and on きょう's tile, wherever they were checked
+    const ids = [...todoSettling];
+    const rows = ids.flatMap((id) => [...document.querySelectorAll(`#todoList [data-check="${id}"], #homeTiles [data-td="${id}"]`)].map((b) => b.closest("li")));
+    const move = () => { for (const id of ids) todoSettling.delete(id); renderTodos(); renderHome(); };
     if (!rows.length || reduceMotion.matches) { move(); return; }
     for (const row of rows) row.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" });
     setTimeout(move, 200); // a timer, not the animation's promise, which waits while the page isn't drawn
@@ -2371,7 +2379,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     setTimeout(() => { for (const r of rows) r.classList.remove("spot"); }, 2400);
   }
   function renderTodos() {
-    const items = [...todos.items].sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
+    const held = todoHeldBack();
+    const items = [...todos.items].filter((t) => !held.has(t.id)).sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? todoPlaced(t).done : !todoPlaced(t).done));
     $("todoFoot").hidden = !items.some((t) => t.done); // only while there is something done to clear
     if (!$("clearDone").classList.contains("armed")) $("clearDone").textContent = clearDoneLabel();
@@ -2419,9 +2428,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const when = doneDay(t) ? relLabel(doneDay(t)) || fmtShort(doneDay(t)) : t.due ? `期限 ${fmtShort(t.due)}` : "";
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
-        el("span", { class: "body" }, flagged(t, editLink("todo", t.id, t.text)),
+        el("span", { class: "body" }, flagged(todoPlaced(t), editLink("todo", t.id, t.text)),
           filed ? (when || n > 1 ? el("span", { class: "done-day" }, keepUnits([n > 1 ? `${n} 回` : "", when].filter(Boolean).join("・"))) : null)
-            : [dueText(t, section === "きょう"), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null]),
+            : [dueText(todoPlaced(t), section === "きょう"), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null]),
         n > 1 ? delButton(() => removeWithUndo(todos, turns.map((x) => x.id), `「${t.text}」の完了を ${n} 件削除しました`), "削除", `${t.text}（完了 ${n} 件）`)
           : t.repeat && t.due && !t.done ? delButton(() => skipTurn(t), "削除", `${t.text}（この回）`, "この回を削除")
           : delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
@@ -5254,7 +5263,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const dueToday = undone.filter((t) => t.due === todayKey).length;
     const overdue = undone.filter((t) => t.due && t.due < todayKey).length;
     // the tile's three to do: one checked off a moment ago still holds its place there
-    const top = todos.items.filter((t) => !todoPlaced(t).done).sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b))).slice(0, 3);
+    const held = todoHeldBack();
+    const top = todos.items.filter((t) => !todoPlaced(t).done && !held.has(t.id)).sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b))).slice(0, 3);
     const j = journal.get(todayKey);
     const ms = meals.items.filter((m) => m.date === todayKey);
     const kcal = sum(ms.filter((m) => typeof m.kcal === "number"), (m) => m.kcal);
