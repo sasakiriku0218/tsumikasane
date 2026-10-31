@@ -194,7 +194,9 @@ button:active:not(:disabled) { opacity: .5; transition: none; }
   padding: 4px 2px; background: transparent; border: 0; border-radius: 999px; color: var(--fg); cursor: pointer;
   font-size: 12px; line-height: 1.15; font-weight: 600; white-space: nowrap;
 }
-.menu .mi { display: grid; place-items: center; }
+.menu .mi { position: relative; display: grid; place-items: center; }
+/* ToDo's tab: how many are 期限切れ or due きょう, at its icon's corner, as an iPhone app's badge (the user's call) */
+.menu .badge { position: absolute; top: -5px; left: calc(100% - 9px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--warn-fill); color: #ffffff; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
 .menu .mi .icon { width: 24px; height: 24px; }
 .menu .lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 /* the selected tab: tint colour on a lighter bubble */
@@ -2378,7 +2380,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const r of rows) r.classList.add("spot");
     setTimeout(() => { for (const r of rows) r.classList.remove("spot"); }, 2400);
   }
+  // ToDo's tab says how many are 期限切れ or due きょう (the user's call: from another page they went unseen), done ones
+  // not counted; read out with the tab's name
+  function renderTodoBadge() {
+    const n = todos.items.filter((t) => !t.done && t.due && t.due <= todayKey).length, mi = menuEl.querySelector('button[data-tab="todo"] .mi');
+    if (!mi) return;
+    mi.querySelector(".badge")?.remove();
+    mi.parentElement.querySelector(".badge-sr")?.remove();
+    if (!n) return;
+    mi.append(el("span", { class: "badge", "aria-hidden": "true" }, n > 99 ? "99+" : String(n)));
+    mi.parentElement.append(el("span", { class: "sr-only badge-sr" }, `、期限切れときょう ${n} 件`));
+  }
   function renderTodos() {
+    renderTodoBadge();
     const held = todoHeldBack();
     const items = [...todos.items].filter((t) => !held.has(t.id)).sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? todoPlaced(t).done : !todoPlaced(t).done));
