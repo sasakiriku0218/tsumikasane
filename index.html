@@ -539,6 +539,12 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .goal-next-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0; background: transparent; border: 0; color: var(--fg); font: inherit; line-height: 1.3; text-align: left; cursor: pointer; }
 .goal-next-open .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .goal-next-open .chev { display: grid; color: var(--muted); }
+/* an action just ticked off there, checked in its row for a moment before the next one takes its place */
+#goalNext li.held .check circle { fill: var(--f-goal); stroke: var(--f-goal); }
+#goalNext li.held .check path { fill: #ffffff; }
+#goalNext li.held .check:disabled { cursor: default; }
+#goalNext li.held .text { color: var(--muted); }
+#goalNext li.next-more { padding-top: 0; padding-bottom: 0; }
 .progress .els { flex: none; font-size: var(--t-foot); color: var(--muted); font-variant-numeric: tabular-nums; }
 /* 目標のマンダラ, in the sheet: the cell walked into sits tinted in the middle and the eight around it are written in
    place, like a paper chart. A cell's foot holds its check, or, once something is written inside it, how many in there
@@ -2897,6 +2903,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // call: the chart didn't say how far off it was), or the day the goal was achieved
   function deadlineNote(g) {
     if (g.done) return doneText(g);
+    if (g.pausedAt) return "保留中"; // never 期限切れ while on hold (the user's call: it said how far past, in red)
     if (!g.deadline) return "";
     const n = daysUntil(g.deadline);
     return n < 0 ? `${-n} 日過ぎています` : n > 1 ? `あと ${n} 日` : n ? "あしたまで" : "きょうまで";
@@ -2956,21 +2963,36 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // 次にやること (the user's call: the next thing to do was out of sight until a goal was opened): for each goal under way,
   // its first action not done yet, under where it is (the goal's name cut short, as in the trail). Its check ticks it off
-  // right here, 元に戻す in the message, and the rest opens the chart at that action's level
+  // right here, 元に戻す in the message, and the rest opens the chart at that action's level.
+  // Three show at first, the rest behind ほかに n 件 (the user's call: with many goals it pushed the list off the screen).
+  // An action just ticked off stays in its row, checked, for a moment before the next one takes its place, so a second
+  // quick press can't tick that one off too (the user's call); its goal keeps its place even if that achieved it
+  const NEXT_SHOWN = 3, NEXT_HOLD = 1200;
+  let nextAll = false;
+  const nextHeld = new Map(); // goal id → { path, name, where, index, until }: the action just ticked off there
   function renderNextActions(active) {
-    const box = $("goalNext"), rows = [];
-    for (const g of active) {
-      const leaf = nextLeaf(g);
+    const box = $("goalNext"), now = Date.now(), list = [...active], rows = [];
+    for (const [id, h] of nextHeld) {
+      if (h.until <= now) nextHeld.delete(id);
+      else if (!list.some((g) => g.id === id) && goals.get(id)) list.splice(Math.min(h.index, list.length), 0, goals.get(id));
+    }
+    for (const [index, g] of list.entries()) {
+      const held = nextHeld.get(g.id), leaf = held || nextLeaf(g);
       if (!leaf) continue;
-      const name = oneLine(leaf.cell.t), where = [g.title, ...leaf.path.slice(0, -1).map((_, i) => nodeAt(g, leaf.path.slice(0, i + 1))?.t)].map(oneLine);
-      rows.push(el("li", {},
-        el("button", { type: "button", class: "check", "aria-label": `「${name}」を達成にする`, onclick: () => checkLeaf(g.id, leaf.path) }, checkMark()),
+      const name = held ? held.name : oneLine(leaf.cell.t);
+      const where = held ? held.where : [g.title, ...leaf.path.slice(0, -1).map((_, i) => nodeAt(g, leaf.path.slice(0, i + 1))?.t)].map(oneLine);
+      const tick = () => { nextHeld.set(g.id, { path: leaf.path, name, where, index, until: Date.now() + NEXT_HOLD }); checkLeaf(g.id, leaf.path); setTimeout(renderGoals, NEXT_HOLD + 50); };
+      rows.push(el("li", { class: held ? "held" : null },
+        el("button", { type: "button", class: "check", disabled: !!held, "aria-label": held ? `「${name}」を達成にしました` : `「${name}」を達成にする`, onclick: tick }, checkMark()),
         el("button", { type: "button", class: "goal-next-open", "aria-label": `「${name}」をチャートで開く`, onclick: (ev) => openChart(g.id, ev.detail === 0, leaf.path.slice(0, -1)) },
           el("span", { class: "body" }, el("span", { class: "text" }, name), el("span", { class: "sub" }, where.map((t, i) => (i < where.length - 1 ? clip(t, 10) : t)).join(" › "))),
           el("span", { class: "chev" }, icon("next", 16)))));
     }
+    const more = rows.length - NEXT_SHOWN;
     box.hidden = !rows.length;
-    box.replaceChildren(...(rows.length ? [el("li", { class: "dayhead" }, el("span", {}, "次にやること")), ...rows] : []));
+    box.replaceChildren(...(rows.length ? [el("li", { class: "dayhead" }, el("span", {}, "次にやること")), ...(nextAll || more <= 0 ? rows : rows.slice(0, NEXT_SHOWN))] : []),
+      ...(more > 0 ? [el("li", { class: "next-more" }, el("button", { type: "button", class: "link-btn", "aria-expanded": String(nextAll), onclick: () => { nextAll = !nextAll; renderGoals(); } },
+        nextAll ? `${NEXT_SHOWN} 件だけ表示` : `ほかに ${more} 件を表示`))] : []));
   }
   // an action checked from 次にやること, the goal's 達成 worked out again as in its chart
   function checkLeaf(id, path) {
@@ -2980,6 +3002,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!cell?.t?.trim()) return;
     cell.d = true;
     saveChart(g, chart, { said: `「${oneLine(cell.t)}」を達成にしました`, undo: () => {
+      nextHeld.delete(id);
       const x = goals.get(id), ch = x && editChart(x), c = ch && slotsAt(ch, at)[k];
       if (c) { delete c.d; saveChart(x, ch); }
     } });
@@ -3824,7 +3847,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       $("mPauseFoot").textContent = g.pausedAt ? `${pausedText(g)}にしています。やめると、進行中に戻ります。` : "保留にした目標は一覧の「保留」にまとまり、期限切れにもなりません。";
       const note = $("mDeadlineNote");
       note.textContent = deadlineNote(g);
-      note.classList.toggle("warn", !g.done && !!g.deadline && daysUntil(g.deadline) < 0);
+      note.classList.toggle("warn", !g.done && !g.pausedAt && !!g.deadline && daysUntil(g.deadline) < 0);
       for (const r of document.querySelectorAll('input[name="chartSplit"]')) r.checked = Number(r.value) === depth;
     }
   }
@@ -4092,9 +4115,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const next = [...all.slice(i + 1), ...all.slice(0, i)].find((x) => !x.value.trim());
     if (next) next.focus(); else ta.blur();
   });
-  // a tap anywhere on a cell, its foot too, starts writing in it, after its text (on an empty one, where the ＋ is): the
-  // textarea takes no taps until then, so a cell can be held down without picking text. With a cell picked up, the tap
-  // swaps it with this one, or, on the same one or off the eight, puts it down
+  // a tap anywhere on a cell, its foot too, starts writing in it, at the character pressed (caretAt; after the text when
+  // the tap is off it, and on an empty one where the ＋ is): the textarea takes no taps until then, so a cell can be held
+  // down without picking text. With a cell picked up, the tap swaps it with this one, or, on the same one or off the
+  // eight, puts it down
   mGrid.addEventListener("click", (ev) => {
     if (swallowClick) { swallowClick = false; return; } // the end of the 長押し that picked a cell up
     const box = ev.target.closest(".m-cell[data-k]");
@@ -4104,8 +4128,25 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       endSwap();
       return;
     }
-    if (box && !ev.target.closest("button, textarea")) { const ta = box.querySelector("textarea"); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    if (box && !ev.target.closest("button, textarea")) {
+      const ta = box.querySelector("textarea"), at = ev.detail ? caretAt(box, ev.clientX, ev.clientY) : ta.value.length;
+      ta.focus(); ta.setSelectionRange(at, at);
+    }
   });
+  // the character under a point of a cell's text as it shows (.m-text, over the textarea while it isn't written in), by
+  // its place in the text, which the textarea holds the same (the user's call: the typing always started after the text)
+  function caretAt(box, x, y) {
+    const t = box.querySelector(".m-text"), end = box.querySelector("textarea").value.length;
+    if (!t?.textContent) return end;
+    t.style.pointerEvents = "auto"; t.style.webkitUserSelect = t.style.userSelect = "text";
+    let at = null;
+    try {
+      const r = document.caretRangeFromPoint?.(x, y), p = !r && document.caretPositionFromPoint?.(x, y);
+      if (r && t.contains(r.startContainer)) at = r.startOffset;
+      else if (p && t.contains(p.offsetNode)) at = p.offset;
+    } finally { t.style.pointerEvents = t.style.webkitUserSelect = t.style.userSelect = ""; }
+    return at === null ? end : Math.min(at, end);
+  }
   // the cell being written in grows to show all its text (the user's call: a long one showed only in part), back to a
   // square once it is left
   function fitWriting(ta) { ta.style.minHeight = ""; ta.style.minHeight = ta.scrollHeight + "px"; }
