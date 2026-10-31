@@ -881,8 +881,22 @@ dialog.sheet {
 }
 dialog.sheet::backdrop { background: rgba(0, 0, 0, .32); animation: sheet-fade .32s; }
 @keyframes sheet-fade { from { opacity: 0; } }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sheet { --bg: #1c1c1e; --surface: #2c2c2e; } }
-:root[data-theme="dark"] .sheet { --bg: #1c1c1e; --surface: #2c2c2e; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :is(.sheet, .ask) { --bg: #1c1c1e; --surface: #2c2c2e; } }
+:root[data-theme="dark"] :is(.sheet, .ask) { --bg: #1c1c1e; --surface: #2c2c2e; }
+/* 変更を破棄 or 編集を続ける, asked over a changed entry's sheet put away unsaved: an iOS action sheet, the way to stay
+   apart and in bold */
+dialog.ask {
+  position: fixed; inset: auto 0 0; width: 100%; max-width: 480px; max-height: none; margin: 0 auto;
+  padding: 0 8px max(8px, env(safe-area-inset-bottom, 0px)); border: 0; background: transparent; color: var(--fg); overflow: visible;
+}
+dialog.ask::backdrop { background: rgba(0, 0, 0, .2); }
+.ask-group { margin-bottom: 8px; border-radius: 14px; background: var(--surface); overflow: hidden; }
+.ask-msg { margin: 0; padding: 14px var(--space-2); border-bottom: .5px solid var(--separator); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); text-align: center; }
+.ask-btn { display: block; width: 100%; min-height: 56px; padding: 0 var(--space-2); border: 0; background: transparent; color: var(--accent); font: inherit; cursor: pointer; }
+.ask-btn.danger { color: var(--warn); }
+.ask-keep { border-radius: 14px; background: var(--surface); font-weight: 600; }
+@media (prefers-reduced-motion: no-preference) { dialog.ask[open] { animation: ask-up .24s ease-out; } }
+@keyframes ask-up { from { transform: translateY(24px); opacity: 0; } }
 /* the bar on top: the title between キャンセル and 完了 or 保存; it stays put while the sheet scrolls, and it is the part to pull */
 .sheet-head {
   position: sticky; top: 0; z-index: 1;
@@ -1734,6 +1748,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     </div>
   </div>
   <div class="toast" id="sheetStatus" role="status"></div>
+</dialog>
+<dialog class="ask" id="discardAsk" aria-labelledby="discardMsg">
+  <div class="ask-group">
+    <p class="ask-msg" id="discardMsg">変更を保存せずに閉じますか？</p>
+    <button type="button" class="ask-btn danger" id="discardYes">変更を破棄</button>
+  </div>
+  <button type="button" class="ask-btn ask-keep" id="discardNo">編集を続ける</button>
 </dialog>
 
 <!-- short messages (saved, exported, errors) float above the tab bar, so they show wherever you are on the page -->
@@ -3757,6 +3778,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let todoAdded = false; // a ToDo has been added from it since it opened, so its キャンセル reads 閉じる
   let todoNewIds = []; // and which, to be lit in the list as the sheet goes down
   let recEdit = null, recReturnId = null; // the entry being changed in the sheet ({ kind, id }), and its row for focus after
+  let recShown = null; // what its fields held as it opened (formState), for what changed since (recChanged)
   let recFromDay = false; // that entry is a ToDo opened from a day's list, which キャンセル, 保存 and 削除 go back to
   let todoFromDay = false; // the new ToDo's form was opened from a day's list (ToDoを追加), which キャンセル and 閉じる go back to
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
@@ -3795,7 +3817,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
     dropKeptDue();
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; todoAdded = false; todoNewIds = []; todoFromDay = false; recEdit = null; recFromDay = false; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; todoAdded = false; todoNewIds = []; todoFromDay = false; recEdit = null; recShown = null; recFromDay = false; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   // a grey day of the month before or after opens its sheet too, without turning the month (the user's call)
@@ -3822,6 +3844,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     recEdit = { kind: "todo", id }; recReturnId = id; recFromDay = true;
     delete $("recForm").dataset.typed;
     setChildren($("recForm"), REC_EDIT.todo.fields(x).flat(Infinity));
+    recShown = formState($("recForm"));
     disarmRecDelete(); syncSheetHead();
     sheetEl.scrollTop = 0;
     $("sheetTitle").focus();
@@ -4107,13 +4130,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     ev.preventDefault();
     if (menuFor !== null) { closeMenu(); return; } // a menu open goes first, then a cell picked up
     if (mSwap !== null) { endSwap(); return; }
-    if (mandalaGoal && (mPath.length || chartFromDay)) chartBack(); else if (editingId || settingsFrom === "day") showDayView(); else if (planFromDay) backToDay(); else if (todoFromDay) backFromTodo(); else if (recFromDay) backFromRec(); else if (dayFromFind) backToFind(); else closeSheet();
+    leaveRec(() => { if (mandalaGoal && (mPath.length || chartFromDay)) chartBack(); else if (editingId || settingsFrom === "day") showDayView(); else if (planFromDay) backToDay(); else if (todoFromDay) backFromTodo(); else if (recFromDay) backFromRec(); else if (dayFromFind) backToFind(); else closeSheet(); });
   });
   // a tap on the dimmed page above the sheet puts it away
   sheetEl.addEventListener("click", (ev) => {
     if (ev.target !== sheetEl) return;
     const r = sheetEl.getBoundingClientRect();
-    if (ev.clientY < r.top || ev.clientY > r.bottom || ev.clientX < r.left || ev.clientX > r.right) closeSheet();
+    if (ev.clientY < r.top || ev.clientY > r.bottom || ev.clientX < r.left || ev.clientX > r.right) leaveRec(() => closeSheet());
   });
   $("sheetDone").addEventListener("click", () => closeSheet());
   // キャンセル: a new goal or plan is dropped (one begun from a day's list goes back to it), an entry's changes too; 戻る:
@@ -4122,7 +4145,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const mode = sheetMode();
     if (mode === "goal") { clearGoalForm(); closeSheet(); } else if (mode === "plan") { clearPlanForm(); if (planFromDay) backToDay(); else closeSheet(); }
     else if (mode === "todo") { if (!todoAdded) clearTodoForm(); if (todoFromDay) backFromTodo(); else closeSheet(); } // 閉じる keeps what was typed, as a pull down does
-    else if (mode === "rec") { if (recFromDay) backFromRec(); else closeSheet(); } else if (mode === "chart") chartBack(); else if (mode === "day" && dayFromFind) backToFind(); else showDayView();
+    else if (mode === "rec") leaveRec(() => { if (recFromDay) backFromRec(); else closeSheet(); }); else if (mode === "chart") chartBack(); else if (mode === "day" && dayFromFind) backToFind(); else showDayView();
   });
   $("calSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0));
   // iPhone: the bar on top can be pulled down to put the sheet away, as iOS sheets can
@@ -4140,10 +4163,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!drag) return;
     const { dy, t } = drag;
     drag = null;
-    // pulled a quarter of the way down, or flicked
-    if (dy > sheetEl.offsetHeight / 4 || (dy > 24 && dy / Math.max(1, ev.timeStamp - t) > .6)) { closeSheet(); return; }
+    // pulled a quarter of the way down, or flicked; a changed entry's sheet goes back up and asks (leaveRec)
+    const away = dy > sheetEl.offsetHeight / 4 || (dy > 24 && dy / Math.max(1, ev.timeStamp - t) > .6);
+    if (away && !recChanged()) { closeSheet(); return; }
     sheetEl.style.transform = "";
     if (dy && !reduceMotion.matches) sheetEl.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 200, easing: "ease-out" });
+    if (away) leaveRec(() => closeSheet());
   }
   sheetHead.addEventListener("pointerup", endDrag);
   sheetHead.addEventListener("pointercancel", endDrag);
@@ -5077,9 +5102,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     recEdit = { kind, id }; recReturnId = id;
     delete $("recForm").dataset.typed;
     setChildren($("recForm"), spec.fields(x).flat(Infinity)); // rows come as [label, field] pairs
+    recShown = formState($("recForm"));
     disarmRecDelete(); syncSheetHead();
     presentSheet(byKey, "rec");
   }
+  // a changed entry's sheet put away without 保存 (pulled down, a tap above it, Esc or キャンセル) asks first, as iOS does
+  // (the user's call: the changes went without a word, while a new ToDo's typing stays): 変更を破棄 goes on, 編集を続ける,
+  // Esc or a tap outside stays. Changed is against what its fields held as it opened (recShown), so a change put back
+  // asks nothing
+  const discardAsk = $("discardAsk");
+  let discardGo = null;
+  function formState(f) { return JSON.stringify(fieldsOf(f).map((x) => (x.type === "radio" || x.type === "checkbox" ? x.checked : x.value))); }
+  const recChanged = () => sheetMode() === "rec" && recShown !== null && formState($("recForm")) !== recShown;
+  function leaveRec(go) {
+    if (!recChanged()) { go(); return; }
+    discardGo = go;
+    discardAsk.showModal();
+    $("discardNo").focus();
+  }
+  $("discardYes").addEventListener("click", () => { const go = discardGo; discardAsk.close(); go?.(); });
+  $("discardNo").addEventListener("click", () => discardAsk.close());
+  discardAsk.addEventListener("click", (ev) => { if (ev.target === discardAsk) discardAsk.close(); }); // around the buttons
+  discardAsk.addEventListener("close", () => { discardGo = null; });
   $("recForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const spec = recEdit && REC_EDIT[recEdit.kind], x = spec?.store.get(recEdit.id);
