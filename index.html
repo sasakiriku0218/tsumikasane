@@ -1809,6 +1809,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const daysUntil = (s) => daysBetween(todayKey, s);
   const monthOf = (s) => (s || "").slice(0, 7);
   const addMonths = (ym, n) => { const [y, m] = ym.split("-").map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  // a day n months on, the month's last where it has no such day (1/31 → 2/28)
+  const addMonthsDay = (s, n) => { const ym = addMonths(s.slice(0, 7), n); return `${ym}-${pad(Math.min(Number(s.slice(8, 10)), daysInMonth(ym)))}`; };
   const fmtMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return `${y}年${m}月`; };
   const daysInMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(y, m, 0).getDate(); };
   const fmtYen = (n) => (n < 0 ? "−" : "") + Math.abs(Math.round(n)).toLocaleString("ja-JP") + " 円";
@@ -2511,6 +2513,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // きょうに移す moved it (repeatBase), except that a month without its day has the month's last instead of none (toEnd)
   const repeatBase = (t) => t.repeatFrom || t.due;
   function nextDue(t) {
+    if (afterDone(t.repeat)) return afterDone(t.repeat)[2](todayKey); // that long after today, the day it is done (or skipped)
     const after = t.due > todayKey ? t.due : todayKey;
     if (t.repeat === "weekly" && t.repeatDays?.length) { // the next of its own weekdays (月・木)
       for (let i = 1; i <= 7; i++) { const d = addDays(after, i); if (t.repeatDays.includes(parseYmd(d).getDay())) return d; }
@@ -3615,11 +3618,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // the repeats: every day, Monday to Friday, every week or every other week on its weekday, every month on its date or
   // on its weekday of the same week (the second Monday), every year (the user's call, after the first four)
   const REPEATS = [["", "しない"], ["daily", "毎日"], ["weekdays", "平日"], ["weekly", "毎週"], ["biweekly", "隔週"], ["monthly", "毎月"], ["monthlyNth", "毎月"], ["yearly", "毎年"]];
+  // a ToDo's own repeats, counted from the day it is done rather than from its 期限 (the user's call: シーツ洗い done three
+  // days late came back on its old day): the next 期限 is that long after the day it is checked off. In the ToDo forms'
+  // menus under their own heading; plans don't have them
+  const AFTER_DONE = [["after1w", "完了から1週間後", (d) => addDays(d, 7)], ["after2w", "完了から2週間後", (d) => addDays(d, 14)],
+    ["after1m", "完了から1か月後", (d) => addMonthsDay(d, 1)], ["after1y", "完了から1年後", (d) => addMonthsDay(d, 12)]];
+  const afterDone = (r) => AFTER_DONE.find(([k]) => k === r);
+  // a ToDo's menu: the repeats, then those from the day done
+  const todoRepeatOptions = (current = "") => [...REPEATS.map(([k, name]) => el("option", { value: k, selected: k === current }, name)),
+    el("optgroup", { label: "完了した日から数える" }, AFTER_DONE.map(([k, name]) => el("option", { value: k, selected: k === current }, name)))];
   const nthOf = (d) => Math.ceil(Number(d.slice(8, 10)) / 7); // which of its weekday in the month a day is: 2 for the second Monday
   // a repeat in words: short in the lists (毎週, 毎月第2月曜), and in the forms' menus with the day the plan's date gives it
   // (毎週（月曜日）, 毎月（第2月曜日）, 毎年（11月9日）). A ToDo's (todo) 31st is 月末 and its fifth weekday 最終, which
   // is what its turns are (turnStarts' toEnd)
   function repeatName(r, date, long, todo = false, days = null) {
+    if (afterDone(r)) return afterDone(r)[1]; // 完了から2週間後, the same in a list and a menu
     const dt = date ? parseYmd(date) : null, wd = dt ? WD[dt.getDay()] : "";
     if (!dt) return (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
     const nth = todo && nthOf(date) === 5 ? "最終" : `第${nthOf(date)}`;
@@ -3816,7 +3829,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const lastDate = {}, lastTime = {};
   const remember = (f) => { lastDate[f] = $(f + "Date").value; lastTime[f] = $(f + "Time").value; };
   function clearPlanForm() { $("planForm").reset(); syncPlanSave(); syncPlanRows("plan"); remember("plan"); }
-  for (const id of ["planRepeat", "edRepeat", "todoRepeat"]) setChildren($(id), REPEATS.map(([k, name]) => el("option", { value: k }, name)));
+  for (const id of ["planRepeat", "edRepeat"]) setChildren($(id), REPEATS.map(([k, name]) => el("option", { value: k }, name)));
+  setChildren($("todoRepeat"), todoRepeatOptions());
   // a plan form's rows that come and go (f: "plan" for a new one, "ed" for a change): the end time once there is a start
   // time, the repeat's end once it repeats. No end may come before its start (min), so 追加 and 保存 wait until it's right
   function syncPlanRows(f) {
@@ -5153,7 +5167,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         const due = el("input", { type: "date", id: "reDue", value: t.due || "" });
         const quick = el("span", { class: "quick-days", role: "group", "aria-label": "期限をすぐ選ぶ" });
         const clear = el("button", { type: "button", class: "link-btn" }, "期限なしにする");
-        const repeat = el("select", { id: "reRepeat" }, REPEATS.map(([k]) => el("option", { value: k, selected: k === (t.repeat || "") }, k)));
+        const repeat = el("select", { id: "reRepeat" }, todoRepeatOptions(t.repeat || ""));
         const days = dayPicker("reDays");
         for (const x of days.querySelectorAll("input")) x.checked = (t.repeatDays || []).includes(Number(x.value));
         const repeatRow = el("div", { class: "form-rows" }, recRow("繰り返し", repeat), days);
