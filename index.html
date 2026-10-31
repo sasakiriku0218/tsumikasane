@@ -526,20 +526,25 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .goal-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .goal-open .chev { display: grid; color: var(--muted); }
 .goal .title { font-weight: 600; overflow-wrap: anywhere; }
-.goal.done .title { color: var(--muted); text-decoration: line-through; }
+/* achieved or on hold (保留): the name muted, not struck through (the user's call: a line through looked like given up) */
+.goal.done .title, .goal.paused .title { color: var(--muted); }
 .progress { display: flex; align-items: center; gap: var(--space-1); }
 .bar-track { flex: 1; height: 8px; border-radius: 999px; background: var(--fill); overflow: hidden; }
 .bar-track i { display: block; height: 100%; border-radius: 999px; background: var(--sec-c); }
 .bar-track i.over { background: var(--warn); }
 .pct { flex: none; width: 4.5ch; text-align: right; font-size: var(--t-foot); color: var(--muted); font-variant-numeric: tabular-nums; }
-/* a goal's row: the 期限 and 達成基準 share a line, and the count of elements done sits by the % */
-.goal-meta { display: block; line-height: 1.35; }
+/* a goal's row: the 期限, 達成基準 on a line of its own, and the count of elements done by the % */
+.goal-meta { display: flex; flex-direction: column; line-height: 1.35; }
+/* 次にやること: a check, then the action with where it is in the chart, which opens it there */
+.goal-next-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0; background: transparent; border: 0; color: var(--fg); font: inherit; line-height: 1.3; text-align: left; cursor: pointer; }
+.goal-next-open .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.goal-next-open .chev { display: grid; color: var(--muted); }
 .progress .els { flex: none; font-size: var(--t-foot); color: var(--muted); font-variant-numeric: tabular-nums; }
 /* 目標のマンダラ, in the sheet: the cell walked into sits tinted in the middle and the eight around it are written in
    place, like a paper chart. A cell's foot holds its check, or, once something is written inside it, how many in there
    are done; › goes into it while the goal's 分割 allows. Square cells, three to a row: about 110px on a phone */
 .m-trail { margin: 0; padding: 0 var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mandala { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.mandala { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; container-type: inline-size; }
 .m-cell { aspect-ratio: 1; min-width: 0; display: flex; flex-direction: column; padding: 6px 6px 2px; border-radius: 12px; background: var(--surface); }
 .m-cell.done { background: color-mix(in srgb, var(--c-goal) 16%, var(--surface)); }
 /* 16px at least, or iPhone zooms the page in on a tap. While a cell isn't being written in, its text shows through .m-text
@@ -547,12 +552,21 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
    it fits, smaller down to 11px when it doesn't, and past that cut at its last whole line with … (fitCells) */
 .m-write { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
 .m-cell textarea { flex: 1 1 auto; width: 100%; min-height: 0; padding: 2px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; font-size: max(16px, var(--t-sub)); line-height: 1.3; text-align: center; resize: none; overflow: hidden; }
-.m-cell textarea:not(:focus) { color: transparent; }
+.m-cell textarea:not(:focus) { color: transparent; pointer-events: none; }
 .m-cell textarea:focus { overflow-y: auto; }
 .m-cell textarea:focus-visible { outline-offset: 0 !important; }
 .m-text { position: absolute; inset: 0; padding: 2px; overflow: hidden; font-size: max(16px, var(--t-sub)); line-height: 1.3; text-align: center; white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; }
 .m-text.cut { display: -webkit-box; -webkit-box-orient: vertical; }
 .m-cell textarea:focus + .m-text { visibility: hidden; }
+/* the cell being written in leaves its square for as tall as its text needs (the user's call: a long one showed only in
+   part while it was written), a square at the least: the grid's width less its two gaps, over three */
+.m-cell:has(textarea:focus) { aspect-ratio: auto; min-height: calc((100cqi - 12px) / 3); }
+/* 長押し: a cell held down is picked up, outlined, to swap with the next one pressed; nothing in a cell can be selected
+   or called up by holding it, and its check and › are out of reach meanwhile */
+.m-cell[data-k] { -webkit-touch-callout: none; }
+.m-tools, .m-text { -webkit-user-select: none; user-select: none; }
+.mandala.swapping .m-tools { pointer-events: none; }
+.m-cell.picked { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* an empty cell: a faint ＋ in its middle, gone while it is being written in; taps go through it to the cell */
 .m-cell[data-k] { position: relative; cursor: text; }
 .m-plus { position: absolute; inset: 0; display: none; place-items: center; color: var(--muted); opacity: .6; pointer-events: none; }
@@ -573,7 +587,7 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 /* 全体: the whole chart as one sheet of nine blocks of nine, like the paper chart. The goal's block is in the middle (the
    goal and its eight elements), and each element's block sits where the element does, the element in its middle and
    the eight under it around. Done cells are tinted as in 8マス. It is for looking: a block opens its element's 8マス */
-.mandala.whole { gap: 4px; container-type: inline-size; }
+.mandala.whole { gap: 4px; }
 .m-block { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; cursor: pointer; }
 /* an element not written yet: a faint ＋ in its middle; a press writes it, in 8マス */
 .m-block.empty .m-mini.mid { color: var(--muted); }
@@ -1361,6 +1375,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="sec-head">
           <div class="title-row"><h2>目標</h2><button type="button" class="icon-btn" id="goalAdd" aria-label="目標を追加" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button></div>
         </div>
+        <ul class="list card" id="goalNext" aria-label="次にやること" hidden></ul>
         <div class="card" id="goalList"></div>
       </section>
     </div>
@@ -1594,6 +1609,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           </div>
         </div>
         <p class="group-foot">減らしても、深いマスに書いたことは消えずに残り、また増やすと戻ります。</p>
+        <!-- 保留: a goal set aside for now, and back (the user's call: one given up could only be deleted) -->
+        <div class="card"><button type="button" class="link-btn sheet-del" id="mPause">この目標を保留にする</button></div>
+        <p class="group-foot" id="mPauseFoot"></p>
         <div class="card"><button type="button" class="link-btn danger sheet-del" id="mDelete">この目標を削除</button></div>
       </div>
     </div>
@@ -2844,6 +2862,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const k = kidsOf(cell, left);
     return k.length ? k.reduce((s, x) => s + cellProgress(x, left - 1), 0) / k.length : cell?.d ? 1 : 0;
   }
+  // the first action not done yet: the first cell in reading order with nothing written inside it (as deep as the 分割
+  // goes) that isn't checked, as { path, cell }; none when all are done or nothing is written
+  function nextLeaf(g) {
+    const walk = (slots, left, path) => {
+      for (let k = 0; k < 8; k++) {
+        const c = slots?.[k];
+        if (!c?.t?.trim()) continue;
+        if (kidsOf(c, left - 1).length) { const r = walk(c.c, left - 1, [...path, k]); if (r) return r; } else if (!c.d) return { path: [...path, k], cell: c };
+      }
+      return null;
+    };
+    return walk(g.mandala, goalDepth(g), []);
+  }
   // the cell at path (indexes from the goal down); the goal itself for an empty path
   function nodeAt(g, path) {
     let n = { t: g.title, d: !!g.done, c: g.mandala };
@@ -2879,23 +2910,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       renderGoals();
     });
   });
-  const goalSection = (g) => (g.done ? "達成" : g.deadline && g.deadline < todayKey ? "期限切れ" : "進行中");
+  // 保留 (goal.pausedAt): set aside for now, in a section of its own, never 期限切れ, and off the calendar and きょう
+  const goalSection = (g) => (g.done ? "達成" : g.pausedAt ? "保留" : g.deadline && g.deadline < todayKey ? "期限切れ" : "進行中");
+  const pausedText = (g) => `${fmtShort(ymd(new Date(g.pausedAt)))}から保留`;
   function renderGoals() {
-    const active = goals.items.filter((g) => !g.done).sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999") || num(a.createdAt) - num(b.createdAt));
+    const active = goals.items.filter((g) => !g.done && !g.pausedAt).sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999") || num(a.createdAt) - num(b.createdAt));
+    const paused = goals.items.filter((g) => !g.done && g.pausedAt).sort((a, b) => num(b.pausedAt) - num(a.pausedAt));
     const done = goals.items.filter((g) => g.done).sort((a, b) => num(b.doneAt) - num(a.doneAt));
     const list = $("goalList");
     list.replaceChildren();
+    renderNextActions(goalFilter === "done" ? [] : active);
     if (!goals.items.length) { list.append(el("div", { class: "empty" }, el("span", { class: "phrase" }, "まだ目標がありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。"))); return; }
-    const shown = goalFilter === "active" ? active : goalFilter === "done" ? done : [...active, ...done];
+    const shown = goalFilter === "active" ? active : goalFilter === "done" ? done : [...active, ...paused, ...done];
     if (!shown.length) { list.append(el("div", { class: "empty" }, goalFilter === "done" ? "達成した目標はまだありません。" : "進行中の目標はありません。")); return; }
-    // in sections, each under its name with its count, as ToDo's list (the user's call): 期限切れ, 進行中, then 達成, which
-    // is the order the goals already come in. With only 達成 showing, its name would just say the bar's choice again
+    // in sections, each under its name with its count, as ToDo's list (the user's call): 期限切れ, 進行中, 保留, then 達成,
+    // the order the goals already come in. With only 達成 showing, its name would just say the bar's choice again
     const counts = new Map();
     for (const g of shown) counts.set(goalSection(g), (counts.get(goalSection(g)) || 0) + 1);
     let section = null;
-    // a row per goal that opens its chart, in three lines (the user's call: more goals on the screen): its name; its 期限
-    // and 達成基準 on one line, the two kept whole so a narrow row breaks between them; how far the chart has got, with
-    // how many of the eight around the goal are done. 分割 is left to the chart, where it is set
+    // a row per goal that opens its chart (the user's call: more goals on the screen): its name; its 期限 (or the day it
+    // was achieved or put on hold), and 達成基準 on a line of its own (the user's call: a ・ between them was left at the
+    // end of the line, as a phone's row always broke there); how far the chart has got, with how many of the eight around
+    // the goal are done. 分割 is left to the chart, where it is set
     for (const g of shown) {
       if (goalFilter !== "done" && goalSection(g) !== section) {
         section = goalSection(g);
@@ -2903,9 +2939,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       }
       const depth = goalDepth(g), root = nodeAt(g, []), els = kidsOf(root, depth), crit = criterionText(g);
       const pct = g.done ? 100 : Math.floor(cellProgress(root, depth) * 100);
-      const when = g.done ? (g.doneAt ? el("span", { class: "sub" }, el("span", { class: "phrase" }, doneText(g))) : null) : deadlineText(g);
-      if (when && crit) when.lastChild.append("・"); // the ・ ends the line if it breaks before 達成基準
-      list.append(el("div", { class: "goal" + (g.done ? " done" : "") },
+      const day = g.done ? (g.doneAt ? doneText(g) : "") : g.pausedAt ? pausedText(g) : "";
+      const when = day ? el("span", { class: "sub" }, el("span", { class: "phrase" }, day)) : g.done ? null : deadlineText(g);
+      list.append(el("div", { class: "goal" + (g.done ? " done" : g.pausedAt ? " paused" : "") },
         el("button", { type: "button", class: "goal-open", "data-goal": g.id, onclick: (ev) => openChart(g.id, ev.detail === 0) },
           el("span", { class: "goal-body" },
             el("span", { class: "row-between" },
@@ -2916,6 +2952,37 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
               els.length ? el("span", { class: "els" }, `要素 ${els.filter((x) => cellDone(x, depth - 1)).length}/${els.length}`) : null)),
           el("span", { class: "chev" }, icon("next", 16)))));
     }
+  }
+
+  // 次にやること (the user's call: the next thing to do was out of sight until a goal was opened): for each goal under way,
+  // its first action not done yet, under where it is (the goal's name cut short, as in the trail). Its check ticks it off
+  // right here, 元に戻す in the message, and the rest opens the chart at that action's level
+  function renderNextActions(active) {
+    const box = $("goalNext"), rows = [];
+    for (const g of active) {
+      const leaf = nextLeaf(g);
+      if (!leaf) continue;
+      const name = oneLine(leaf.cell.t), where = [g.title, ...leaf.path.slice(0, -1).map((_, i) => nodeAt(g, leaf.path.slice(0, i + 1))?.t)].map(oneLine);
+      rows.push(el("li", {},
+        el("button", { type: "button", class: "check", "aria-label": `「${name}」を達成にする`, onclick: () => checkLeaf(g.id, leaf.path) }, checkMark()),
+        el("button", { type: "button", class: "goal-next-open", "aria-label": `「${name}」をチャートで開く`, onclick: (ev) => openChart(g.id, ev.detail === 0, leaf.path.slice(0, -1)) },
+          el("span", { class: "body" }, el("span", { class: "text" }, name), el("span", { class: "sub" }, where.map((t, i) => (i < where.length - 1 ? clip(t, 10) : t)).join(" › "))),
+          el("span", { class: "chev" }, icon("next", 16)))));
+    }
+    box.hidden = !rows.length;
+    box.replaceChildren(...(rows.length ? [el("li", { class: "dayhead" }, el("span", {}, "次にやること")), ...rows] : []));
+  }
+  // an action checked from 次にやること, the goal's 達成 worked out again as in its chart
+  function checkLeaf(id, path) {
+    const g = goals.get(id), at = path.slice(0, -1), k = path[path.length - 1];
+    if (!g) return;
+    const chart = editChart(g), cell = slotsAt(chart, at)[k];
+    if (!cell?.t?.trim()) return;
+    cell.d = true;
+    saveChart(g, chart, { said: `「${oneLine(cell.t)}」を達成にしました`, undo: () => {
+      const x = goals.get(id), ch = x && editChart(x), c = ch && slotsAt(ch, at)[k];
+      if (c) { delete c.d; saveChart(x, ch); }
+    } });
   }
 
   // ---------- カレンダー ----------
@@ -3319,6 +3386,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let chartFromDay = false; // the chart was opened from a day's list (its goal falls due that day), which 戻る goes back to
   let mOverview = false; // the chart shows 全体, the whole of it at a glance, rather than the eight to write in
   let mWholeFrom = []; // the levels whose 全体 the cells walked into were opened from, so 戻る back to them shows 全体 again
+  let mSwap = null, holdTimer = null, holdFrom = null, swallowClick = false; // a cell picked up by 長押し, to swap with the next
   let chartDraft = null, composing = false, mDelTimer = null; // a cell's text not saved yet; a kana conversion under way
   let mEditGoal = null; // the goal whose name, 達成基準 and 期限 the fields under its chart were filled from
   // what the sheet holds, one view at a time: a new goal, a goal's chart, the settings, a new plan, an entry of a record
@@ -3348,7 +3416,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = [];
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   // a grey day of the month before or after opens its sheet too, without turning the month (the user's call)
@@ -3446,7 +3514,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // the ToDo and goal deadlines still to do, as items of 予定 (the calendar shows these too): { date, text, … }
   const dueItems = () => [
     ...todos.items.filter((t) => !t.done && t.due).map((t) => ({ date: t.due, text: t.text, chip: "ToDo", hue: "var(--c-todo)", sub: "ToDo の期限" })),
-    ...goals.items.filter((g) => !g.done && g.deadline).map((g) => ({ date: g.deadline, text: g.title, chip: "目標", hue: "var(--c-goal)", sub: "目標の期限" })),
+    ...goals.items.filter((g) => !g.done && !g.pausedAt && g.deadline).map((g) => ({ date: g.deadline, text: g.title, chip: "目標", hue: "var(--c-goal)", sub: "目標の期限" })),
   ];
   // anything after a day: a plan's turn (five years ahead) or a deadline, for もっと見る
   const anyAfter = (d) => dueItems().some((x) => x.date > d) || events.items.some((e) => turnStarts(e, addDays(d, 1), addDays(d, 1830)).some((s) => s > d));
@@ -3559,11 +3627,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     todoNew = true; syncSheetHead(); syncTodoSave();
     presentSheet(byKey, "todo", $("todoText"));
   }
-  // a goal's chart: from its row in the list, at the goal's own eight
-  function openChart(id, byKey) {
+  // a goal's chart: from its row in the list, at the goal's own eight; from 次にやること, at the level of its action (path)
+  function openChart(id, byKey, path = []) {
     if (sheetEl.open || !goals.get(id)) return;
     resetSheet();
-    mandalaGoal = chartReturnId = id;
+    mandalaGoal = chartReturnId = id; mPath = path;
     buildChart(); syncSheetHead();
     presentSheet(byKey, "chart");
   }
@@ -3622,6 +3690,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // out of it, otherwise out of the sheet
   sheetEl.addEventListener("cancel", (ev) => {
     ev.preventDefault();
+    if (mSwap !== null) { endSwap(); return; } // a cell picked up is put down first
     if (mandalaGoal && (mPath.length || chartFromDay)) chartBack(); else if (editingId || settingsFrom === "day") showDayView(); else if (planFromDay) backToDay(); else if (dayFromFind) backToFind(); else closeSheet();
   });
   // a tap on the dimmed page above the sheet puts it away
@@ -3671,6 +3740,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // the nine cells for the level walked into; paintChart fills them, and redraws them in place after each change so a
   // cell being typed in keeps its text, caret and keyboard
   function buildChart() {
+    mSwap = null; mGrid.classList.remove("swapping");
     mGrid.classList.toggle("whole", mOverview);
     if (mOverview) { paintChart(); return; } // 全体 is drawn whole each time (paintWhole)
     const word = CELL_WORDS[mPath.length];
@@ -3730,11 +3800,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // between (the user's call: it said the title again, in up to three lines); one line, ending in … if longer
     const above = mPath.map((_, i) => oneLine(nodeAt(g, mPath.slice(0, i))?.t));
     trail.textContent = above.map((t, i) => (i < above.length - 1 ? clip(t, 10) : t)).join(" › ");
-    $("mHint").textContent = mOverview
+    $("mHint").textContent = mSwap !== null ? "入れ替える先のマスを押してください。同じマスを押すとやめます。" : mOverview
       ? `チャート全体です。まわりのかたまりを押すと、その${CELL_WORDS[mPath.length]}の8マスに入って書けます。＋のかたまりからは、新しい${CELL_WORDS[mPath.length]}を書けます。`
       : left > 1
-        ? "まわりの8マスに書き出します。› でそのマスをさらに8つに分けられ、中が全部達成になるとそのマスも達成になります。"
-        : "まわりの8マスに書き出して、できたら ○ をタップして達成にします。";
+        ? "まわりの8マスに書き出します。› でそのマスをさらに8つに分けられ、中が全部達成になるとそのマスも達成になります。長押しで、ほかのマスと入れ替えられます。"
+        : "まわりの8マスに書き出して、できたら ○ をタップして達成にします。長押しで、ほかのマスと入れ替えられます。";
     $("mRoot").hidden = !!mPath.length;
     if (!mPath.length) {
       // a field being typed in keeps its text when the same goal is drawn again, but another goal always fills it: focus
@@ -3748,6 +3818,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       $("mAchieve").parentElement.hidden = g.done && hasEls && !g.doneByHand;
       $("mAchieve").textContent = g.done ? "達成を取り消す" : "この目標を達成にする";
       $("mAchieveFoot").hidden = g.done || !hasEls;
+      // 保留にする while under way, 保留をやめる while on hold; nothing once achieved
+      $("mPause").parentElement.hidden = $("mPauseFoot").hidden = !!g.done;
+      $("mPause").textContent = g.pausedAt ? "保留をやめる" : "この目標を保留にする";
+      $("mPauseFoot").textContent = g.pausedAt ? `${pausedText(g)}にしています。やめると、進行中に戻ります。` : "保留にした目標は一覧の「保留」にまとまり、期限切れにもなりません。";
       const note = $("mDeadlineNote");
       note.textContent = deadlineNote(g);
       note.classList.toggle("warn", !g.done && !!g.deadline && daysUntil(g.deadline) < 0);
@@ -3823,6 +3897,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     syncSheetHead(); // the bar's title is the goal's name
   }
   $("mEdit").addEventListener("change", saveGoalEdit);
+  // 保留 and back; 元に戻す in the message takes it back
+  $("mPause").addEventListener("click", () => {
+    commitChartText(); saveGoalEdit();
+    const g = goals.get(mandalaGoal);
+    if (!g || g.done) return;
+    const id = g.id, put = (at) => act(() => goals.update(id, { pausedAt: at }));
+    if (g.pausedAt) { put(null); return; }
+    flash(`「${oneLine(g.title)}」を保留にしました`, () => put(null));
+    put(Date.now());
+  });
   // 達成 by hand and back: with nothing written around the goal, its middle's own check; with something, a mark of its own
   // the cells can't take away. 元に戻す in the message takes it back
   $("mAchieve").addEventListener("click", () => {
@@ -3876,6 +3960,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const byCells = cellDone({ d: selfDone, c: chart }, depth), done = byHand || byCells;
     const patch = { mandala: chart, depth, done }, keep = byHand && !byCells && kidsOf({ c: chart }, depth).length > 0;
     if (keep || g.doneByHand) patch.doneByHand = keep;
+    if (done && g.pausedAt) patch.pausedAt = null; // achieved, it is on hold no more
     if (done && !g.done) { patch.doneAt = Date.now(); said = (said ? said + "。" : "") + `「${oneLine(g.title)}」を達成しました`; }
     if (said) flash(said, undo);
     act(() => goals.update(g.id, patch));
@@ -3989,6 +4074,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (/[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/\s*[\r\n]+\s*/g, " "); // pasted in on several lines
     const k = Number(ta.dataset.k);
     ta.nextElementSibling.textContent = ta.value; // as it will show once the typing is over
+    fitWriting(ta);
     if (chartDraft && chartDraft.k !== k) commitChartText();
     clearTimeout(chartDraft?.timer);
     const later = () => { if (composing) chartDraft.timer = setTimeout(later, 400); else commitChartText(); };
@@ -4006,11 +4092,72 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const next = [...all.slice(i + 1), ...all.slice(0, i)].find((x) => !x.value.trim());
     if (next) next.focus(); else ta.blur();
   });
-  // a tap anywhere on a cell, its foot too, starts writing in it (on an empty one, where the ＋ is)
+  // a tap anywhere on a cell, its foot too, starts writing in it, after its text (on an empty one, where the ＋ is): the
+  // textarea takes no taps until then, so a cell can be held down without picking text. With a cell picked up, the tap
+  // swaps it with this one, or, on the same one or off the eight, puts it down
   mGrid.addEventListener("click", (ev) => {
+    if (swallowClick) { swallowClick = false; return; } // the end of the 長押し that picked a cell up
     const box = ev.target.closest(".m-cell[data-k]");
-    if (box && !ev.target.closest("button, textarea")) box.querySelector("textarea")?.focus();
+    if (mSwap !== null) {
+      const k = box ? Number(box.dataset.k) : null;
+      if (k !== null && k !== mSwap) swapCells(mSwap, k);
+      endSwap();
+      return;
+    }
+    if (box && !ev.target.closest("button, textarea")) { const ta = box.querySelector("textarea"); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   });
+  // the cell being written in grows to show all its text (the user's call: a long one showed only in part), back to a
+  // square once it is left
+  function fitWriting(ta) { ta.style.minHeight = ""; ta.style.minHeight = ta.scrollHeight + "px"; }
+  mGrid.addEventListener("focusin", (ev) => { if (ev.target.matches?.(".m-cell textarea")) fitWriting(ev.target); });
+  mGrid.addEventListener("focusout", (ev) => { if (ev.target.matches?.(".m-cell textarea")) ev.target.style.minHeight = ""; });
+  // 長押し (the user's call: cells couldn't be moved): a cell held down for half a second is picked up, and the next one
+  // pressed swaps places with it, all that is in each going along (an empty one takes the other's place); 元に戻す in the
+  // message swaps them back. Moving the finger, or holding the cell being written in, picks nothing up
+  mGrid.addEventListener("pointerdown", (ev) => {
+    swallowClick = false;
+    const box = ev.target.closest(".m-cell[data-k]");
+    if (!box || mOverview || mSwap !== null || ev.button !== 0 || ev.target.closest("button") || box.contains(document.activeElement)) return;
+    clearTimeout(holdTimer);
+    holdFrom = { x: ev.clientX, y: ev.clientY };
+    holdTimer = setTimeout(() => { holdTimer = null; swallowClick = true; pickCell(Number(box.dataset.k)); }, 500);
+  });
+  mGrid.addEventListener("pointermove", (ev) => {
+    if (holdTimer && Math.hypot(ev.clientX - holdFrom.x, ev.clientY - holdFrom.y) > 10) { clearTimeout(holdTimer); holdTimer = null; }
+  });
+  for (const type of ["pointerup", "pointercancel", "pointerleave"]) mGrid.addEventListener(type, () => { clearTimeout(holdTimer); holdTimer = null; });
+  mGrid.addEventListener("contextmenu", (ev) => { if (ev.target.closest(".m-cell[data-k]")) ev.preventDefault(); });
+  function pickCell(k) {
+    commitChartText();
+    mSwap = k;
+    navigator.vibrate?.(15);
+    mGrid.classList.add("swapping");
+    mGrid.querySelector(`.m-cell[data-k="${k}"]`)?.classList.add("picked");
+    paintChart(); // the hint says what to do
+  }
+  function endSwap() {
+    if (mSwap === null) return;
+    mSwap = null;
+    mGrid.classList.remove("swapping");
+    for (const c of mGrid.querySelectorAll(".m-cell.picked")) c.classList.remove("picked");
+    paintChart();
+  }
+  function swapCells(a, b) {
+    const g = goals.get(mandalaGoal);
+    if (!g) return;
+    const id = g.id, at = [...mPath];
+    const swapped = () => {
+      const x = goals.get(id), chart = x && editChart(x);
+      if (!chart) return null;
+      const slots = slotsAt(chart, at);
+      [slots[a], slots[b]] = [slots[b] || null, slots[a] || null];
+      return { x, chart, slots };
+    };
+    const r = swapped(), one = r && oneLine(r.slots[b]?.t), other = r && oneLine(r.slots[a]?.t);
+    if (!r || (!one && !other)) return;
+    saveChart(r.x, r.chart, { said: one && other ? `「${one}」と「${other}」を入れ替えました` : `「${one || other}」を移しました`,
+      undo: () => { const u = swapped(); if (u) saveChart(u.x, u.chart); } });
+  }
   mGrid.addEventListener("compositionstart", () => { composing = true; });
   mGrid.addEventListener("compositionend", () => { composing = false; });
   for (const r of document.querySelectorAll('input[name="chartSplit"]')) r.addEventListener("change", () => {
@@ -4477,7 +4624,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const evs = turnsBy.get(d) || [], laneCount = lanesAt.get(d) || 0;
       const own = evs.filter((t) => !drawn.has(w + "|" + t.e.id + "|" + t.start)); // the ones not drawn as a run's bar
       const todosDue = (todoBy.get(d) || []).filter((t) => !t.done);
-      const goalsDue = (goalBy.get(d) || []).filter((g) => !g.done);
+      const goalsDue = (goalBy.get(d) || []).filter((g) => !g.done && !g.pausedAt);
       // the day's plans as bars: events by time in their label's colour, then ToDo and goal deadlines; the day's name lists the labels too
       const plans = [
         ...own.map(({ e }) => ({ text: e.title, hue: labelHue(labelOf(e)), plain: !labelOf(e) })),
@@ -4529,9 +4676,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     // a goal falling due opens its chart right here, as an event opens its form
     for (const g of goalsDue) {
-      list.append(el("li", { class: "btn-row" + (g.done ? " done" : "") },
-        el("button", { type: "button", class: "row-btn nav", "aria-label": `「${g.title}」のマンダラチャートを開く（目標の期限${g.done ? "・達成" : ""}）`, onclick: () => openChartFromDay(g.id) },
-          el("span", { class: "chip", style: "--chip-c: var(--c-goal)" }, g.done ? "達成" : "目標"),
+      const state = g.done ? "達成" : g.pausedAt ? "保留" : "";
+      list.append(el("li", { class: "btn-row" + (state ? " done" : "") },
+        el("button", { type: "button", class: "row-btn nav", "aria-label": `「${g.title}」のマンダラチャートを開く（目標の期限${state ? "・" + state : ""}）`, onclick: () => openChartFromDay(g.id) },
+          el("span", { class: "chip", style: "--chip-c: var(--c-goal)" }, state || "目標"),
           el("span", { class: "body" }, el("span", { class: "text" }, g.title), el("span", { class: "sub" }, "目標の期限")),
           el("span", { class: "chev" }, icon("next", 16)))));
     }
@@ -4669,7 +4817,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const budget = monthlyBudget();
     const todayOut = sum(mon.outs.filter((e) => e.date === todayKey), (e) => e.amount);
     // the goal due soonest; one made before 期限 was needed may have none, so those come last
-    const active = goals.items.filter((g) => !g.done);
+    const active = goals.items.filter((g) => !g.done && !g.pausedAt), onHold = goals.items.some((g) => !g.done && g.pausedAt);
     const nearest = [...active].sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999"))[0];
     const left = nearest?.deadline ? daysUntil(nearest.deadline) : null;
     const evToday = turnsByDay(todayKey, todayKey).get(todayKey) || [];
@@ -4702,7 +4850,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         "今月の支出・" + (budget > 0 ? (budget - mon.out >= 0 ? `予算の残り ${fmtYen(budget - mon.out)}` : `予算を ${fmtYen(mon.out - budget)} 超過`) : `収入 ${fmtYen(mon.inn)}`) + `・きょう ${fmtYen(todayOut)}`),
       // 目標: no counts, as on its page (the user's call); the goal due soonest and the days left to it
       tile("goal",
-        !nearest ? (goals.items.length ? "すべて達成" : "まだ") : left === null ? "期限なし" : left < 0 ? "期限切れ" : left === 0 ? "きょう" : String(left),
+        !nearest ? (onHold ? "保留中" : goals.items.length ? "すべて達成" : "まだ") : left === null ? "期限なし" : left < 0 ? "期限切れ" : left === 0 ? "きょう" : String(left),
         left > 0 ? "日" : null,
         !nearest ? (goals.items.length ? "新しい目標を立ててみましょう。" : "目標を立ててみましょう。")
           : `「${nearest.title}」` + (left > 0 ? "の期限まで" : left === 0 ? "の期限です" : "")),
