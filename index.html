@@ -809,6 +809,20 @@ li.done .text { color: var(--muted); }  /* done: grey, not struck through (the u
 /* a web address in it opens that page, above the row's tap that opens the ToDo; underlined, so it reads as a link, not
    just green text */
 #todoList .ev-memo a { position: relative; z-index: 1; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+/* a ToDo's row swiped left (todoSwipe): what it holds slides aside and あした and 来週 show behind it at its end, as
+   iOS lists show a row's actions; the buttons widen with the swipe. Only a row being swiped or left open moves (a
+   transform at rest would take the name's tap area off the row) */
+#todoList > li { touch-action: pan-y pinch-zoom; }
+#todoList > li.swiping { overflow: clip; }
+#todoList > li.swiping > :not(.swipe-acts) { transform: translateX(var(--sx, 0px)); }
+#todoList > li.swipe-anim > :not(.swipe-acts) { transition: transform .22s ease-out; }
+.swipe-acts { position: absolute; top: 0; right: 0; bottom: 0; z-index: 2; display: flex; width: calc(-1 * var(--sx, 0px)); overflow: hidden; }
+#todoList > li:not(.swiping) > .swipe-acts { display: none; }
+#todoList > li.swipe-anim > .swipe-acts { transition: width .22s ease-out; }
+.swipe-act { flex: 1 1 0; min-width: 0; padding: 0; border: 0; color: #ffffff; font: inherit; font-size: var(--t-foot); font-weight: 600; white-space: nowrap; overflow: hidden; cursor: pointer; }
+.swipe-act.day1 { background: var(--f-todo); }
+.swipe-act.day7 { background: var(--f-weight); }
+@media (prefers-reduced-motion: reduce) { #todoList > li.swipe-anim > * { transition: none; } }
 /* the words looked for, lit where they are in the names and memos found (lightWords), as iOS lights what it finds */
 ::highlight(todo-hit) { background-color: rgba(255, 204, 0, .42); color: var(--fg); }
 /* one reached from the keyboard: the memo shows whole while it has the focus, or its two lines would be scrolled to it,
@@ -2513,6 +2527,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!$("clearDone").classList.contains("armed")) $("clearDone").textContent = clearDoneLabel();
     const list = $("todoList");
     const focused = listFocus(list); // keyboard focus in the list, put back once it is drawn again (refocus)
+    rowOpen = null; rowSwipe = null; // its rows are new: none swiped open
     list.replaceChildren();
     if (!shown.length) {
       list.append(el("li", { class: "empty", tabindex: -1 }, words.length ? `「${todoQuery.trim()}」に合うToDoはありません。` : items.length
@@ -2565,7 +2580,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             : [dueText(todoPlaced(t), section === "きょう"), t.memo ? el("span", { class: "sub ev-memo" + (words.length ? "" : " clamp") }, linkedText(t.memo)) : null]),
         n > 1 ? delButton(() => removeWithUndo(todos, turns.map((x) => x.id), `「${t.text}」の完了を ${n} 件削除しました`), "削除", `${t.text}（完了 ${n} 件）`)
           : t.repeat && t.due && !t.done ? delButton(() => skipTurn(t), "削除", `${t.text}（この回）`, "この回を削除")
-          : delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
+          : delButton(() => removeWithUndo(todos, t.id), "削除", t.text),
+        // behind it, for a swipe (todoSwipe): out of reach (inert) until the row is open
+        t.done ? null : el("span", { class: "swipe-acts", inert: true },
+          el("button", { type: "button", class: "swipe-act day1", "aria-label": `「${t.text}」をあしたに移す`, onclick: () => putOff(t, 1) }, "あした"),
+          el("button", { type: "button", class: "swipe-act day7", "aria-label": `「${t.text}」を来週に移す`, onclick: () => putOff(t, 7) }, "来週"))
       ));
     }
     if (more.length) list.append(el("li", { class: "more-done" }, el("button", { type: "button", class: "link-btn", onclick: (ev) => showAllDone(ev.detail === 0) },
@@ -2626,6 +2645,90 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("todoSearch").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing) ev.target.blur(); }); // 検索 puts the keyboard away
   $("todoSearchClear").addEventListener("pointerdown", (ev) => ev.preventDefault());
   $("todoSearchClear").addEventListener("click", () => { todoQuery = ""; $("todoSearch").value = ""; renderTodos(); $("todoSearch").focus(); });
+  // ---------- a ToDo's row swiped left: あした, 来週 ----------
+  // a row still to do, swiped left, opens on あした and 来週 at its end, as iOS lists open on a row's actions (the user's
+  // call: putting one ToDo off took opening it, picking the day and 保存). A tap on one moves its 期限 there, with
+  // 元に戻す. One row is open at a time; a tap anywhere else or a scroll closes it, and the tap that closes it does nothing
+  // more. By touch only: from a keyboard or VoiceOver, which can't swipe, its sheet does the same
+  const SWIPE_W = 144; // the two buttons open
+  let rowSwipe = null, rowOpen = null, rowTapGone = -1; // the swipe going on, the row left open, when a gesture was used up
+  const rowX = (li, x) => li.style.setProperty("--sx", `${x}px`);
+  function openRow(li) {
+    li.classList.add("swiping", "swipe-anim"); rowX(li, -SWIPE_W);
+    li.querySelector(".swipe-acts").inert = false;
+    rowOpen = li;
+  }
+  function closeRow(li = rowOpen) {
+    if (!li) return;
+    if (li === rowOpen) rowOpen = null;
+    li.querySelector(".swipe-acts").inert = true;
+    const rest = () => { if (rowOpen !== li && rowSwipe?.li !== li) { li.classList.remove("swiping", "swipe-anim"); li.style.removeProperty("--sx"); } };
+    if (reduceMotion.matches || !li.isConnected) { rest(); return; }
+    li.classList.add("swipe-anim"); rowX(li, 0);
+    setTimeout(rest, 240); // a timer, not transitionend, which doesn't come while the page isn't drawn
+  }
+  const todoListEl = $("todoList");
+  todoListEl.addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType === "mouse" || !ev.isPrimary) return;
+    const li = ev.target.closest("#todoList > li");
+    if (!li?.querySelector(".swipe-acts")) return;
+    // one begun on its buttons moves the row too; a tap there is the button's
+    rowSwipe = { li, id: ev.pointerId, x: ev.clientX, y: ev.clientY, t: ev.timeStamp, from: li === rowOpen ? -SWIPE_W : 0, at: li === rowOpen ? -SWIPE_W : 0, on: false, onActs: !!ev.target.closest(".swipe-acts") };
+  });
+  todoListEl.addEventListener("pointermove", (ev) => {
+    const sw = rowSwipe;
+    if (!sw || ev.pointerId !== sw.id) return;
+    const dx = ev.clientX - sw.x, dy = ev.clientY - sw.y;
+    if (!sw.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { rowSwipe = null; return; } // a scroll, not a swipe
+      if (Math.abs(dx) < 10) return;
+      sw.on = true;
+      if (rowOpen && rowOpen !== sw.li) closeRow();
+      try { sw.li.setPointerCapture(ev.pointerId); } catch {}
+      sw.li.classList.add("swiping"); sw.li.classList.remove("swipe-anim");
+    }
+    const x = Math.min(0, sw.from + dx);
+    sw.at = x < -SWIPE_W ? -SWIPE_W + (x + SWIPE_W) / 3 : x; // past its buttons it gives, as iOS rows do
+    rowX(sw.li, sw.at);
+  });
+  function endRowSwipe(ev) {
+    const sw = rowSwipe;
+    if (!sw || ev.pointerId !== sw.id) return;
+    rowSwipe = null;
+    if (!sw.on) { if (sw.li === rowOpen && ev.type === "pointerup" && !sw.onActs) { closeRow(); rowTapGone = ev.timeStamp; } return; } // a tap on the open row closes it
+    rowTapGone = ev.timeStamp; // the click a swipe ends with does nothing
+    // open past half its buttons, or flicked left; closed otherwise, and by a pointercancel
+    const flick = (sw.at - sw.from) / Math.max(1, ev.timeStamp - sw.t);
+    if (ev.type !== "pointercancel" && (sw.at < -SWIPE_W / 2 || (flick < -0.4 && sw.at < -24))) openRow(sw.li);
+    else { if (rowOpen === sw.li) rowOpen = null; closeRow(sw.li); }
+  }
+  todoListEl.addEventListener("pointerup", endRowSwipe);
+  todoListEl.addEventListener("pointercancel", endRowSwipe);
+  // a tap while a row is open closes it: one outside it here, one on it at its end (a swipe on it moves it from open).
+  // Each touch starts afresh: only the gesture that closed a row, or swiped one, has its click come to nothing
+  document.addEventListener("pointerdown", (ev) => {
+    rowTapGone = -1;
+    if (!rowOpen || rowOpen.contains(ev.target)) return;
+    closeRow();
+    rowTapGone = ev.timeStamp;
+  }, true);
+  // that click does nothing in the list (not the row's sheet, a check or ×)
+  document.addEventListener("click", (ev) => {
+    const gone = rowTapGone >= 0 && ev.timeStamp - rowTapGone <= 1500 && todoListEl.contains(ev.target);
+    rowTapGone = -1;
+    if (gone) { ev.preventDefault(); ev.stopPropagation(); }
+  }, true);
+  window.addEventListener("scroll", () => { if (rowOpen && !rowSwipe?.on) closeRow(); }, { passive: true });
+  // あした or 来週 (a week on, as under a 期限): the 期限 moved there; a repeat keeps the day its turns count from
+  // (repeatFrom), as for きょうに移す, so its turns after stay on their days
+  function putOff(t, days) {
+    const x = todos.get(t.id);
+    if (!x || x.done) return;
+    const due = addDays(todayKey, days), was = { due: x.due, repeatFrom: x.repeatFrom };
+    closeRow();
+    act(() => todos.update(x.id, { due, ...(x.repeat && x.due ? { repeatFrom: repeatBase(x) } : {}) }));
+    flash(`「${x.text}」を${fmtDay(due)}に移しました`, () => act(() => todos.update(x.id, was)));
+  }
   // the rest of 完了: the bar's 完了, from the top of the list
   function showAllDone(byKey) {
     setTodoFilter("done");
