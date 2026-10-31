@@ -1274,6 +1274,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <div class="card import-ask" id="importAsk" hidden>
           <strong>記録を読み込みますか？</strong>
           <span class="nudge-text" id="importAskText"></span>
+          <label class="check-line" id="importAskDeadRow" hidden><input type="checkbox" id="importAskDead"><span id="importAskDeadText"></span></label>
           <div class="notice-actions">
             <button type="button" class="btn sm" id="importGo" aria-describedby="importAskText">読み込む</button>
             <button type="button" class="link-btn" id="importCancel">やめる</button>
@@ -1313,6 +1314,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <strong>このコピーから戻しますか？</strong>
           <span class="nudge-text" id="copyAskText"></span>
           <label class="check-line" id="copyAskDeadRow" hidden><input type="checkbox" id="copyAskDead"><span id="copyAskDeadText"></span></label>
+          <label class="check-line" id="copyAskDiffRow" hidden><input type="checkbox" id="copyAskDiff"><span id="copyAskDiffText"></span></label>
           <div class="notice-actions">
             <button type="button" class="btn sm" id="copyGo">戻す</button>
             <button type="button" class="link-btn" id="copyCancel">やめる</button>
@@ -1392,7 +1394,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             <div class="ffield"><input type="number" id="woSets" min="1" max="99" inputmode="numeric" required><span class="unit">セット</span></div>
           </div>
           <label class="flabel" for="woNote">メモ <span class="opt">任意</span></label>
-          <div class="ffield"><input type="text" id="woNote" maxlength="200"></div>
+          <div class="ffield"><input type="text" id="woNote" maxlength="1000"></div>
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <ul class="list card" id="workoutList"></ul>
@@ -1412,7 +1414,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <label class="flabel" for="stMin">時間<span class="sr-only">（分）</span></label>
           <div class="ffield"><input type="number" id="stMin" placeholder="30" min="1" max="1440" inputmode="numeric" required><span class="unit">分</span></div>
           <label class="flabel" for="stNote">メモ <span class="opt">任意</span></label>
-          <div class="ffield"><input type="text" id="stNote" maxlength="200"></div>
+          <div class="ffield"><input type="text" id="stNote" maxlength="1000"></div>
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <ul class="list card" id="studyList"></ul>
@@ -1499,7 +1501,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <div class="ffield"><select id="exCat"></select></div>
           <label class="flabel" for="exDate">日付</label>
           <div class="ffield"><input type="date" id="exDate" required></div>
-          <input type="text" id="exMemo" class="full" placeholder="メモ" aria-label="メモ" maxlength="200">
+          <input type="text" id="exMemo" class="full" placeholder="メモ" aria-label="メモ" maxlength="1000">
           <div class="actions"><button class="btn" type="submit"><svg class="icon" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>追加</button></div>
         </form>
         <div class="card" id="catCard">
@@ -1592,7 +1594,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
         <span class="flabel" id="edLabelLabel">ラベル</span>
         <div class="ffield" id="edLabels"></div>
-        <input type="text" id="edMemo" class="full" placeholder="メモ" aria-label="メモ" maxlength="200">
+        <input type="text" id="edMemo" class="full" placeholder="メモ" aria-label="メモ" maxlength="1000">
       </form>
       <div class="card"><button type="button" class="link-btn sheet-row" id="edCopy">この予定を複製</button></div>
       <div class="card"><button type="button" class="link-btn danger sheet-del" id="edDelete">この予定を削除</button></div>
@@ -1658,7 +1660,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
         <span class="flabel" id="planLabelLabel">ラベル</span>
         <div class="ffield" id="planLabels"></div>
-        <input type="text" id="planMemo" class="full" placeholder="メモ" aria-label="メモ" maxlength="200">
+        <input type="text" id="planMemo" class="full" placeholder="メモ" aria-label="メモ" maxlength="1000">
       </form>
     </div>
     <!-- 予定, from the magnifier on the month bar: a field to look for plans by their name or memo; empty, the next
@@ -1715,7 +1717,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <form class="add" id="goalForm" autocomplete="off">
         <textarea id="goalTitle" class="full grow" rows="1" placeholder="新たな目標" aria-label="新たな目標" maxlength="200" required></textarea>
         <label class="flabel" for="goalCriterion">達成基準</label>
-        <div class="ffield"><textarea id="goalCriterion" class="grow" rows="1" maxlength="40" required></textarea></div>
+        <div class="ffield"><textarea id="goalCriterion" class="grow" rows="1" maxlength="100" required></textarea></div>
         <label class="flabel" for="goalDeadline">期限</label>
         <div class="ffield"><input type="date" id="goalDeadline" required></div>
         <span class="flabel" id="goalSplitLabel">分割</span>
@@ -1753,7 +1755,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <form class="add" id="mEdit" autocomplete="off">
           <textarea id="mTitle" class="full grow" rows="1" aria-label="目標の名前" maxlength="200" enterkeyhint="done" required></textarea>
           <label class="flabel" for="mCriterion">達成基準</label>
-          <div class="ffield"><textarea id="mCriterion" class="grow" rows="1" maxlength="40" enterkeyhint="done" required></textarea></div>
+          <div class="ffield"><textarea id="mCriterion" class="grow" rows="1" maxlength="100" enterkeyhint="done" required></textarea></div>
           <label class="flabel" for="mDeadline">期限</label>
           <div class="ffield"><input type="date" id="mDeadline" required></div>
           <span class="sub field-note" id="mDeadlineNote"></span>
@@ -1920,7 +1922,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
   })();
   class Store {
-    constructor(name) { this.name = name; this.unsaved = false; this.items = this.loadLocal(); }
+    constructor(name) {
+      this.name = name; this.unsaved = false;
+      // a kind moved to the bigger storage is read from there as the app starts (loadBig), before anything is drawn;
+      // until then nothing is saved over it
+      this.big = isBig(name); this.loaded = !this.big;
+      this.items = this.big ? [] : this.loadLocal();
+    }
     // text that can't be read back (cut short, or not a list) is kept aside under a key of its own instead of being saved
     // over, and the store starts empty: the check against the daily copies (checkRestore) then offers its records back
     loadLocal() {
@@ -1936,10 +1944,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // a save the browser won't take (full) leaves the records here in the page, marked unsaved: the note at the top says
     // so, today's copy takes them in (keepUnsaved), and the next save that goes through brings them along (retryUnsaved)
     saveLocal() {
+      if (this.big) {
+        if (this.loaded) { saveBig(this); return true; }
+        this.unsaved = true; saveFails++; showError(); renderSaveNote(); // never read in: not saved over
+        return false;
+      }
       try { localStorage.setItem(LS_PREFIX + this.name, JSON.stringify(this.items)); }
       catch {
         if (!canStoreLocal) return false;
-        this.unsaved = true;
+        // no room left: this kind moves to the bigger storage, once it is written there (flushBig)
+        if (window.indexedDB) { saveBig(this); return true; }
+        this.unsaved = true; saveFails++;
         showError(); renderSaveNote(); keepUnsaved();
         return false;
       }
@@ -1953,6 +1968,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const i = this.items.findIndex((x) => x.id === id);
       if (i >= 0) this.items[i] = { id, ...data }; else this.items.push({ id, ...data });
       undelete(this, id);
+      this.saveLocal(); renderAll();
+    }
+    // a day's own record written (日記, 体重): one deleted from the same day before isn't brought back by it, and stays in
+    // 最近削除した項目 (setAside)
+    async write(id, data) {
+      const i = this.items.findIndex((x) => x.id === id);
+      if (i >= 0) this.items[i] = { id, ...data }; else { this.items.push({ id, ...data }); setAside(this, id); }
       this.saveLocal(); renderAll();
     }
     async update(id, patch) {
@@ -1985,6 +2007,74 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     get(id) { return this.items.find((x) => x.id === id); }
   }
+  // ---------- the bigger storage (IndexedDB), for a kind of record that no longer fits ----------
+  // the browser's own storage holds about 5 MB. A save it refuses for want of room moves that kind of record to IndexedDB,
+  // which holds far more, for good (the user's call: once full, nothing could be saved any more): its key in localStorage
+  // goes, making room for the rest, and a small mark (big:<kind>) says where it lives now
+  const BIG_DB = "tsumikasane-records";
+  const bigMark = (name) => LS_PREFIX + "big:" + name;
+  function isBig(name) { try { return !!localStorage.getItem(bigMark(name)); } catch { return false; } }
+  let bigDb = null;
+  function openBig() {
+    if (bigDb) return Promise.resolve(bigDb);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(BIG_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("stores", { keyPath: "name" });
+      req.onsuccess = () => { bigDb = req.result; bigDb.onversionchange = () => { bigDb.close(); bigDb = null; }; resolve(bigDb); };
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => reject(new Error("blocked"));
+    });
+  }
+  // the kinds to write, each as it is when its turn comes; written at once (a microtask later, so the saves of one action
+  // go together), as a page going away may be stopped soon after
+  const bigPending = new Set();
+  let bigQueued = false;
+  function saveBig(st) {
+    bigPending.add(st);
+    if (!bigQueued) { bigQueued = true; queueMicrotask(flushBig); }
+  }
+  async function flushBig() {
+    bigQueued = false;
+    const list = [...bigPending];
+    bigPending.clear();
+    if (!list.length) return;
+    try {
+      const db = await openBig();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("stores", "readwrite"), os = tx.objectStore("stores");
+        for (const st of list) os.put({ name: st.name, savedAt: Date.now(), items: st.items });
+        tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+      });
+      for (const st of list) {
+        // a kind written there for the first time lives there from now on: its old key goes, then its mark
+        if (!st.big) { st.big = true; try { localStorage.removeItem(LS_PREFIX + st.name); localStorage.setItem(bigMark(st.name), "1"); } catch {} saveBig(st); } // and once more, as it is now
+        st.unsaved = false;
+      }
+      storageFull = false;
+      renderSaveNote();
+    } catch {
+      for (const st of list) st.unsaved = true;
+      saveFails++; showError(); renderSaveNote(); keepUnsaved();
+    }
+  }
+  // the kinds living there, read in as the app starts. One that can't be read is left as it is there (nothing is saved
+  // over it) and the note at the top says records can't be saved
+  async function loadBig() {
+    const want = ALL_STORES.filter((s) => s.big);
+    if (!want.length) return;
+    try {
+      const db = await Promise.race([openBig(), new Promise((_, reject) => setTimeout(() => reject(new Error("slow")), 4000))]);
+      const rows = await new Promise((resolve, reject) => {
+        const r = db.transaction("stores").objectStore("stores").getAll();
+        r.onsuccess = () => resolve(r.result || []); r.onerror = () => reject(r.error);
+      });
+      for (const s of want) {
+        const row = rows.find((x) => x.name === s.name);
+        s.items = Array.isArray(row?.items) ? row.items.filter((x) => x && typeof x === "object") : [];
+        s.loaded = true;
+      }
+    } catch { for (const s of want) if (!s.loaded) s.unsaved = true; }
+  }
   const todos = new Store("todos");
   const journal = new Store("journal");
   const meals = new Store("meals");
@@ -2016,9 +2106,43 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const at = Date.now();
     for (const x of records) {
       const key = delKey(st, x.id), data = JSON.parse(JSON.stringify(x)), had = deleted.get(key);
-      if (had) Object.assign(had, { at, data }); else deleted.items.push({ id: key, store: st.name, rid: x.id, at, data });
+      if (had?.data) apart(had); // one deleted from the same id before stays too (a day's 日記 deleted twice)
+      if (had && !had.data) Object.assign(had, { at, data }); else deleted.items.push({ id: key, store: st.name, rid: x.id, at, data });
     }
     deleted.saveLocal();
+  }
+  // a deleted one kept apart from its id, which is in use again: under store/id#when it stays in 最近削除した項目 for its
+  // 30 days, without counting the id as deleted (a file or copy read in doesn't take it for one)
+  function apart(t) { let k = `${t.id}#${t.at}`; while (deleted.get(k)) k += "+"; t.id = k; }
+  // an id in use again (a day written anew): the deletion remembered for it goes, and what the deleted one held stays in
+  // 最近削除した項目, apart from it (the user's call: writing the day's 日記 again took the deleted one out for good)
+  function setAside(st, id) {
+    const t = remembers(st) && deleted.get(delKey(st, id));
+    if (!t) return;
+    if (t.data) apart(t); else deleted.items = deleted.items.filter((x) => x !== t);
+    deleted.saveLocal();
+  }
+  // records set aside while their ids stay in use (swapped for one from 最近削除した項目 or from a copy): what each held
+  // goes to 最近削除した項目, apart from its id
+  function keepInTrash(st, records) {
+    if (!remembers(st) || !records.length) return;
+    const at = Date.now();
+    for (const x of records) { const t = { id: delKey(st, x.id), store: st.name, rid: x.id, at, data: JSON.parse(JSON.stringify(x)) }; apart(t); deleted.items.push(t); }
+    deleted.saveLocal();
+  }
+  // records just added, taken back (元に戻す, a check taken back): gone as if never added. Their ids are remembered as
+  // deleted, without what they held (so not in 最近削除した項目), so a copy made meanwhile neither says they are missing
+  // nor brings them back (the user's call: a ToDo taken back showed as 見当たらない the next time the app opened)
+  function takeBack(st, ids) {
+    const gone = new Set(ids);
+    st.items = st.items.filter((x) => !gone.has(x.id));
+    if (remembers(st)) {
+      const at = Date.now();
+      for (const id of ids) if (!deleted.get(delKey(st, id))) deleted.items.push({ id: delKey(st, id), store: st.name, rid: id, at });
+      deleted.saveLocal();
+    }
+    st.saveLocal();
+    renderAll();
   }
   // after 30 days only the id stays (so nothing older brings the record back), not what it held
   const TRASH_DAYS = 30;
@@ -2026,6 +2150,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const old = Date.now() - TRASH_DAYS * 864e5;
     let changed = false;
     for (const t of deleted.items) if (t.data && !(t.at > old)) { delete t.data; changed = true; }
+    // one kept apart from its id is nothing more once what it held goes
+    const left = deleted.items.filter((t) => t.data || !t.id.includes("#"));
+    if (left.length !== deleted.items.length) { deleted.items = left; changed = true; }
     if (changed) deleted.saveLocal();
   }
   function undelete(st, ...ids) {
@@ -2047,11 +2174,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // ---------- 保存できないとき ----------
   // the note at the top while records can't be saved: from the start when the probe found storage full, and after a save
   // the browser wouldn't take, until one goes through again
-  function renderSaveNote() { $("fullNote").hidden = !(storageFull || ALL_STORES.some((x) => x.unsaved)); }
+  // (a full localStorage alone doesn't stop saving where the bigger storage can take the records)
+  function renderSaveNote() { $("fullNote").hidden = !((storageFull && !window.indexedDB) || ALL_STORES.some((x) => x.unsaved)); }
   // the kinds a save didn't reach, tried again (room was made); true when nothing is left unsaved
   function retryUnsaved() {
     for (const st of ALL_STORES) {
       if (!st.unsaved) continue;
+      if (st.big) { if (st.loaded) saveBig(st); continue; }
       try { localStorage.setItem(LS_PREFIX + st.name, JSON.stringify(st.items)); st.unsaved = false; } catch {}
     }
     if (storageFull) { try { localStorage.setItem(LS_PREFIX + "probe", "1"); localStorage.removeItem(LS_PREFIX + "probe"); storageFull = false; } catch {} }
@@ -2103,6 +2232,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     statusTimer = setTimeout(() => { t.classList.remove("show"); flashed = null; }, ms);
   }
   function showError() { flash("保存できませんでした。端末の空き容量が足りているか確かめてください。"); }
+  // a field's most letters (maxlength): a paste cut short there, or typing stopped at it, says so instead of keeping quiet
+  // (the user's call: a long memo pasted in lost its end without a word)
+  const lenOf = (f) => (f instanceof HTMLInputElement || f instanceof HTMLTextAreaElement) && f.maxLength > 0 ? f.maxLength : 0;
+  document.addEventListener("paste", (ev) => {
+    const f = ev.target, max = lenOf(f);
+    if (!max) return;
+    const text = ev.clipboardData?.getData("text") || "", room = max - f.value.length + Math.abs((f.selectionEnd ?? 0) - (f.selectionStart ?? 0));
+    if (text.length > room) flash(`ここは ${max.toLocaleString("ja-JP")} 字までなので、あとの ${(text.length - room).toLocaleString("ja-JP")} 字は入りませんでした`);
+  }, true);
+  document.addEventListener("input", (ev) => {
+    const f = ev.target, max = lenOf(f);
+    if (max && f.value.length >= max && ev.inputType?.startsWith("insert") && ev.inputType !== "insertFromPaste") flash(`ここは ${max.toLocaleString("ja-JP")} 字までです`);
+  }, true);
   // the keyboard up (iPhone) covers the foot of the screen, where messages show: how far up it reaches, from the visual
   // viewport, so a message can sit just above it (html.kb, --kb). A page zoomed in has no keyboard to keep clear of
   const visual = window.visualViewport;
@@ -2113,7 +2255,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   visual?.addEventListener("resize", syncKeyboard);
   visual?.addEventListener("scroll", syncKeyboard);
-  async function act(fn) { try { await fn(); } catch { showError(); } }
+  let saveFails = 0; // saves the browser refused (saveLocal counts them), so act can tell one happened while it ran
+  // an action whose save the browser refused ends on saying so, over the 「追加しました」 or 「保存しました」 it may have
+  // shown meanwhile (the user's call: those were said of records that weren't kept)
+  async function act(fn) {
+    const fails = saveFails;
+    try { await fn(); } catch { showError(); return; }
+    if (saveFails > fails) showError();
+  }
   // a page drawn on its own: one that fails on a record it can't show leaves the others drawn (and the records as they
   // are), and says so once
   let drawFailed = false;
@@ -2372,7 +2521,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(async () => {
       const now = Date.now(), ids = await todos.addMany(lines.map((text, i) => ({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(repeatDays ? { repeatDays } : {}), ...(memo ? { memo } : {}), ...(flag ? { flag: true } : {}), createdAt: now + i })));
       todoNewIds.push(...ids); // lit in the list as the sheet goes down
-      flash(ids.length > 1 ? `ToDoを ${ids.length} 件追加しました` : `「${lines[0]}」を追加しました`, () => unmerge([[todos, ids]]));
+      flash(ids.length > 1 ? `ToDoを ${ids.length} 件追加しました` : `「${lines[0]}」を追加しました`, () => takeBack(todos, ids));
     });
     // the sheet stays, empty, with the typing ready for the next one (the user's call: it had to be opened again for each);
     // the bar's キャンセル becomes 閉じる. The next one keeps this one's 期限 (the user's call: several for one day were each
@@ -2498,7 +2647,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       return;
     }
     const next = t.next ? todos.get(t.next) : null, back = next && !next.done;
-    if (back) unmerge([[todos, [next.id]]]);
+    if (back) takeBack(todos, [next.id]);
     await todos.update(t.id, { done: false, doneAt: undefined, next: undefined, ...(back ? { repeat: next.repeat, repeatDays: next.repeatDays } : {}) });
   }
   // a repeating ToDo's turn deleted alone (× on its row, or この回を削除 in its sheet): it goes on to its next turn, as if
@@ -2818,12 +2967,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     journalDirty = true;
     journalState.textContent = "未保存";
     clearTimeout(journalTimer);
-    journalTimer = setTimeout(flushJournal, 1200);
+    journalTimer = setTimeout(() => flushJournal(false), 1200);
   }
-  function flushJournal() {
+  // leaving: the field is being left (blur, another day, the app going away), not a pause in the writing
+  function flushJournal(leaving = true) {
     clearTimeout(journalTimer);
     if (!journalDirty) return journalChain;
     const date = viewDate, text = journalText.value.trim();
+    // emptied while still being written in (all of it taken out to write it again): deleted only once the field is left
+    // (the user's call: a pause after clearing it deleted the day's 日記)
+    if (!text && !leaving) return journalChain;
     journalDirty = false;
     journalState.textContent = "保存中…";
     journalChain = journalChain.then(async () => {
@@ -2833,7 +2986,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           if (journal.get(date)) removeWithUndo(journal, date);
         } else {
           // a mood from before the scale went stays in the entry (and its backups), unseen
-          await journal.set(date, { ...journal.get(date), date, text, updatedAt: Date.now() });
+          await journal.write(date, { ...journal.get(date), date, text, updatedAt: Date.now() });
         }
         if (journal.unsaved) throw new Error("not saved"); // the browser didn't take it (full): kept, and tried again later
         if (!journalDirty && date === viewDate) journalState.textContent = text ? "保存済み" : "";
@@ -3112,8 +3265,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const date = viewDate;
     wtState.textContent = "保存中…";
     act(async () => {
-      await weights.set(date, { date, kg: Math.round(v * 10) / 10, updatedAt: Date.now() });
-      if (date === viewDate) wtState.textContent = "記録しました";
+      await weights.write(date, { date, kg: Math.round(v * 10) / 10, updatedAt: Date.now() });
+      if (date === viewDate) wtState.textContent = weights.unsaved ? "保存できませんでした" : "記録しました";
     });
   });
   armLink($("wtDelete"), "この日の記録を削除", "もう一度押すと削除します", () => {
@@ -4405,7 +4558,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const mode = sheetMode();
     if (mode === "goal") { clearGoalForm(); closeSheet(); } else if (mode === "plan") { clearPlanForm(); if (planFromDay) backToDay(); else closeSheet(); }
     else if (mode === "todo") { if (!todoAdded) clearTodoForm(); if (todoFromDay) backFromTodo(); else closeSheet(); } // 閉じる keeps what was typed, as a pull down does
-    else if (mode === "rec") leaveRec(() => { if (recFromDay) backFromRec(); else closeSheet(); }); else if (mode === "chart") chartBack(); else if (mode === "day" && dayFromFind) backToFind(); else showDayView();
+    else if (mode === "rec") leaveRec(() => { if (recFromDay) backFromRec(); else closeSheet(); }); else if (mode === "chart") chartBack(); else if (mode === "edit") leaveRec(showDayView); else if (mode === "day" && dayFromFind) backToFind(); else showDayView();
   });
   $("calSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0));
   // iPhone: the bar on top can be pulled down to put the sheet away, as iOS sheets can
@@ -4948,7 +5101,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function addToRoutine(name) {
     act(async () => {
       const id = await routines.add({ name, createdAt: Date.now() });
-      flash(`「${name}」をルーティーンに入れました`, () => unmerge([[routines, [id]]]));
+      flash(`「${name}」をルーティーンに入れました`, () => takeBack(routines, [id]));
     });
   }
   function pickCell(k) {
@@ -5073,15 +5226,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (editFields() === editBase && date + "\n" + $("edEndDate").value === editDays) { showDayView(); return; }
     const labelId = edLabelChoice && labels.get(edLabelChoice) ? edLabelChoice : undefined;
     const { repeat, repeatUntil, ...rest } = planExtras("ed", date, time);
-    // the plans as they were before 保存, for 元に戻す (this turn alone and この回以降 change two plans at once)
-    const plansBefore = JSON.parse(JSON.stringify(events.items));
-    const saved = (msg) => flash(msg, () => act(async () => { await events.restore(plansBefore); flash("元に戻しました"); }));
+    // what 元に戻す puts right: this plan as it was before 保存, and the plan 保存 made from one of its turns (this turn
+    // alone and この回以降 make one); not the other plans, which may have changed in those seconds (the user's call: a plan
+    // added meanwhile went with it)
+    const before = JSON.parse(JSON.stringify(e)), made = [];
+    const saved = (msg) => flash(msg, () => act(async () => { if (made.length) takeBack(events, made); await events.set(before.id, before); flash("元に戻しました"); }));
     const fields = { title, date, time: time || undefined, labelId, endDate: undefined, endTime: undefined, memo: undefined, ...rest };
     if (e.repeat && editScope === "one") {
       // this turn alone: taken out of the plan, and kept as a plan of its own with what the form says
       const skip = [...new Set([...(e.skip || []), editingStart])], moved = date !== editingStart;
       showDayView();
-      act(async () => { await events.update(e.id, { skip }); await events.add({ ...fields, createdAt: Date.now() }); });
+      act(async () => { await events.update(e.id, { skip }); made.push(await events.add({ ...fields, createdAt: Date.now() })); });
       saved(moved ? `${fmtMDW(date)}に移しました` : "この回を保存しました");
       noteHidden(labelId);
       return;
@@ -5094,7 +5249,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       showDayView();
       act(async () => {
         await events.update(e.id, { repeatUntil: addDays(editingStart, -1), skip: skips.filter((d) => d < editingStart) });
-        await events.add(next);
+        made.push(await events.add(next));
       });
       saved("この回以降を保存しました");
       noteHidden(labelId);
@@ -5162,7 +5317,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   const recNum = (id, value, attrs) => el("input", { type: "number", id, value: num(value) > 0 ? value : "", ...attrs });
   const recDate = (value) => el("input", { type: "date", id: "reDate", value, required: true });
-  const recNote = (value) => el("input", { type: "text", id: "reNote", value: value || "", maxlength: 200 });
+  const recNote = (value) => el("input", { type: "text", id: "reNote", value: value || "", maxlength: 1000 });
   const recFixedDay = (day) => recRow("日付", el("output", { id: "reDay" }, fmtMDW(day))); // not to be changed (日記, 体重, ルーティーン)
   // a field that keeps the form from saving: focused, so it can be put right
   const recBad = (id) => { $(id).focus(); return null; };
@@ -5318,7 +5473,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           recRow("金額", recNum("reAmount", e.amount, { placeholder: "0", min: 1, max: 99999999, step: 1, inputmode: "numeric", required: true }), { unit: "円" }),
           recRow("費目", cat),
           recRow("日付", recDate(e.date)),
-          el("input", { type: "text", id: "reMemo", class: "full", value: e.memo || "", placeholder: "メモ", "aria-label": "メモ", maxlength: 200 }),
+          el("input", { type: "text", id: "reMemo", class: "full", value: e.memo || "", placeholder: "メモ", "aria-label": "メモ", maxlength: 1000 }),
         ];
       },
       read: () => {
@@ -5383,7 +5538,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const discardAsk = $("discardAsk");
   let discardGo = null;
   function formState(f) { return JSON.stringify(fieldsOf(f).map((x) => (x.type === "radio" || x.type === "checkbox" ? x.checked : x.value))); }
-  const recChanged = () => sheetMode() === "rec" && recShown !== null && formState($("recForm")) !== recShown;
+  // an entry's edit form changed, or a plan's (its words or its days; the user's call: a plan's changes went without a word)
+  const recChanged = () => (sheetMode() === "rec" && recShown !== null && formState($("recForm")) !== recShown)
+    || (sheetMode() === "edit" && !!editingId && (editFields() !== editBase || $("edDate").value + "\n" + $("edEndDate").value !== editDays));
   function leaveRec(go) {
     if (!recChanged()) { go(); return; }
     discardGo = go;
@@ -5656,18 +5813,20 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function journalTile(j) {
     if (j?.text) return el("div", { class: "jt-text" }, j.text);
     const ta = el("textarea", { class: "jt-input", rows: 3, placeholder: "ひとこと", "aria-label": "きょうの日記" });
-    ta.addEventListener("input", () => { clearTimeout(homeJournalTimer); homeJournalTimer = setTimeout(() => saveHomeJournal(ta), 1200); });
+    ta.addEventListener("input", () => { clearTimeout(homeJournalTimer); homeJournalTimer = setTimeout(() => saveHomeJournal(ta, null, true), 1200); });
     ta.addEventListener("blur", (ev) => saveHomeJournal(ta, ev.relatedTarget));
     return ta;
   }
   // leftTo: what focus went to on leaving the field. Done writing with nothing left to save, the tile shows the words, unless
   // a button took focus (the tiles aren't drawn again under a press that is still going on)
-  function saveHomeJournal(ta, leftTo = null) {
+  // typing: a pause in the writing, after which an emptied field is left as it is until the field or the app is left
+  function saveHomeJournal(ta, leftTo = null, typing = false) {
+    if (typing && !ta.value.trim()) return; // its timer stays set, so the app going away still deletes it
     clearTimeout(homeJournalTimer); homeJournalTimer = null;
     const text = ta.value.trim(), cur = journal.get(todayKey);
     if ((cur?.text || "") === text) { if (document.activeElement !== ta && !leftTo) renderHome(); return; }
     if (!text) { removeWithUndo(journal, todayKey); return; }
-    act(() => journal.set(todayKey, { ...cur, date: todayKey, text, updatedAt: Date.now() }));
+    act(() => journal.write(todayKey, { ...cur, date: todayKey, text, updatedAt: Date.now() }));
   }
   document.addEventListener("visibilitychange", () => {
     const ta = document.querySelector("#homeTiles .jt-input");
@@ -6155,12 +6314,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     const { add, differ, gone, odd, adds } = mergePlan(payload.data);
     const leftOut = (gone ? `消した ${gone} 件は、消したままにします。` : "") + (odd ? `中身が読み取れない ${odd} 件は読み込みません。` : "");
-    if (!add) { flash(differ || leftOut ? "足す記録はありません。" + (differ ? `内容のちがう ${differ} 件は、この端末のほうのままにします。` : "") + leftOut : "このファイルの記録は、すべてこの端末にあります。"); return; }
+    if (!add && !gone) { flash(differ || leftOut ? "足す記録はありません。" + (differ ? `内容のちがう ${differ} 件は、この端末のほうのままにします。` : "") + leftOut : "このファイルの記録は、すべてこの端末にあります。"); return; }
     const at = new Date(payload.exportedAt);
     const when = isNaN(at) ? "" : (at.getFullYear() !== new Date().getFullYear() ? `${at.getFullYear()}年` : "") + fmtMDW(ymd(at)) + "に書き出した";
     importPending = payload.data;
-    $("importAskText").textContent = `${when}「${file.name}」から、この端末にない記録を ${add.toLocaleString("ja-JP")} 件（${adds.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")}`).join("・")}）足します。いまある記録は変わりません。`
-      + (differ ? `この端末にもあって内容のちがう ${differ} 件は、この端末のほうを残します。` : "") + leftOut;
+    $("importAskText").textContent = `${when}「${file.name}」から、` + (add ? `この端末にない記録を ${add.toLocaleString("ja-JP")} 件（${adds.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")}`).join("・")}）足します。` : "足す記録はありません。")
+      + "いまある記録は変わりません。" + (differ ? `この端末にもあって内容のちがう ${differ} 件は、この端末のほうを残します。` : "") + (odd ? `中身が読み取れない ${odd} 件は読み込みません。` : "");
+    // the ones deleted can come back too, by choice, as from a copy (the user's call: a file couldn't bring them back)
+    $("importAskDeadRow").hidden = !gone;
+    $("importAskDead").checked = !add;
+    $("importAskDeadText").textContent = `消した ${gone.toLocaleString("ja-JP")} 件も戻す`;
     $("importAsk").hidden = false;
     $("importGo").focus();
   }
@@ -6169,11 +6332,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // copy too, so the check against the copies doesn't offer them again
   $("importGo").addEventListener("click", () => {
     if (!importPending) return;
-    const added = mergeRecords(importPending), count = addedCount(added);
+    const withDeleted = !$("importAskDeadRow").hidden && $("importAskDead").checked, tombBefore = [...deleted.items];
+    const added = mergeRecords(importPending, withDeleted), count = addedCount(added);
+    const revived = tombBefore.filter((t) => !deleted.items.includes(t)); // deleted ones it brought back
     hideImportAsk();
     saveCopy();
     flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を足しました。` : "足す記録はありませんでした。",
-      count ? () => { unmerge(added); dropFromCopy(added); flash("読み込みを取り消しました。"); } : null, 10000);
+      count ? () => { unmerge(added); dropFromCopy(added); if (revived.length) deleted.putBack(revived); flash("読み込みを取り消しました。"); } : null, 10000);
     $("importBtn").focus();
   });
   $("importCancel").addEventListener("click", () => { hideImportAsk(); $("importBtn").focus(); });
@@ -6239,6 +6404,34 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     loadJournalForm();
     renderAll();
     return added;
+  }
+  // a set's own version of records changed here since (a 日記 written over by mistake), in their place; each one here goes
+  // to 最近削除した項目, apart from its id. Gives back [store, records as they were here, the keys put there], for 元に戻す
+  function replaceFrom(data) {
+    const out = [];
+    for (const s of ALL_STORES) {
+      if (!remembers(s)) continue;
+      const here = new Map(s.items.map((x) => [x.id, x]));
+      const swap = incomingOf(data, s).filter((x) => here.has(x.id) && JSON.stringify(here.get(x.id)) !== JSON.stringify(x) && fits(s, x));
+      if (!swap.length) continue;
+      const was = swap.map((x) => JSON.parse(JSON.stringify(here.get(x.id)))), keysBefore = new Set(deleted.items.map((t) => t.id));
+      keepInTrash(s, was);
+      const by = new Map(swap.map((x) => [x.id, x]));
+      s.items = s.items.map((x) => by.get(x.id) || x);
+      s.saveLocal();
+      out.push([s, was, deleted.items.filter((t) => !keysBefore.has(t.id)).map((t) => t.id)]);
+    }
+    if (out.length) { renderAll(); if (!journalDirty) loadJournalForm(); }
+    return out;
+  }
+  function undoReplace(out) {
+    for (const [s, was, keys] of out) {
+      const by = new Map(was.map((x) => [x.id, x])), drop = new Set(keys);
+      s.items = s.items.map((x) => by.get(x.id) || x);
+      deleted.items = deleted.items.filter((t) => !drop.has(t.id));
+      s.saveLocal();
+    }
+    if (out.length) { deleted.saveLocal(); renderAll(); if (!journalDirty) loadJournalForm(); }
   }
   // how many records that was (settings and deleted ones aside)
   const addedCount = (added) => added.reduce((n, [s, ids]) => n + (remembers(s) ? ids.length : 0), 0);
@@ -6539,14 +6732,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     try { c = await readCopy(day); } catch {}
     if (!c) { flash("このコピーは読めませんでした。"); return; }
     const plan = mergePlan(c.data), at = new Date(c.savedAt), when = `${fmtMDW(day)} ${at.getHours()}:${pad(at.getMinutes())}`;
-    if (!plan.add && !plan.gone) { flash("このコピーの記録は、すべてこの端末にあります。"); return; }
+    if (!plan.add && !plan.gone && !plan.differ) { flash("このコピーの記録は、すべてこの端末にあります。"); return; }
     copyPending = c;
     $("copyAskText").textContent = `${when} 時点のコピー（${c.count.toLocaleString("ja-JP")} 件）から、`
-      + (plan.add ? `この端末にない記録を ${plan.add.toLocaleString("ja-JP")} 件（${plan.adds.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")}`).join("・")}）戻します。` : "戻す記録はありません。")
-      + "いまある記録は変わりません。";
+      + (plan.add ? `この端末にない記録を ${plan.add.toLocaleString("ja-JP")} 件（${plan.adds.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")}`).join("・")}）戻します。` : "この端末にない記録はありません。")
+      + (plan.differ ? "下で選ばないかぎり、いまある記録は変わりません。" : "いまある記録は変わりません。");
     $("copyAskDeadRow").hidden = !plan.gone;
     $("copyAskDead").checked = !plan.add;
     $("copyAskDeadText").textContent = `この端末で消した ${plan.gone.toLocaleString("ja-JP")} 件も戻す`;
+    // records changed here since (a 日記 written over by mistake): the copy's own version, by choice (the user's call: a
+    // copy could only add what was missing)
+    $("copyAskDiffRow").hidden = !plan.differ;
+    $("copyAskDiff").checked = false;
+    $("copyAskDiffText").textContent = `内容が変わった ${plan.differ.toLocaleString("ja-JP")} 件を、このコピーのときの内容に戻す（いまの内容は「最近削除した項目」に移します）`;
     $("copyAsk").hidden = false;
     $("copyAsk").scrollIntoView({ block: "nearest" });
     $("copyGo").focus();
@@ -6554,12 +6752,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // brought back with 元に戻す for a while, as from the notice; the deleted ones taken back are counted as deleted again
   $("copyGo").addEventListener("click", () => {
     if (!copyPending) return;
-    const withDeleted = !$("copyAskDeadRow").hidden && $("copyAskDead").checked, tombBefore = JSON.parse(JSON.stringify(deleted.items));
-    const added = mergeRecords(copyPending.data, withDeleted), count = addedCount(added);
+    const withDeleted = !$("copyAskDeadRow").hidden && $("copyAskDead").checked, withChanged = !$("copyAskDiffRow").hidden && $("copyAskDiff").checked;
+    const tombBefore = [...deleted.items];
+    const added = mergeRecords(copyPending.data, withDeleted), swapped = withChanged ? replaceFrom(copyPending.data) : [];
+    const revived = tombBefore.filter((t) => !deleted.items.includes(t)); // deleted ones it brought back
+    const count = addedCount(added) + swapped.reduce((n, [, was]) => n + was.length, 0);
     copyPending = null; $("copyAsk").hidden = true;
     saveCopy();
+    // taken back: what it added goes, what it changed is as it was, and the deleted ones it brought back are deleted
+    // again, with no other deletion of those seconds touched
     flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を戻しました。` : "戻す記録はありませんでした。",
-      count ? () => { unmerge(added); if (withDeleted) deleted.restore(tombBefore); flash("取り消しました。"); checkRestore(); } : null, 10000);
+      count ? () => { unmerge(added); undoReplace(swapped); if (revived.length) deleted.putBack(revived); flash("取り消しました。"); checkRestore(); } : null, 10000);
   });
   $("copyCancel").addEventListener("click", () => { copyPending = null; $("copyAsk").hidden = true; });
   // drawn before the page slides in, so it arrives with its days
@@ -6567,8 +6770,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- 保存できる量 ----------
   // how much the records take in the browser's storage, against the most a site may keep there (about 5 MB on an iPhone;
-  // counted as two bytes a character, which errs on the full side). Past 60 % the line turns red: time to write them out,
-  // and to move them somewhere roomier (IndexedDB), which this app doesn't do yet
+  // counted as two bytes a character, which errs on the full side). Once it is full, a kind of record that doesn't fit
+  // moves to the bigger storage (saveBig), and the line says so; without one (IndexedDB), past 60 % it turns red
   const STORAGE_LIMIT = 5 * 1024 * 1024;
   function storageUsed() {
     let n = 0;
@@ -6585,9 +6788,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     line.hidden = !canStoreLocal;
     if (!canStoreLocal) return;
     const used = storageUsed(), mb = used / 1024 / 1024, near = used > STORAGE_LIMIT * 0.6;
+    const moved = ALL_STORES.filter((s) => s.big), roomy = !!window.indexedDB;
     line.textContent = `この端末で使っている量：${mb < 0.1 ? "0.1 MB 未満" : `約 ${mb.toFixed(1)} MB`}（ブラウザの上限はおよそ 5 MB）`
-      + (near ? "。上限に近づいています。いまのうちに記録を書き出しておいてください。" : "");
-    line.classList.toggle("due", near);
+      + (moved.length ? `。入りきらない${moved.map((s) => STORE_NAMES[s.name] || { settings: "設定", deleted: "削除した記録" }[s.name]).join("・")}は、もっと大きい置き場所に移して保存しています。`
+        : near ? (roomy ? "。上限に近づいています。いっぱいになったら、記録はもっと大きい置き場所に移して保存します。" : "。上限に近づいています。いまのうちに記録を書き出しておいてください。") : "");
+    line.classList.toggle("due", near && !roomy && !moved.length);
   }
   // at start: the text kept aside for a store that couldn't be read goes after 30 days, and a draft too old to put back
   function tidyStorage() {
@@ -6646,24 +6851,36 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function restoreFromTrash(key) {
     const t = deleted.get(key), st = t && ALL_STORES.find((x) => x.name === t.store);
     if (!st || !t.data || !fits(st, t.data)) { flash("この記録は戻せませんでした。"); return; }
-    act(() => st.putBack([t.data]));
-    flash(`${STORE_NAMES[st.name]}を戻しました`);
+    // a day written again since (日記, 体重): the two change places, the one there now going to 最近削除した項目, so neither
+    // is lost (the user's call); another deleted one of the same day stays there, apart
+    const back = JSON.parse(JSON.stringify(t.data)), now = st.get(back.id);
+    deleted.items = deleted.items.filter((x) => x !== t);
+    if (now) keepInTrash(st, [now]); else setAside(st, back.id);
+    st.items = now ? st.items.map((x) => (x.id === back.id ? back : x)) : [...st.items, back];
+    deleted.saveLocal();
+    act(() => { st.saveLocal(); renderAll(); });
+    flash(now ? `${STORE_NAMES[st.name]}を戻しました。いまあったほうは「最近削除した項目」に移しました` : `${STORE_NAMES[st.name]}を戻しました`);
   }
   // 完全に削除: what deleted records held goes from 最近削除した項目 and from the copies kept on this device too (a file
   // written out before still has it); their ids stay remembered, so nothing older brings them back
   function purgeTrash(keys) {
     const ts = keys.map((k) => deleted.get(k)).filter((t) => t?.data);
     if (!ts.length) return;
+    // one kept apart from its id goes from the copies where it is that id's record or deletion with what it held then
+    const exact = ts.filter((t) => t.id.includes("#")).map((t) => [`${t.store}/${t.rid}`, JSON.stringify(t.data)]);
     for (const t of ts) delete t.data;
+    deleted.items = deleted.items.filter((t) => t.data || !t.id.includes("#"));
     deleted.saveLocal();
     renderAll();
-    scrubCopies(ts.map((t) => t.id));
+    scrubCopies(ts.map((t) => t.id), exact);
     flash(ts.length > 1 ? `${ts.length.toLocaleString("ja-JP")} 件を完全に削除しました` : "完全に削除しました");
   }
   armLink($("trashPurgeAll"), "すべて完全に削除", "もう一度押すと、すべて完全に削除します", () => purgeTrash(trashShown().map((t) => t.id)));
   // those records out of every copy, as records and as what deleted ones held (in turn after a copy being made)
-  function scrubCopies(keys) {
-    const gone = new Set(keys);
+  function scrubCopies(keys, exact = []) {
+    const gone = new Set(keys), same = new Map();
+    for (const [k, json] of exact) { if (!same.has(k)) same.set(k, new Set()); same.get(k).add(json); }
+    const isSame = (k, x) => !!same.get(k)?.has(JSON.stringify(x));
     return inQueue(async () => {
       if (!canStoreLocal || !window.indexedDB) return;
       try {
@@ -6673,8 +6890,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           let changed = false;
           for (const [name, arr] of Object.entries(c.data)) {
             if (!Array.isArray(arr)) continue;
-            if (name === "deleted") { for (const t of arr) if (t && gone.has(t.id) && t.data) { delete t.data; changed = true; } continue; }
-            const kept = arr.filter((x) => !gone.has(`${name}/${x?.id}`));
+            if (name === "deleted") { for (const t of arr) if (t?.data && (gone.has(t.id) || isSame(`${t.store}/${t.rid}`, t.data))) { delete t.data; changed = true; } continue; }
+            const kept = arr.filter((x) => !gone.has(`${name}/${x?.id}`) && !isSame(`${name}/${x?.id}`, x));
             if (kept.length !== arr.length) { c.data[name] = kept; changed = true; }
           }
           if (changed) { c.count = recordCount(c.data); await putCopy(c); }
@@ -6789,25 +7006,33 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tab === "copies") draw(renderCopies);
     if (tab === "records") draw(renderUsage);
   }
-  // the safeguards first, so a page that can't be drawn doesn't keep them from running
-  pruneTrash();
-  tidyStorage();
-  showMode();
-  checkRestore().then(() => saveCopy());
-  askPersist();
-  const initial = (location.hash || "").slice(1);
-  // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
-  draw(() => setTab(["reclist", "trash", "copies"].includes(initial) ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home"));
-  draw(loadJournalForm);
-  renderAll();
-  draw(() => restoreDraft(!initial || initial === "home"));
+  // the safeguards first, so a page that can't be drawn doesn't keep them from running; a kind of record moved to the
+  // bigger storage is read in before all of it
+  function boot() {
+    pruneTrash();
+    tidyStorage();
+    showMode();
+    checkRestore().then(() => saveCopy());
+    askPersist();
+    const initial = (location.hash || "").slice(1);
+    // straight there: no slide in from きょう as the app opens (a record's entries open at 記録, which record being unknown)
+    draw(() => setTab(["reclist", "trash", "copies"].includes(initial) ? "records" : PAGES.some((p) => p.key === initial) ? initial : "home"));
+    draw(loadJournalForm);
+    renderAll();
+    draw(() => restoreDraft(!initial || initial === "home"));
+  }
+  if (ALL_STORES.some((s) => s.big)) loadBig().finally(boot); else boot();
+  // what is still to be written there goes as the app goes away
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushBig(); });
   // iOS only shows :active (the pressed look HIG asks for) once the page listens for touches
   document.addEventListener("touchstart", () => {}, { passive: true });
 
   // another tab of this app saved: pick up its records so the two tabs don't overwrite each other
   window.addEventListener("storage", (e) => {
-    const s = ALL_STORES.find((x) => e.key === LS_PREFIX + x.name);
+    const s = ALL_STORES.find((x) => e.key === LS_PREFIX + x.name || e.key === bigMark(x.name));
     if (!s) return;
+    // moved to the bigger storage (by the other tab): read from there from now on
+    if (isBig(s.name)) { if (!s.big) { s.big = true; s.loaded = false; loadBig().then(() => renderAll()); } return; }
     s.items = s.loadLocal();
     renderAll();
   });
