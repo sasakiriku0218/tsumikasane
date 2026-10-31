@@ -4804,12 +4804,29 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         memo.addEventListener("input", () => growField(memo)); // keeping its line breaks
         requestAnimationFrame(() => { growField(text); growField(memo); });
         const flag = el("input", { type: "checkbox", id: "reFlag", class: "switch", role: "switch", checked: !!t.flag });
+        // a done one says when it was done, with 未完了に戻す, in place of its repeat and 重要, which mean nothing now (the
+        // user's call); 未完了に戻す keeps what was changed in the sheet too
+        if (t.done) {
+          const back = el("button", { type: "button", class: "link-btn", onclick: () => {
+            const patch = REC_EDIT.todo.read(t);
+            if (!patch) return;
+            act(() => todos.update(t.id, patch));
+            if (recFromDay) backFromRec(); else closeSheet();
+            const x = todos.get(t.id);
+            if (x?.done) toggleTodo(x);
+          } }, "未完了に戻す");
+          return [text, recRow("期限", due, { opt: true, after: [quick, clear], below: true }),
+            recRow("完了", el("output", { id: "reDone" }, doneDay(t) ? fmtMDW(doneDay(t)) : "日付なし"), { after: back }), memo];
+        }
         return [text, recRow("期限", due, { opt: true, after: [quick, clear], below: true }), repeatRow, recRow("重要", flag), memo];
       },
-      // a 期限 changed here is the repeat's new day; left as it was, the day its turns count from stays too
+      // a 期限 changed here is the repeat's new day; left as it was, the day its turns count from stays too. A done one's
+      // sheet has no repeat or 重要 to read: they stay as they were
       read: (t) => {
-        const text = $("reText").value.trim(), due = $("reDue").value || "", memo = $("reMemo").value.trim(), repeat = (due && $("reRepeat").value) || undefined;
-        return text ? { text, due, repeat, repeatFrom: repeat && due === t.due ? t.repeatFrom : undefined, memo: memo || undefined, flag: $("reFlag").checked || undefined } : recBad("reText");
+        const text = $("reText").value.trim(), due = $("reDue").value || "", memo = $("reMemo").value.trim();
+        const repeat = $("reRepeat") ? (due && $("reRepeat").value) || undefined : t.repeat;
+        return text ? { text, due, repeat, repeatFrom: repeat && due === t.due ? t.repeatFrom : undefined, memo: memo || undefined,
+          flag: $("reFlag") ? $("reFlag").checked || undefined : t.flag } : recBad("reText");
       },
     },
     meal: {
