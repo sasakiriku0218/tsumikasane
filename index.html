@@ -333,6 +333,9 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
 section { container-type: inline-size; }
 form.add { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 12px; padding: 14px var(--space-2); background: var(--surface); border-radius: var(--radius); }
 form.add > .full, form.add > .actions { grid-column: 1 / -1; }
+/* under a new ToDo's name holding a list pasted in: each line is a ToDo of its own, or 1件にまとめる runs them into one */
+.lines-note { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-2); margin: -4px 0 0; font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
+.lines-note .link-btn { min-height: 44px; font-size: inherit; }
 .flabel { min-width: 0; }
 .flabel .opt { margin-inline-start: 2px; font-size: var(--t-foot); color: var(--muted); }
 .ffield { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
@@ -1657,7 +1660,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
          あした・来週 under it, a repeat once it is set, and a memo (the user's call) -->
     <div class="sheet-view" id="todoView" hidden>
       <form class="add" id="todoForm" autocomplete="off">
-        <textarea id="todoText" class="full grow" rows="1" placeholder="やること" aria-label="やること" maxlength="200" required></textarea>
+        <textarea id="todoText" class="full grow" rows="1" placeholder="やること" aria-label="やること" maxlength="2000" required></textarea>
+        <p class="full lines-note" id="todoLines" hidden><span id="todoLinesText"></span><button type="button" class="link-btn" id="todoJoin">1件にまとめる</button></p>
         <label class="flabel" for="todoDue">期限 <span class="opt">任意</span></label>
         <div class="ffield below"><input type="date" id="todoDue"><span class="quick-days" id="todoQuick" role="group" aria-label="期限をすぐ選ぶ"></span><button type="button" class="link-btn" id="todoDueClear" hidden>期限なしにする</button></div>
         <div class="form-rows">
@@ -1916,6 +1920,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       return true;
     }
     async add(data) { const id = uid(); this.items.push({ id, ...data }); this.saveLocal(); renderAll(); return id; }
+    async addMany(list) { const added = list.map((data) => ({ id: uid(), ...data })); this.items.push(...added); this.saveLocal(); renderAll(); return added.map((x) => x.id); }
     async set(id, data) {
       const i = this.items.findIndex((x) => x.id === id);
       if (i >= 0) this.items[i] = { id, ...data }; else this.items.push({ id, ...data });
@@ -2239,7 +2244,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
 
   // ---------- ToDo ----------
   // a new ToDo is made in the sheet the ＋ beside the title opens (openNewTodo); 追加 there stays grey until it has its text
-  const syncTodoSave = () => { $("todoSave").disabled = !$("todoText").value.trim(); };
+  // a new ToDo's name, a line a ToDo: a list pasted in (牛乳, 卵, パン on lines of their own) adds that many at once with
+  // the same 期限, repeat, 重要 and memo (the user's call: it became one, 牛乳 卵 パン). 追加 says how many, the note under
+  // the name says so too, and 1件にまとめる runs the lines into one name as before
+  const todoLines = () => $("todoText").value.split("\n").map((x) => x.trim()).filter(Boolean);
+  const syncTodoSave = () => {
+    const n = todoLines().length;
+    $("todoSave").disabled = !n;
+    $("todoSave").textContent = n > 1 ? `${n} 件を追加` : "追加";
+    $("todoLines").hidden = n < 2;
+    $("todoLinesText").textContent = n > 1 ? `${n} 行を、それぞれ別のToDoとして追加します。` : "";
+  };
+  $("todoJoin").addEventListener("click", () => {
+    const ta = $("todoText");
+    ta.value = todoLines().join(" ");
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    ta.focus();
+  });
   $("todoText").addEventListener("input", syncTodoSave);
   // a ToDo's 期限, here and in its edit form: きょう, あした and 来週 (a week on) under the date put that day in at a tap
   // (the user's call), and 期限なしにする empties it again, a day once picked being hard to empty on iPhone. The 繰り返し
@@ -2274,16 +2295,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("navAdd").addEventListener("click", (ev) => openNewTodo(ev.detail === 0, "todonav")); // the same, in the top bar
   $("todoForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    const text = $("todoText").value.trim();
-    if (!text) return;
+    const lines = todoLines().map((x) => x.slice(0, 200)); // each as long as an edited name can be
+    if (!lines.length) return;
     // a new one isn't done, so with 完了 picked it would not show and seem not added: the list goes back to すべて
     if (todoFilter === "done") setTodoFilter("all");
     if (todoQuery) { todoQuery = ""; $("todoSearch").value = ""; } // nor would it if it lacked the words looked for
     const due = $("todoDue").value || "", repeat = due && $("todoRepeat").value, memo = $("todoMemo").value.trim(), flag = $("todoFlag").checked;
     act(async () => {
-      const id = await todos.add({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(memo ? { memo } : {}), ...(flag ? { flag: true } : {}), createdAt: Date.now() });
-      todoNewIds.push(id); // lit in the list as the sheet goes down
-      flash(`「${text}」を追加しました`, () => unmerge([[todos, [id]]]));
+      const now = Date.now(), ids = await todos.addMany(lines.map((text, i) => ({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(memo ? { memo } : {}), ...(flag ? { flag: true } : {}), createdAt: now + i })));
+      todoNewIds.push(...ids); // lit in the list as the sheet goes down
+      flash(ids.length > 1 ? `ToDoを ${ids.length} 件追加しました` : `「${lines[0]}」を追加しました`, () => unmerge([[todos, ids]]));
     });
     // the sheet stays, empty, with the typing ready for the next one (the user's call: it had to be opened again for each);
     // the bar's キャンセル becomes 閉じる. The next one keeps this one's 期限 (the user's call: several for one day were each
@@ -4494,7 +4515,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("mMemo").addEventListener("input", () => growField($("mMemo"))); // the memo grows too, but keeps its line breaks
   for (const ta of document.querySelectorAll("textarea.grow:not(.memo)")) {
     ta.addEventListener("input", () => {
-      if (/[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/\s*[\r\n]+\s*/g, " "); // pasted in on several lines
+      // pasted in on several lines: they run into one, except in a new ToDo's name, where a list stays a line a ToDo
+      // (todoLines), each line trimmed and the empty ones dropped
+      if (/[\r\n]/.test(ta.value)) {
+        const lines = ta.value.split(/\r\n?|\n/).map((x) => x.trim()).filter(Boolean);
+        if (ta.id === "todoText" && lines.length > 1) { if (ta.value !== lines.join("\n")) ta.value = lines.join("\n"); }
+        else ta.value = ta.value.replace(/\s*[\r\n]+\s*/g, " ");
+      }
       growField(ta);
     });
     ta.addEventListener("keydown", (ev) => {
