@@ -803,6 +803,12 @@ li.done .text { color: var(--muted); }  /* done: grey, not struck through (the u
 /* a ToDo's memo set off from its 期限 above it, which is the same grey (the user's call: きょうまで and the memo's first
    line read as one), by a thin bar at its start, as a note is */
 #todoList .ev-memo { margin-block-start: 2px; padding-inline-start: 8px; border-inline-start: 2px solid var(--line); }
+/* a web address in it opens that page, above the row's tap that opens the ToDo; underlined, so it reads as a link, not
+   just green text */
+#todoList .ev-memo a { position: relative; z-index: 1; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+/* one reached from the keyboard: the memo shows whole while it has the focus, or its two lines would be scrolled to it,
+   and left so */
+#todoList .ev-memo.clamp:focus-within { display: block; -webkit-line-clamp: none; overflow: visible; }
 /* 予定 (the magnifier on the month bar): a field to look for plans, and under it the next three months or what it found */
 .find-groups { display: flex; flex-direction: column; gap: var(--space-2); }
 /* the labels' rings in the settings show or hide their plans on the calendar, as the iPhone's list of calendars does */
@@ -2287,6 +2293,27 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   // the day a ToDo was checked off (doneAt), for those done since it was kept
   const doneDay = (t) => (num(t.doneAt) > 0 ? ymd(new Date(num(t.doneAt))) : "");
+  // a memo's web addresses as links (the user's call: one pasted in had to be copied out to be opened), opening apart from
+  // the app. An address runs from http(s):// to the end of its ASCII, so the Japanese right after it isn't taken in, less a
+  // full stop or comma ending the sentence, or a bracket closing it (one closing a bracket in the address, as a Wikipedia
+  // page's, stays)
+  function linkedText(s) {
+    const out = [];
+    let at = 0;
+    for (const m of s.matchAll(/https?:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+/g)) {
+      let url = m[0];
+      for (;;) {
+        const c = url.slice(-1), open = c === ")" ? "(" : c === "]" ? "[" : "";
+        if (open ? url.split(open).length >= url.split(c).length : !/[.,;:!?'*]/.test(c)) break;
+        url = url.slice(0, -1);
+      }
+      if (!/^https?:\/\/[^/?#]/.test(url)) continue;
+      out.push(s.slice(at, m.index), el("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, url));
+      at = m.index + url.length;
+    }
+    out.push(s.slice(at));
+    return out;
+  }
   // a done one says the day it was done (the user's call), the days left meaning nothing now; one done before that was
   // kept, its 期限. One that repeats says how after its 期限, with a mark of its own (毎週, 毎月第2土曜). Under the きょう
   // heading (inToday) one due today says only its repeat: きょうまで would just say the heading again (the user's call)
@@ -2465,7 +2492,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
         el("span", { class: "body" }, flagged(todoPlaced(t), editLink("todo", t.id, t.text)),
           filed ? (when || n > 1 ? el("span", { class: "done-day" }, keepUnits([n > 1 ? `${n} 回` : "", when].filter(Boolean).join("・"))) : null)
-            : [dueText(todoPlaced(t), section === "きょう"), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null]),
+            : [dueText(todoPlaced(t), section === "きょう"), t.memo ? el("span", { class: "sub ev-memo clamp" }, linkedText(t.memo)) : null]),
         n > 1 ? delButton(() => removeWithUndo(todos, turns.map((x) => x.id), `「${t.text}」の完了を ${n} 件削除しました`), "削除", `${t.text}（完了 ${n} 件）`)
           : t.repeat && t.due && !t.done ? delButton(() => skipTurn(t), "削除", `${t.text}（この回）`, "この回を削除")
           : delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
