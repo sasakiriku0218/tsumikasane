@@ -233,6 +233,10 @@ html:is([data-tab="todo"], [data-tab="goal"]) #status { bottom: calc(var(--tabba
 }
 .navtitle { grid-column: 2; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 600; opacity: 0; transition: opacity .2s; }
 .navbar.scrolled .navtitle { opacity: 1; }
+/* ToDo's ＋ comes into the top bar with the title once the large one has scrolled under it (the user's call: a long list
+   had to be scrolled back up to add one), as iOS keeps a bar's buttons */
+.nav-add { grid-column: 3; grid-row: 1; justify-self: end; margin: 0 -3px 0 0; visibility: hidden; opacity: 0; transition: opacity .2s, visibility .2s; }
+html[data-tab="todo"] .navbar.scrolled .nav-add { visibility: visible; opacity: 1; }
 /* the calendar has no large title, so it has no top bar either: the month line sits right at the top */
 html[data-tab="calendar"] .navbar { display: none; }
 html[data-tab="calendar"] .wrap { padding-top: max(var(--space-1), env(safe-area-inset-top, 0px)); }
@@ -411,6 +415,9 @@ ul.list li.dayhead.warn { color: var(--warn); }  /* ToDo's 期限切れ, red as 
 /* 期限切れ's きょうに移す, at the end of its line, with a 44px reach */
 ul.list li.dayhead .dayhead-btn { position: relative; min-height: 0; padding: 0; font-size: inherit; font-weight: 600; }
 ul.list li.dayhead .dayhead-btn::after { content: ""; position: absolute; inset: -12px -10px; }
+/* 完了's last row under すべて: the rest of them, under 完了 */
+ul.list li.more-done { padding-block: 0; }
+ul.list li.more-done .link-btn { width: 100%; }
 .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .text { overflow-wrap: anywhere; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -431,6 +438,15 @@ ul.list li.dayhead .dayhead-btn::after { content: ""; position: absolute; inset:
 }
 .empty { display: block; padding: var(--space-3) var(--space-2); text-align: center; color: var(--muted); }
 .phrase { display: inline-block; }  /* a sentence kept whole, so the line breaks between sentences */
+/* a 期限 in parts (4 日過ぎています, 10/27（火）, a repeat), a narrow row breaking between them. The ・ before each part is
+   its own and sits in a margin the line cuts off, so a part that starts a line drops it: no line ends or starts with a ・
+   (the user's call). A repeat has its mark after a space instead */
+.sub.due { display: block; overflow: hidden; }
+.due-parts { display: flex; flex-wrap: wrap; margin-inline-start: -.5em; }
+.due-parts > * { flex: 0 1 auto; min-width: 0; }
+.due-parts > .phrase::before { content: "・"; display: inline-block; width: .5em; text-align: center; }
+.due-rep { display: inline-flex; align-items: center; gap: 2px; padding-inline-start: .5em; }
+.due-rep .icon { width: 1em; height: 1em; }
 .note { padding: var(--space-1) var(--space-2) var(--space-2); font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 /* delete: × first, then a red 削除する capsule to confirm (destructive role) */
 .del { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 44px; margin-inline-end: -10px; padding: 0 10px; background: transparent; border: 0; border-radius: 999px; color: var(--muted); cursor: pointer; line-height: 1; }
@@ -965,6 +981,9 @@ ul.list.rec-list > li.one { flex-wrap: wrap; column-gap: 12px; }
 .toast.has-undo { display: flex; align-items: center; gap: 12px; text-align: start; }
 .toast-undo { flex: none; min-height: 44px; margin: -10px -10px -10px 0; padding: 0 10px; background: transparent; border: 0; color: #30d158; font-weight: 600; cursor: pointer; }
 @media (min-width: 768px) { .toast { bottom: var(--space-3); } }
+/* the keyboard up (iPhone): a message shows just above it, not under it (--kb, how far it reaches up; the user's call:
+   「追加しました」 and its 元に戻す were hidden while the next ToDo was typed) */
+html.kb .toast, html.kb #status { bottom: calc(var(--kb) + 12px); }
 .notice { display: flex; flex-direction: column; gap: 4px; padding: 14px var(--space-2); border-radius: var(--radius); background: var(--surface); text-wrap: pretty; }
 .notice strong { display: flex; align-items: center; gap: var(--space-1); color: var(--warn); font-weight: 600; line-height: 1.3; }
 .notice .cut { fill: var(--surface); }
@@ -1017,6 +1036,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   <symbol id="i-workout" viewBox="0 0 24 24"><path d="M5.25 6h1A1.75 1.75 0 0 1 8 7.75V11h8V7.75A1.75 1.75 0 0 1 17.75 6h1a1.75 1.75 0 0 1 1.75 1.75V9h.25a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-.25v1.25A1.75 1.75 0 0 1 18.75 18h-1A1.75 1.75 0 0 1 16 16.25V13H8v3.25A1.75 1.75 0 0 1 6.25 18h-1a1.75 1.75 0 0 1-1.75-1.75V15h-.25a1.5 1.5 0 0 1-1.5-1.5v-3A1.5 1.5 0 0 1 3.25 9h.25V7.75A1.75 1.75 0 0 1 5.25 6Z"/></symbol>
   <symbol id="i-study" viewBox="0 0 24 24"><path d="M3.4 20.6 4.5 15.9 15 5.4 18.6 9 8.1 19.5Z"/><path d="M16.1 4.3 17.3 3.1A1.7 1.7 0 0 1 19.7 3.1L20.9 4.3A1.7 1.7 0 0 1 20.9 6.7L19.7 7.9Z"/></symbol>
   <!-- ルーティーン: a turning arrow round a check, drawn for this app -->
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4.75 11.5v-2A2.5 2.5 0 0 1 7.25 7H18m-2.75-2.75L18 7l-2.75 2.75M19.25 12.5v2a2.5 2.5 0 0 1-2.5 2.5H6m2.75 2.75L6 17l2.75-2.75" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-routine" viewBox="0 0 24 24"><path d="M20.22 9.01A8.75 8.75 0 1 1 12 3.25V5.25A6.75 6.75 0 1 0 18.34 9.69Z"/><path d="M12 .9 16 4.25 12 7.6Z"/><path d="M10.6 15.6 7.6 12.6l1.2-1.2 1.8 1.8 4.6-4.6 1.2 1.2-5.8 5.8Z"/></symbol>
   <symbol id="i-weight" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm1.25 7.5h7.5a3.75 3.75 0 0 0-7.5 0Z"/><path d="m11.4 10.1 1.6-2.75a.6.6 0 0 1 1.04.6l-1.6 2.75a.6.6 0 0 1-1.04-.6Z"/></symbol>
   <symbol id="i-money" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19ZM8.3 6.9l1.3-.9 2.4 3.5 2.4-3.5 1.3.9-2.6 3.8H15v1.5h-2.25v1.2H15v1.5h-2.25V18h-1.5v-3.1H9v-1.5h2.25v-1.2H9v-1.5h1.9L8.3 6.9Z"/></symbol>
@@ -1041,6 +1061,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <!-- HIG toolbars: the standard back button is a symbol, not a text label; its name still says where it goes -->
       <button type="button" class="back" id="backBtn" aria-label="きょうに戻る" hidden><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
       <span class="navtitle" id="navTitle" aria-hidden="true"></span>
+      <button type="button" class="icon-btn nav-add" id="navAdd" aria-label="ToDoを追加" aria-haspopup="dialog"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
     </header>
 
     <div class="wrap">
@@ -1971,6 +1992,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     statusTimer = setTimeout(() => { t.classList.remove("show"); flashed = null; }, ms);
   }
   function showError() { flash("保存できませんでした。端末の空き容量が足りているか確かめてください。"); }
+  // the keyboard up (iPhone) covers the foot of the screen, where messages show: how far up it reaches, from the visual
+  // viewport, so a message can sit just above it (html.kb, --kb). A page zoomed in has no keyboard to keep clear of
+  const visual = window.visualViewport;
+  function syncKeyboard() {
+    const kb = visual && visual.scale < 1.05 ? Math.max(0, Math.round(innerHeight - visual.height - visual.offsetTop)) : 0;
+    document.documentElement.classList.toggle("kb", kb > 80);
+    document.documentElement.style.setProperty("--kb", kb + "px");
+  }
+  visual?.addEventListener("resize", syncKeyboard);
+  visual?.addEventListener("scroll", syncKeyboard);
   async function act(fn) { try { await fn(); } catch { showError(); } }
   // a page drawn on its own: one that fails on a record it can't show leaves the others drawn (and the records as they
   // are), and says so once
@@ -2154,6 +2185,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("todoMemo").addEventListener("input", () => growField($("todoMemo"))); // the memo grows too, keeping its line breaks
   function clearTodoForm() { $("todoForm").reset(); syncTodoDue(); syncTodoSave(); growField($("todoText")); growField($("todoMemo")); }
   $("todoAdd").addEventListener("click", (ev) => openNewTodo(ev.detail === 0));
+  $("navAdd").addEventListener("click", (ev) => openNewTodo(ev.detail === 0, "todonav")); // the same, in the top bar
   $("todoForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const text = $("todoText").value.trim();
@@ -2186,20 +2218,20 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   });
   // a 期限 by the days left, for ToDo and 目標 alike (the user's call: short, and the two written the same way): past it in
   // red, きょう and あした by name, later ones with the date too. The parts are kept whole, so a narrow row breaks the line
-  // between them, not inside a word, and the ・ stays at the end of the first line (a line doesn't start with it)
-  // with something after it (a ToDo's repeat), that comes last, after a ・ of its own
-  function untilText(day, tail = "") {
+  // between them, not inside a word; the ・ between them is dropped where it breaks (.due-parts), so no line ends or starts
+  // with one (the user's call: it was left at a line's end). Something after them (a ToDo's repeat) comes last
+  function untilText(day, tail = null) {
     const n = daysUntil(day), part = (s) => el("span", { class: "phrase" }, s);
-    const parts = [...(n < 0 ? [`${-n} 日過ぎています`, fmtShort(day)] : n <= 1 ? [n ? "あしたまで" : "きょうまで"] : [`あと ${n} 日`, fmtShort(day)]), tail].filter(Boolean);
-    return el("span", { class: "sub" + (n < 0 ? " warn" : "") }, parts.map((s, i) => part(i < parts.length - 1 ? s + "・" : s)));
+    const words = n < 0 ? [`${-n} 日過ぎています`, fmtShort(day)] : n <= 1 ? [n ? "あしたまで" : "きょうまで"] : [`あと ${n} 日`, fmtShort(day)];
+    return el("span", { class: "sub due" + (n < 0 ? " warn" : "") }, el("span", { class: "due-parts" }, words.map(part), tail));
   }
   // the day a ToDo was checked off (doneAt), for those done since it was kept
   const doneDay = (t) => (num(t.doneAt) > 0 ? ymd(new Date(num(t.doneAt))) : "");
   // a done one says the day it was done (the user's call), the days left meaning nothing now; one done before that was
-  // kept, its 期限. One that repeats says how after its 期限 (毎週, 毎月第2土曜)
+  // kept, its 期限. One that repeats says how after its 期限, with a mark of its own (毎週, 毎月第2土曜)
   function dueText(t) {
     if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtShort(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : null;
-    return t.due ? untilText(t.due, t.repeat ? repeatName(t.repeat, t.due) : "") : null;
+    return t.due ? untilText(t.due, t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, t.due)) : null) : null;
   }
   // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): the 期限
   // soonest first, which puts those past it first and today's next, then those without one, each oldest first. Done
@@ -2212,6 +2244,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // mistaken tap shows, and is undone right there). It is saved as done at once, so きょう's tile and the calendar have it;
   // only this list holds it in its old place. Unchecked, it goes straight back among the rest
   const TODO_SETTLE = 1500;
+  const TODO_DONE_SHOWN = 10; // 完了 under すべて: the last ten done, the rest under 完了
   const todoSettling = new Map(); // id → the timer that sends it down
   const todoPlaced = (t) => (todoSettling.has(t.id) ? { ...t, done: false } : t); // where the list puts it
   function toggleTodo(t) {
@@ -2286,8 +2319,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // is the order todoOrder already gives. With only 完了 showing, its name would just say the bar's choice again
     const counts = new Map();
     for (const t of shown) counts.set(todoSection(todoPlaced(t)), (counts.get(todoSection(todoPlaced(t))) || 0) + 1);
+    // under すべて, 完了 shows the last ten done (the user's call: a repeat leaves one more there each time it is done) and
+    // its count; the rest are a press away, under 完了
+    const more = todoFilter === "all" ? shown.filter((t) => todoPlaced(t).done).slice(TODO_DONE_SHOWN) : [], cut = new Set(more);
     let section = null;
     for (const t of shown) {
+      if (cut.has(t)) continue;
       if (todoFilter !== "done" && todoSection(todoPlaced(t)) !== section) {
         section = todoSection(todoPlaced(t));
         list.append(section === "期限切れ"
@@ -2303,8 +2340,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
       ));
     }
+    if (more.length) list.append(el("li", { class: "more-done" }, el("button", { type: "button", class: "link-btn", onclick: (ev) => showAllDone(ev.detail === 0) }, `ほか ${more.length} 件を見る`)));
     // the check keeps keyboard focus as the list is drawn again, and follows its ToDo down to 完了
     if (focusId) list.querySelector(`[data-check="${focusId}"]`)?.focus();
+  }
+  // the rest of 完了: the bar's 完了, from the top of the list
+  function showAllDone(byKey) {
+    setTodoFilter("done");
+    window.scrollTo(0, 0);
+    if (byKey) $("todoFilters").querySelector('[data-filter="done"]').focus();
   }
 
   // ---------- 日記 ----------
@@ -3508,7 +3552,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const sheetHead = $("sheetHead"), edDelete = $("edDelete");
   let editingId = null, editingStart = null, editScope = "one", editBase = "", editDays = "", edLabelChoice = "", sheetByKey = false, sheetClosing = false, sheetAnims = [], closeTimer = null, drag = null, delTimer = null;
   let settingsFrom = null; // the settings showing: "gear" when opened from the month bar, "day" when from a day's sheet
-  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or ＋, 勉強's or きょう's gear, ToDo's or 目標's ＋
+  let sheetOpener = "day"; // what keyboard focus goes back to when the sheet closes: the day, the calendar's gear or ＋, 勉強's or きょう's gear, ToDo's (or the top bar's) or 目標's ＋
   let settingsScope = "calendar"; // whose settings: the calendar's labels, 勉強's subjects or きょう's tiles ("home")
   let tileDrag = null; // きょう's tile whose row is being dragged by its grip in the settings
   let goalNew = false; // the sheet holds a new goal's form, opened from 目標's ＋
@@ -3762,11 +3806,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     presentSheet(byKey, "plan", $("planTitle"));
   }
   // a new ToDo: its text ready to type in; what was typed stays if the sheet is pulled away, as for a plan
-  function openNewTodo(byKey) {
+  function openNewTodo(byKey, opener = "todo") {
     if (sheetEl.open) return;
     resetSheet();
     todoNew = true; syncSheetHead(); syncTodoSave(); syncTodoDue();
-    presentSheet(byKey, "todo", $("todoText"));
+    presentSheet(byKey, opener, $("todoText"));
     growField($("todoText")); growField($("todoMemo")); // what was kept from before, at its height now it shows
   }
   // a goal's chart: from its row in the list, at the goal's own eight; from 次にやること, at the level of its action (path)
@@ -3835,7 +3879,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     resetSheet();
     // keyboard users land back on what they opened it from: the day (the grid has been redrawn since), the gear, or an
     // entry's row on the page showing (記録's list and the record page can hold the same entry)
-    if (sheetByKey) ({ find: $("calFind"), month: $("calMonthBtn"), gear: $("calSettings"), plan: $("calAdd"), todo: $("todoAdd"), rec: $("sec-" + tab).querySelector(`[data-edit="${recReturnId}"]`), study: $("studySettings"), home: $("homeSettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
+    if (sheetByKey) ({ find: $("calFind"), month: $("calMonthBtn"), gear: $("calSettings"), plan: $("calAdd"), todo: $("todoAdd"), todonav: navbar.classList.contains("scrolled") ? $("navAdd") : $("todoAdd"), rec: $("sec-" + tab).querySelector(`[data-edit="${recReturnId}"]`), study: $("studySettings"), home: $("homeSettings"), goal: $("goalAdd"), chart: $("goalList").querySelector(`[data-goal="${chartReturnId}"]`) || $("goalAdd") }[sheetOpener] || $("calGrid").querySelector(".cal-day.sel"))?.focus();
   });
   // Esc: from an edit form (or settings or a chart reached from a day) back to the day's list, from a chart's cell back
   // out of it, otherwise out of the sheet
