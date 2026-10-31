@@ -1771,6 +1771,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const fmtShort = (s) => { const d = parseYmd(s); return `${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）`; };
   const fmtMD = (s) => { const d = parseYmd(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
   const fmtMDW = (s) => { const d = parseYmd(s); return `${d.getMonth() + 1}月${d.getDate()}日（${WD[d.getDay()]}）`; };
+  // the same with its year when it isn't this year's (2027/1/5（火）, 2025年10月23日（木）), for a 期限 or a day done, so
+  // one next year or last year isn't taken for this year's day of the same date (the user's call: its weekday didn't fit)
+  const fmtDay = (s) => (s.slice(0, 4) === todayKey.slice(0, 4) ? fmtShort(s) : `${Number(s.slice(0, 4))}/${fmtShort(s)}`);
+  const fmtDayLong = (s) => (s.slice(0, 4) === todayKey.slice(0, 4) ? fmtMDW(s) : `${Number(s.slice(0, 4))}年${fmtMDW(s)}`);
   const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
   const daysBetween = (a, b) => Math.round((parseYmd(b) - parseYmd(a)) / 86400000);
   const daysUntil = (s) => daysBetween(todayKey, s);
@@ -2254,7 +2258,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const put = (day) => { due.value = day; due.dispatchEvent(new Event("change", { bubbles: true })); };
     repeat.addEventListener("change", () => { if (repeat.value && !due.value) put(todayKey); });
     quick.append(...[["きょう", 0], ["あした", 1], ["来週", 7]].map(([name, n]) =>
-      el("button", { type: "button", "data-day": addDays(todayKey, n), "aria-label": `${name}、${fmtShort(addDays(todayKey, n))}`, onclick: () => put(addDays(todayKey, n)) }, name)));
+      el("button", { type: "button", "data-day": addDays(todayKey, n), "aria-label": `${name}、${fmtDay(addDays(todayKey, n))}`, onclick: () => put(addDays(todayKey, n)) }, name)));
     clear.addEventListener("click", (ev) => {
       put("");
       if (ev.detail === 0) due.focus(); // pressed from the keyboard: keep focus in the form
@@ -2316,7 +2320,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // with one (the user's call: it was left at a line's end). Something after them (a ToDo's repeat) comes last
   function untilText(day, tail = null) {
     const n = daysUntil(day), part = (s) => el("span", { class: "phrase" }, s);
-    const words = n < 0 ? [`${-n} 日過ぎています`, fmtShort(day)] : n <= 1 ? [n ? "あしたまで" : "きょうまで"] : [`あと ${n} 日`, fmtShort(day)];
+    const words = n < 0 ? [`${-n} 日過ぎています`, fmtDay(day)] : n <= 1 ? [n ? "あしたまで" : "きょうまで"] : [`あと ${n} 日`, fmtDay(day)];
     return el("span", { class: "sub due" + (n < 0 ? " warn" : "") }, el("span", { class: "due-parts" }, words.map(part), tail));
   }
   // the day a ToDo was checked off (doneAt), for those done since it was kept
@@ -2346,7 +2350,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // kept, its 期限. One that repeats says how after its 期限, with a mark of its own (毎週, 毎月第2土曜). Under the きょう
   // heading (inToday) one due today says only its repeat: きょうまで would just say the heading again (the user's call)
   function dueText(t, inToday = false) {
-    if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtShort(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : null;
+    if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtDay(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtDay(t.due)}`) : null;
     const rep = t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, repeatBase(t), false, true)) : null;
     if (inToday && t.due === todayKey) return rep && el("span", { class: "sub due" }, el("span", { class: "due-parts" }, rep));
     return t.due ? untilText(t.due, rep) : null;
@@ -2399,7 +2403,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const next = due ? await todos.add({ text: t.text, done: false, due, repeat: t.repeat, ...(from ? { repeatFrom: from } : {}), ...(t.memo ? { memo: t.memo } : {}), ...(t.flag ? { flag: true } : {}), createdAt: Date.now() }) : null;
       await todos.update(t.id, { done: true, doneAt: Date.now(), ...(next ? { repeat: undefined, next } : {}) });
       // and says when that is (the user's call: it just went, its next turn far down the list), with 元に戻す
-      if (next) flash(`「${t.text}」の次は ${fmtShort(due)}です`, () => { const x = todos.get(t.id); if (x?.done) toggleTodo(x); });
+      if (next) flash(`「${t.text}」の次は ${fmtDay(due)}です`, () => { const x = todos.get(t.id); if (x?.done) toggleTodo(x); });
       return;
     }
     const next = t.next ? todos.get(t.next) : null, back = next && !next.done;
@@ -2414,7 +2418,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!next) return;
     const was = { due: t.due, repeatFrom: t.repeatFrom };
     act(() => todos.update(t.id, { due: next, repeatFrom: turnBase(t, next) }));
-    flash(`「${t.text}」のこの回を削除しました。次は ${fmtShort(next)}です`, () => act(() => todos.update(t.id, was)));
+    flash(`「${t.text}」のこの回を削除しました。次は ${fmtDay(next)}です`, () => act(() => todos.update(t.id, was)));
   }
   // a repeating ToDo's next 期限: the first turn of its repeat after both its 期限 and today, so one done late doesn't come
   // back past it already. The turns are the calendar's (turnStarts), from its 期限, or from the day it had before
@@ -2529,7 +2533,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       // turn back, and × deletes every turn it stands for. In 完了 a row is one line (the user's call: two each took half of
       // すべて), the day it was done small at its end (きょう, きのう, 10/27（火）), a repeat's how many times before it
       const turns = group.get(t) || [t], n = turns.length, filed = todoPlaced(t).done;
-      const when = doneDay(t) ? relLabel(doneDay(t)) || fmtShort(doneDay(t)) : t.due ? `期限 ${fmtShort(t.due)}` : "";
+      const when = doneDay(t) ? relLabel(doneDay(t)) || fmtDay(doneDay(t)) : t.due ? `期限 ${fmtDay(t.due)}` : "";
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
         el("span", { class: "body" }, flagged(todoPlaced(t), editLink("todo", t.id, t.text)),
@@ -3280,11 +3284,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // written as ToDo's 期限 is (untilText)
   function deadlineText(g) {
     if (!g.deadline) return null;
-    return g.done ? el("span", { class: "sub" }, `期限 ${fmtShort(g.deadline)}`) : untilText(g.deadline);
+    return g.done ? el("span", { class: "sub" }, `期限 ${fmtDay(g.deadline)}`) : untilText(g.deadline);
   }
   // the day an achieved goal was achieved (the user's call: neither its row nor its chart said when); none for a goal
   // achieved before the day was kept
-  const doneText = (g) => (g.doneAt ? `${fmtShort(ymd(new Date(g.doneAt)))}に達成` : "");
+  const doneText = (g) => (g.doneAt ? `${fmtDay(ymd(new Date(g.doneAt)))}に達成` : "");
   // under the 期限 field below a goal's chart, which shows the date: the days left in untilText's words (the user's
   // call: the chart didn't say how far off it was), or the day the goal was achieved
   function deadlineNote(g) {
@@ -3305,7 +3309,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   });
   // 保留 (goal.pausedAt): set aside for now, in a section of its own, never 期限切れ, and off the calendar and きょう
   const goalSection = (g) => (g.done ? "達成" : g.pausedAt ? "保留" : g.deadline && g.deadline < todayKey ? "期限切れ" : "進行中");
-  const pausedText = (g) => `${fmtShort(ymd(new Date(g.pausedAt)))}から保留`;
+  const pausedText = (g) => `${fmtDay(ymd(new Date(g.pausedAt)))}から保留`;
   function renderGoals() {
     const active = goals.items.filter((g) => !g.done && !g.pausedAt).sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999") || num(a.createdAt) - num(b.createdAt));
     const paused = goals.items.filter((g) => !g.done && g.pausedAt).sort((a, b) => num(b.pausedAt) - num(a.pausedAt));
@@ -4958,7 +4962,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             if (x?.done) toggleTodo(x);
           } }, "未完了に戻す");
           return [text, recRow("期限", due, { opt: true, after: [quick, clear], below: true }),
-            recRow("完了", el("output", { id: "reDone" }, doneDay(t) ? fmtMDW(doneDay(t)) : "日付なし"), { after: back }), memo];
+            recRow("完了", el("output", { id: "reDone" }, doneDay(t) ? fmtDayLong(doneDay(t)) : "日付なし"), { after: back }), memo];
         }
         return [text, recRow("期限", due, { opt: true, after: [quick, clear], below: true }), repeatRow, recRow("重要", flag), memo];
       },
