@@ -1168,6 +1168,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         </div>
       </div>
 
+      <!-- 読めなくなった記録の中身の控えがあるとき：書き出すか消すまで残す -->
+      <div class="notice" id="asideNote" role="status" hidden>
+        <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="警告"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg>読めなくなった記録の控えがあります</strong>
+        <span id="asideText"></span>
+        <div class="notice-actions">
+          <button type="button" class="btn" id="asideExport">控えを書き出す</button>
+          <button type="button" class="link-btn" id="asideDrop">控えを消す</button>
+        </div>
+      </div>
+
       <!-- 端末に保存しきれなくなったとき（空き容量が足りない、または保存できる量の上限）：書き出しの案内 -->
       <div class="notice" id="fullNote" role="status" hidden>
         <strong><svg class="icon" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="警告"><path d="M1 21 12 2l11 19H1Z"/><path class="cut" d="M13 15h-2v-5h2v5Z"/><circle class="cut" cx="12" cy="17" r="1"/></svg>記録を保存できません</strong>
@@ -1275,6 +1285,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <strong>記録を読み込みますか？</strong>
           <span class="nudge-text" id="importAskText"></span>
           <label class="check-line" id="importAskDeadRow" hidden><input type="checkbox" id="importAskDead"><span id="importAskDeadText"></span></label>
+          <label class="check-line" id="importAskDiffRow" hidden><input type="checkbox" id="importAskDiff"><span id="importAskDiffText"></span></label>
           <div class="notice-actions">
             <button type="button" class="btn sm" id="importGo" aria-describedby="importAskText">読み込む</button>
             <button type="button" class="link-btn" id="importCancel">やめる</button>
@@ -1789,6 +1800,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   </div>
   <button type="button" class="ask-btn ask-keep" id="discardNo">編集を続ける</button>
 </dialog>
+<!-- a step that can't be taken back (すべて完全に削除), asked first in an action sheet that says what it does -->
+<dialog class="ask" id="confirmAsk" aria-labelledby="confirmMsg">
+  <div class="ask-group">
+    <p class="ask-msg" id="confirmMsg"></p>
+    <button type="button" class="ask-btn danger" id="confirmYes"></button>
+  </div>
+  <button type="button" class="ask-btn ask-keep" id="confirmNo">やめる</button>
+</dialog>
 
 <!-- short messages (saved, exported, errors) float above the tab bar, so they show wherever you are on the page -->
 <div class="toast" id="status" role="status"></div>
@@ -2197,6 +2216,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // where records live is said once, under バックアップ on the 記録 page (renderBackup), instead of at the foot of every page
   function showMode() {
     $("noSave").hidden = canStoreLocal;
+    renderAsideNote();
     renderSaveNote();
     renderBrowserNote();
   }
@@ -2277,7 +2297,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // two-step delete: first press arms it, second press within 3 s deletes. List rows have no room for a label, so the ×
   // carries the name 削除 and a 44px target (DADS's exception for icon-only controls), with the entry's name where given
   // (「…」を削除), so VoiceOver says which; armed, it spells the action out
-  function delButton(onConfirm, label = "削除", name = "", armedText = label + "する") {
+  function delButton(onConfirm, label = "削除", name = "", armedText = label + "する", onArm = null) {
     const b = el("button", { type: "button", class: "del" });
     const named = (s) => (name ? `「${name}」を${s}` : s);
     const idle = () => { b.classList.remove("armed"); b.setAttribute("aria-label", named(label)); b.replaceChildren(icon("close", 24)); };
@@ -2288,6 +2308,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       if (b.classList.contains("armed")) { clearTimeout(t); idle(); onConfirm(); return; }
       b.classList.add("armed"); b.textContent = armedText;
       if (name) b.setAttribute("aria-label", named(label + "する")); else b.removeAttribute("aria-label");
+      onArm?.(); // a word on what pressing again does, where it does more than the row shows
       t = setTimeout(idle, 3000);
     });
     return b;
@@ -2425,6 +2446,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // the same 期限, repeat, 重要 and memo (the user's call: it became one, 牛乳 卵 パン). 追加 says how many, the note under
   // the name says so too, and 1件にまとめる runs the lines into one name as before
   const todoLines = () => $("todoText").value.split("\n").map((x) => x.trim()).filter(Boolean);
+  const TODO_NAME = 500; // the most letters a ToDo's name holds
   const syncTodoSave = () => {
     const n = todoLines().length;
     $("todoSave").disabled = !n;
@@ -2511,7 +2533,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("navAdd").addEventListener("click", (ev) => openNewTodo(ev.detail === 0, "todonav")); // the same, in the top bar
   $("todoForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    const lines = todoLines().map((x) => x.slice(0, 200)); // each as long as an edited name can be
+    // each as long as an edited name can be (TODO_NAME), and the message says when one was cut (the user's call: it was
+    // cut at 200 without a word)
+    const whole = todoLines(), lines = whole.map((x) => x.slice(0, TODO_NAME)), cut = whole.filter((x) => x.length > TODO_NAME).length;
     if (!lines.length) return;
     // a new one isn't done, so with 完了 picked it would not show and seem not added: the list goes back to すべて
     if (todoFilter === "done") setTodoFilter("all");
@@ -2521,7 +2545,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(async () => {
       const now = Date.now(), ids = await todos.addMany(lines.map((text, i) => ({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(repeatDays ? { repeatDays } : {}), ...(memo ? { memo } : {}), ...(flag ? { flag: true } : {}), createdAt: now + i })));
       todoNewIds.push(...ids); // lit in the list as the sheet goes down
-      flash(ids.length > 1 ? `ToDoを ${ids.length} 件追加しました` : `「${lines[0]}」を追加しました`, () => takeBack(todos, ids));
+      flash((ids.length > 1 ? `ToDoを ${ids.length} 件追加しました` : `「${clip(lines[0], 40)}」を追加しました`) + (cut ? `（長い名前は ${TODO_NAME} 字までにしました）` : ""), () => takeBack(todos, ids));
     });
     // the sheet stays, empty, with the typing ready for the next one (the user's call: it had to be opened again for each);
     // the bar's キャンセル becomes 閉じる. The next one keeps this one's 期限 (the user's call: several for one day were each
@@ -2648,7 +2672,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     const next = t.next ? todos.get(t.next) : null, back = next && !next.done;
     if (back) takeBack(todos, [next.id]);
-    await todos.update(t.id, { done: false, doneAt: undefined, next: undefined, ...(back ? { repeat: next.repeat, repeatDays: next.repeatDays } : {}) });
+    // what was written on the turn that goes (a memo, 重要, a new name) comes back with the repeat (the user's call: a memo
+    // written there was lost with it)
+    await todos.update(t.id, { done: false, doneAt: undefined, next: undefined, ...(back ? { repeat: next.repeat, repeatDays: next.repeatDays, text: next.text, memo: next.memo, flag: next.flag } : {}) });
   }
   // a repeating ToDo's turn deleted alone (× on its row, or この回を削除 in its sheet): it goes on to its next turn, as if
   // this one were done but with nothing kept as done (the user's call: × on 毎週's ゴミ出し took the repeat with it);
@@ -3948,6 +3974,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     delete list.dataset.stale;
     const items = [...store.items].sort((x, y) => num(x.createdAt) - num(y.createdAt));
     if (!items.length) { setChildren(list, el("li", { class: "empty" }, `${what}はまだありません。下の「${what}を追加」から作れます。`)); return; }
+    // a label or subject in use says on how many records, before it goes and as it goes (the user's call: deleting one said
+    // nothing of the plans that lost it)
+    const usesOf = (l) => (store === labels ? events.items.filter((e) => e.labelId === l.id).length : study.items.filter((x) => x.subjectId === l.id).length);
+    const onWhat = store === labels ? "予定" : "勉強の記録";
     // the calendar's labels: a ring that shows or hides their plans in place of the dot, and ラベルなし first
     const cal = store === labels, hidden = cal ? calHidden() : null, ringFocus = a?.dataset?.ring;
     const ring = (key, name, l) => el("button", { type: "button", class: "check show", role: "checkbox", "aria-checked": String(!hidden.has(key)), "data-ring": key || "none",
@@ -3964,7 +3994,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         ev.target.closest("li").style.cssText = labelStyle({ color: ev.target.value });
         act(() => store.update(l.id, { color: ev.target.value }));
       } }, LABEL_COLORS.map(([k, name]) => el("option", { value: k, selected: k === colorKey(l.color) }, name))),
-      delButton(() => removeWithUndo(store, l.id)))));
+      delButton(() => { const n = usesOf(l); removeWithUndo(store, l.id, n ? `${what}「${l.name}」を削除しました。${onWhat} ${n.toLocaleString("ja-JP")} 件は${what}なしになりました` : undefined); }, "削除", l.name, undefined,
+        () => { const n = usesOf(l); if (n) flash(`「${l.name}」は${onWhat} ${n.toLocaleString("ja-JP")} 件で使っています。もう一度押すと削除し、その${onWhat}は${what}なしになります`); }))));
     if (ringFocus) list.querySelector(`[data-ring="${ringFocus}"]`)?.focus(); // pressed from the keyboard: still on it
   }
   for (const [store, id, what] of [[labels, "labelList", "ラベル"], [subjects, "subjectList", "科目"]]) {
@@ -4800,6 +4831,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // so a field left empty takes its old value back
   const GOAL_EDIT = [["mTitle", "title"], ["mCriterion", "criterion"], ["mDeadline", "deadline"], ["mMemo", "memo"]];
   const goalField = (g, key) => (key === "criterion" ? criterionText(g) : g[key] || "");
+  const GOAL_WORDS = { title: "目標の名前", criterion: "達成基準", deadline: "期限", memo: "メモ" };
   function saveGoalEdit() {
     const g = goals.get(mandalaGoal);
     if (!g || mPath.length || mEditGoal !== g.id) return; // only ever into the goal the fields were filled from
@@ -4810,8 +4842,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     for (const id of ["mTitle", "mCriterion", "mMemo"]) growField($(id)); // an emptied field has its old text back
     if (!Object.keys(patch).length) return;
+    // what was written there before, changed or emptied, comes back with 元に戻す (the user's call: a memo emptied by
+    // mistake had no way back); a field filled for the first time says nothing
+    const lost = Object.keys(patch).filter((key) => goalField(g, key)), before = Object.fromEntries(Object.keys(patch).map((key) => [key, g[key]])), id = g.id;
     act(() => goals.update(g.id, patch));
     syncSheetHead(); // the bar's title is the goal's name
+    if (lost.length) flash(`${lost.length > 1 ? "目標" : GOAL_WORDS[lost[0]]}を書き換えました`, () => act(() => goals.update(id, before)));
   }
   $("mEdit").addEventListener("change", saveGoalEdit);
   // 保留 and back; 元に戻す in the message takes it back
@@ -5008,6 +5044,25 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!ta.value.trim()) commitChartText(); // emptied: the cell goes at once, with what is inside it (元に戻す brings it back)
   });
   mGrid.addEventListener("change", (ev) => { if (ev.target.closest("textarea")) commitChartText(); });
+  // a cell's own text as its writing began; written over or emptied, 元に戻す puts it back once the writing ends (the
+  // user's call: a cell's name had no way back). A cell written where nothing was, and one emptied with things inside it
+  // (which says so itself), say nothing here
+  let cellBefore = null;
+  mGrid.addEventListener("focusin", (ev) => {
+    const ta = ev.target.closest("textarea"), g = goals.get(mandalaGoal);
+    if (!ta || !g) return;
+    const k = Number(ta.dataset.k), cell = slotsAt(editChart(g), mPath)[k];
+    cellBefore = { id: g.id, path: [...mPath], k, cell: cell ? JSON.parse(JSON.stringify(cell)) : null };
+  });
+  mGrid.addEventListener("focusout", (ev) => {
+    const ta = ev.target.closest("textarea"), was = cellBefore;
+    if (!ta || !was || was.k !== Number(ta.dataset.k)) return;
+    cellBefore = null;
+    commitChartText();
+    const old = was.cell?.t?.trim() || "", now = ta.value.trim();
+    if (!old || old === now || (!now && kidsOf(was.cell, Infinity).length)) return;
+    flash(now ? `「${clip(oneLine(old), 30)}」を「${clip(oneLine(now), 30)}」に書き換えました` : `「${clip(oneLine(old), 30)}」を消しました`, () => putCellBack(was.id, was.path, was.k, was.cell));
+  });
   // 改行 in a cell goes on to the next empty one, in reading order, and after the last of them ends the typing (the
   // user's call: it put a line break in the cell)
   mGrid.addEventListener("keydown", (ev) => {
@@ -5339,7 +5394,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         const repeatRow = el("div", { class: "form-rows" }, recRow("繰り返し", repeat), days);
         wireTodoDue(due, quick, clear, repeat, t.repeatFrom, days)();
         // the text wraps onto as many lines as it needs, as in the ＋ sheet (the user's call), one line of text still: 改行 saves
-        const text = el("textarea", { id: "reText", class: "full grow", rows: 1, placeholder: "やること", "aria-label": "やること", maxlength: 200, required: true }, t.text);
+        const text = el("textarea", { id: "reText", class: "full grow", rows: 1, placeholder: "やること", "aria-label": "やること", maxlength: TODO_NAME, required: true }, t.text);
         text.addEventListener("input", () => { if (/[\r\n]/.test(text.value)) text.value = text.value.replace(/\s*[\r\n]+\s*/g, " "); growField(text); });
         text.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) { ev.preventDefault(); $("recSave").click(); } });
         const memo = el("textarea", { id: "reMemo", class: "full grow memo", rows: 1, placeholder: "メモ", "aria-label": "メモ", maxlength: 1000 }, t.memo || "");
@@ -6216,20 +6271,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const FILE_VERSION = 1;
   async function exportRecords() {
     const payload = { app: "tsumikasane", version: FILE_VERSION, exportedAt: new Date().toISOString(), data: Object.fromEntries(ALL_STORES.map((s) => [s.name, s.items])) };
-    const name = `tsumikasane-${todayKey}.json`;
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const file = new File([blob], name, { type: "application/json" });
-    // on phones the share sheet is the dependable way to keep a file (a home-screen app on iPhone cannot download)
+    const name = `tsumikasane-${todayKey}.json`, how = await handOut(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), name);
+    if (!how) return;
+    noteExport();
+    flash(how === "shared" ? "記録を書き出しました。" : `「${name}」を書き出しました。`);
+  }
+  // a file handed over: on phones by the share sheet, the dependable way to keep one (a home-screen app on iPhone cannot
+  // download; 保存 to ファイル), elsewhere as a download. Says how it went ("shared", "saved"), or null when it didn't
+  async function handOut(blob, name) {
+    const file = new File([blob], name, { type: blob.type });
     if (matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: name }); noteExport(); flash("記録を書き出しました。"); }
-      catch (e) { if (e.name !== "AbortError") flash("書き出せませんでした。もう一度お試しください。"); }
-      return;
+      try { await navigator.share({ files: [file], title: name }); return "shared"; }
+      catch (e) { if (e.name !== "AbortError") flash("書き出せませんでした。もう一度お試しください。"); return null; }
     }
     const a = el("a", { href: URL.createObjectURL(blob), download: name });
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    noteExport();
-    flash(`「${name}」を書き出しました。`);
+    return "saved";
   }
   // 予定を書き出す: every plan in an iCalendar file (.ics) the iPhone's カレンダー takes in (the user's call): repeats as RRULE,
   // turns taken out as EXDATE, the memo as its description and the label as its category. Times carry no zone, so they
@@ -6281,19 +6339,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   async function exportIcs() {
     if (!events.items.length) { flash("書き出す予定がありません。"); return; }
-    const name = `tsumikasane-calendar-${todayKey}.ics`;
-    const blob = new Blob([icsOf()], { type: "text/calendar" });
-    const file = new File([blob], name, { type: "text/calendar" });
-    // on phones the share sheet keeps the file (保存 to ファイル), as for the records' backup
-    if (matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: name }); flash("予定を書き出しました。"); }
-      catch (e) { if (e.name !== "AbortError") flash("書き出せませんでした。もう一度お試しください。"); }
-      return;
-    }
-    const a = el("a", { href: URL.createObjectURL(blob), download: name });
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    flash(`「${name}」を書き出しました。`);
+    const name = `tsumikasane-calendar-${todayKey}.ics`, how = await handOut(new Blob([icsOf()], { type: "text/calendar" }), name);
+    if (how) flash(how === "shared" ? "予定を書き出しました。" : `「${name}」を書き出しました。`);
   }
   $("icsExport").addEventListener("click", exportIcs);
   function noteExport() { act(() => settings.set("backup", { ...(settings.get("backup") || {}), lastExport: Date.now() })); }
@@ -6314,16 +6361,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     const { add, differ, gone, odd, adds } = mergePlan(payload.data);
     const leftOut = (gone ? `消した ${gone} 件は、消したままにします。` : "") + (odd ? `中身が読み取れない ${odd} 件は読み込みません。` : "");
-    if (!add && !gone) { flash(differ || leftOut ? "足す記録はありません。" + (differ ? `内容のちがう ${differ} 件は、この端末のほうのままにします。` : "") + leftOut : "このファイルの記録は、すべてこの端末にあります。"); return; }
+    if (!add && !gone && !differ) { flash(leftOut ? "足す記録はありません。" + leftOut : "このファイルの記録は、すべてこの端末にあります。"); return; }
     const at = new Date(payload.exportedAt);
     const when = isNaN(at) ? "" : (at.getFullYear() !== new Date().getFullYear() ? `${at.getFullYear()}年` : "") + fmtMDW(ymd(at)) + "に書き出した";
     importPending = payload.data;
     $("importAskText").textContent = `${when}「${file.name}」から、` + (add ? `この端末にない記録を ${add.toLocaleString("ja-JP")} 件（${adds.map(([st, n]) => `${STORE_NAMES[st.name]} ${n.toLocaleString("ja-JP")}`).join("・")}）足します。` : "足す記録はありません。")
-      + "いまある記録は変わりません。" + (differ ? `この端末にもあって内容のちがう ${differ} 件は、この端末のほうを残します。` : "") + (odd ? `中身が読み取れない ${odd} 件は読み込みません。` : "");
+      + (differ ? `この端末にもあって内容のちがう ${differ.toLocaleString("ja-JP")} 件は、下で選ばないかぎりこの端末のほうを残します。` : "いまある記録は変わりません。") + (odd ? `中身が読み取れない ${odd} 件は読み込みません。` : "");
     // the ones deleted can come back too, by choice, as from a copy (the user's call: a file couldn't bring them back)
     $("importAskDeadRow").hidden = !gone;
     $("importAskDead").checked = !add;
     $("importAskDeadText").textContent = `消した ${gone.toLocaleString("ja-JP")} 件も戻す`;
+    // records changed here since: the file's own version, by choice, as from a copy (the user's call: a file could only
+    // add what was missing)
+    $("importAskDiffRow").hidden = !differ;
+    $("importAskDiff").checked = false;
+    $("importAskDiffText").textContent = `内容のちがう ${differ.toLocaleString("ja-JP")} 件を、ファイルのときの内容にする（いまの内容は「最近削除した項目」に移します）`;
     $("importAsk").hidden = false;
     $("importGo").focus();
   }
@@ -6332,13 +6384,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // copy too, so the check against the copies doesn't offer them again
   $("importGo").addEventListener("click", () => {
     if (!importPending) return;
-    const withDeleted = !$("importAskDeadRow").hidden && $("importAskDead").checked, tombBefore = [...deleted.items];
-    const added = mergeRecords(importPending, withDeleted), count = addedCount(added);
+    const withDeleted = !$("importAskDeadRow").hidden && $("importAskDead").checked, withChanged = !$("importAskDiffRow").hidden && $("importAskDiff").checked;
+    const tombBefore = [...deleted.items];
+    const added = mergeRecords(importPending, withDeleted), swapped = withChanged ? replaceFrom(importPending) : [];
     const revived = tombBefore.filter((t) => !deleted.items.includes(t)); // deleted ones it brought back
+    const count = addedCount(added) + swapped.reduce((n, [, was]) => n + was.length, 0);
     hideImportAsk();
     saveCopy();
-    flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を足しました。` : "足す記録はありませんでした。",
-      count ? () => { unmerge(added); dropFromCopy(added); if (revived.length) deleted.putBack(revived); flash("読み込みを取り消しました。"); } : null, 10000);
+    flash(count ? `${count.toLocaleString("ja-JP")} 件の記録を${swapped.length ? "読み込み" : "足し"}ました。` : "足す記録はありませんでした。",
+      count ? () => { unmerge(added); dropFromCopy(added); undoReplace(swapped); if (revived.length) deleted.putBack(revived); flash("読み込みを取り消しました。"); } : null, 10000);
     $("importBtn").focus();
   });
   $("importCancel").addEventListener("click", () => { hideImportAsk(); $("importBtn").focus(); });
@@ -6498,10 +6552,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       req.onerror = () => reject(req.error);
     });
   }
+  // a day's first copy, kept beside its last (key first:YYYY-MM-DD) once the day's copy is first written over
+  const FIRST = "first:";
+  const isFirst = (k) => String(k).startsWith(FIRST);
   function readCopies() {
     return openCopies().then((db) => new Promise((resolve, reject) => {
       const r = db.transaction("copies").objectStore("copies").getAll();
-      r.onsuccess = () => { db.close(); resolve(r.result || []); };
+      r.onsuccess = () => { db.close(); resolve((r.result || []).filter((c) => !isFirst(c.day))); };
       r.onerror = () => { db.close(); reject(r.error); };
     }));
   }
@@ -6509,13 +6566,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let copyQueue = Promise.resolve();
   const inQueue = (fn) => (copyQueue = copyQueue.then(fn, fn));
   // the copies' days alone (newest first), and one copy by its day: neither reads every copy whole
-  function copyDays() {
+  function copyKeys() {
     return openCopies().then((db) => new Promise((resolve, reject) => {
       const r = db.transaction("copies").objectStore("copies").getAllKeys();
-      r.onsuccess = () => { db.close(); resolve((r.result || []).sort().reverse()); };
+      r.onsuccess = () => { db.close(); resolve(r.result || []); };
       r.onerror = () => { db.close(); reject(r.error); };
     }));
   }
+  // the days' last copies (a day's first aside), newest first
+  function copyDays() { return copyKeys().then((keys) => keys.filter((k) => !isFirst(k)).sort().reverse()); }
   function readCopy(day) {
     return openCopies().then((db) => new Promise((resolve, reject) => {
       const r = db.transaction("copies").objectStore("copies").get(day);
@@ -6554,12 +6613,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         for (const [st, xs] of lost) for (const x of xs) if (!seen.has(delKey(st, x.id))) { seen.add(delKey(st, x.id)); (extra[st.name] ||= []).push(x); }
       }
       const copy = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, extra[k] ? [...v, ...extra[k]] : v]));
-      const db = await openCopies();
+      // nothing changed since the newest copy: none is written, so a day's first copy comes after its first change
+      const newest = days.length ? from.find((c) => c.day === days[0]) : null;
+      if (newest && JSON.stringify(newest.data) === JSON.stringify(copy)) { if (all) try { localStorage.setItem(CARRY_KEY, "1"); } catch {} return; }
+      const keys = await copyKeys(), db = await openCopies();
       await new Promise((resolve, reject) => {
         const tx = db.transaction("copies", "readwrite"), st = tx.objectStore("copies");
+        // today's copy about to be written over the first time is kept as the day's first (その日のはじめ), so what was
+        // written earlier in the day can still come back (the user's call: each closing wrote over the day's copy)
+        if (newest?.day === todayKey && !keys.includes(FIRST + todayKey)) st.put({ ...newest, day: FIRST + todayKey });
         st.put({ day: todayKey, savedAt: Date.now(), count: recordCount(copy), data: copy });
         const keep = copiesKept([todayKey, ...days.filter((d) => d !== todayKey)]);
         for (const d of days) if (!keep.has(d)) st.delete(d);
+        for (const k of keys) if (isFirst(k) && k.slice(FIRST.length) < addDays(todayKey, 1 - SNAP_DAYS)) st.delete(k); // a week of them
         tx.oncomplete = () => { db.close(); Object.assign(copyState, { latest: Date.now(), n: keep.size, failed: false }); resolve(); };
         tx.onerror = () => { db.close(); reject(tx.error); };
       });
@@ -6717,19 +6783,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let copyPending = null; // the copy waiting on 戻す
   async function renderCopies() {
     if (!canStoreLocal || !window.indexedDB) return;
-    let days = [];
-    try { days = await copyDays(); } catch {}
-    $("copiesNote").textContent = days.length ? `${days.length} 個・新しい順` : "";
-    setChildren($("copiesList"), days.length ? days.map((d) => {
+    let days = [], firsts = new Set();
+    try { const keys = await copyKeys(); days = keys.filter((k) => !isFirst(k)).sort().reverse(); firsts = new Set(keys.filter(isFirst).map((k) => k.slice(FIRST.length))); } catch {}
+    $("copiesNote").textContent = days.length ? `${(days.length + firsts.size).toLocaleString("ja-JP")} 個・新しい順` : "";
+    // a day with its first copy kept too shows both, its last first
+    const row = (key, d, sub) => el("li", { class: "btn-row" }, el("button", { type: "button", class: "row-btn nav", "aria-label": `${fmtMDW(d)}（${sub}）のコピーを見る`, onclick: () => openCopy(key) },
+      el("span", { class: "body" }, el("span", { class: "text" }, fmtMDW(d)), el("span", { class: "sub" }, sub)),
+      el("span", { class: "chev" }, icon("next", 16))));
+    setChildren($("copiesList"), days.length ? days.flatMap((d) => {
       const ago = daysBetween(d, todayKey), rel = ago <= 0 ? "きょう" : ago === 1 ? "きのう" : `${ago} 日前`;
-      return el("li", { class: "btn-row" }, el("button", { type: "button", class: "row-btn nav", "aria-label": `${fmtMDW(d)}のコピーを見る`, onclick: () => openCopy(d) },
-        el("span", { class: "body" }, el("span", { class: "text" }, fmtMDW(d)), el("span", { class: "sub" }, rel + (d === days[0] ? "・最新" : ""))),
-        el("span", { class: "chev" }, icon("next", 16))));
+      return [row(d, d, rel + (d === days[0] ? "・最新" : firsts.has(d) ? "・その日の最後" : "")), firsts.has(d) ? row(FIRST + d, d, `${rel}・その日のはじめ`) : null];
     }) : el("li", { class: "empty" }, "まだコピーはありません。アプリを開くと、毎日作られます。"));
   }
-  async function openCopy(day) {
+  async function openCopy(key) {
+    const day = String(key).replace(FIRST, "");
     let c = null;
-    try { c = await readCopy(day); } catch {}
+    try { c = await readCopy(key); } catch {}
     if (!c) { flash("このコピーは読めませんでした。"); return; }
     const plan = mergePlan(c.data), at = new Date(c.savedAt), when = `${fmtMDW(day)} ${at.getHours()}:${pad(at.getMinutes())}`;
     if (!plan.add && !plan.gone && !plan.differ) { flash("このコピーの記録は、すべてこの端末にあります。"); return; }
@@ -6794,18 +6863,38 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         : near ? (roomy ? "。上限に近づいています。いっぱいになったら、記録はもっと大きい置き場所に移して保存します。" : "。上限に近づいています。いまのうちに記録を書き出しておいてください。") : "");
     line.classList.toggle("due", near && !roomy && !moved.length);
   }
-  // at start: the text kept aside for a store that couldn't be read goes after 30 days, and a draft too old to put back
+  // at start: a draft too old to put back goes (the text kept aside for a store that couldn't be read stays: asideNote)
   function tidyStorage() {
     try {
-      const old = Date.now() - 30 * 864e5;
-      for (const k of Object.keys(localStorage)) {
-        const m = k.startsWith(LS_PREFIX + "unreadable:") && k.match(/:(\d+)$/);
-        if (m && Number(m[1]) < old) localStorage.removeItem(k);
-      }
       const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-      if (d && !(Date.now() - num(d.at) < DRAFT_DAYS * 864e5)) localStorage.removeItem(DRAFT_KEY);
+      if (d && !(Date.now() - num(d.since || d.at) < DRAFT_DAYS * 864e5)) localStorage.removeItem(DRAFT_KEY);
     } catch {}
   }
+
+  // ---------- 読めなくなった記録の控え ----------
+  // what a kind of record held that couldn't be read back is kept aside (loadLocal) until it is written out or let go of,
+  // and the note at the top says so (the user's call: it went after 30 days without a word, the last trace of them)
+  const ASIDE = LS_PREFIX + "unreadable:";
+  function asideKeys() { try { return Object.keys(localStorage).filter((k) => k.startsWith(ASIDE)); } catch { return []; } }
+  function renderAsideNote() {
+    const keys = asideKeys();
+    $("asideNote").hidden = !keys.length;
+    if (!keys.length) return;
+    const kinds = [...new Set(keys.map((k) => k.slice(ASIDE.length).split(":")[0]))].map((n) => STORE_NAMES[n] || { settings: "設定", deleted: "削除した記録" }[n] || n);
+    $("asideText").textContent = `この端末に、読めなくなった記録（${kinds.join("・")}）の中身が控えとして残っています。ファイルに書き出しておくと、あとで直せることがあります。`;
+  }
+  $("asideExport").addEventListener("click", async () => {
+    const items = asideKeys().map((k) => { const [store, at] = k.slice(ASIDE.length).split(":"); let text = ""; try { text = localStorage.getItem(k) || ""; } catch {} return { store, at: Number(at) || 0, text }; });
+    if (!items.length) return;
+    const name = `tsumikasane-unreadable-${todayKey}.json`;
+    const how = await handOut(new Blob([JSON.stringify({ app: "tsumikasane-unreadable", exportedAt: new Date().toISOString(), items }, null, 2)], { type: "application/json" }), name);
+    if (how) flash(how === "shared" ? "控えを書き出しました。" : `「${name}」を書き出しました。`);
+  });
+  armLink($("asideDrop"), "控えを消す", "もう一度押すと控えを消します", () => {
+    for (const k of asideKeys()) try { localStorage.removeItem(k); } catch {}
+    renderAsideNote();
+    flash("控えを消しました。");
+  });
 
   // ---------- 最近削除した項目 ----------
   // what deleted records held in the last 30 days, newest first, each back with 戻す as it was (its id too, so what pointed
@@ -6828,19 +6917,37 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
   }
   const trashShown = () => trashItems().filter((t) => !trashOf || t.store === trashOf);
+  const trashOpen = new Set(); // groups of 最近削除した項目 unfolded, by the moment they were deleted at
   function renderTrash() {
     const items = trashShown(), what = trashOf === "todos" ? "最近削除したToDo" : "最近削除した項目";
     $("sec-trash").querySelector("h2").textContent = what;
     $("trashNote").textContent = items.length ? `${items.length.toLocaleString("ja-JP")} 件・新しい順` : "";
-    setChildren($("trashList"), items.length ? items.map((t) => {
-      const ago = daysBetween(ymd(new Date(t.at)), todayKey), left = Math.max(1, TRASH_DAYS - ago), text = trashText(t);
-      const when = ago <= 0 ? "きょう" : ago === 1 ? "きのう" : `${ago} 日前に`;
+    const whenOf = (t) => { const ago = daysBetween(ymd(new Date(t.at)), todayKey); return [ago <= 0 ? "きょう" : ago === 1 ? "きのう" : `${ago} 日前に`, Math.max(1, TRASH_DAYS - ago)]; };
+    const itemRow = (t) => {
+      const [when, left] = whenOf(t), text = trashText(t);
       return el("li", {},
         el("span", { class: "body" }, el("span", { class: "text clamp" }, text || "（中身なし）"),
           el("span", { class: "sub" }, keepUnits(`${STORE_NAMES[t.store] || ""}・${when}削除・あと ${left} 日`))),
         el("button", { type: "button", class: "link-btn", "aria-label": `「${text}」を戻す`, onclick: () => restoreFromTrash(t.id) }, "戻す"),
         delButton(() => purgeTrash([t.id]), "完全に削除"));
-    }) : el("li", { class: "empty" }, `${what}はありません。`));
+    };
+    // deleted together (完了したものを削除, a day's 日記 written over…), at the one moment: a group with まとめて戻す (the
+    // user's call: 60 ToDos deleted at once took 60 presses of 戻す), its rows folded past the first two
+    const groups = new Map();
+    for (const t of items) { if (!groups.has(t.at)) groups.set(t.at, []); groups.get(t.at).push(t); }
+    const rows = [];
+    for (const [at, ts] of groups) {
+      if (ts.length > 1) {
+        const [when] = whenOf(ts[0]), kinds = [...new Set(ts.map((t) => STORE_NAMES[t.store] || ""))].join("・");
+        rows.push(el("li", { class: "trash-group" },
+          el("span", { class: "body" }, el("span", { class: "text" }, `${kinds} ${ts.length.toLocaleString("ja-JP")} 件`), el("span", { class: "sub" }, `${when}まとめて削除`)),
+          el("button", { type: "button", class: "link-btn", "aria-label": `${when}まとめて削除した ${ts.length} 件をまとめて戻す`, onclick: () => restoreManyFromTrash(ts.map((t) => t.id)) }, "まとめて戻す")));
+      }
+      const folded = ts.length > 3 && !trashOpen.has(at);
+      for (const t of folded ? ts.slice(0, 2) : ts) rows.push(itemRow(t));
+      if (folded) rows.push(el("li", { class: "more-done" }, el("button", { type: "button", class: "link-btn", onclick: () => { trashOpen.add(at); renderTrash(); } }, `ほか ${(ts.length - 2).toLocaleString("ja-JP")} 件を見る`)));
+    }
+    setChildren($("trashList"), rows.length ? rows : el("li", { class: "empty" }, `${what}はありません。`));
     $("trashFoot").hidden = !items.length;
   }
   function renderTrashRow() {
@@ -6848,18 +6955,26 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("trashCount").textContent = n ? n.toLocaleString("ja-JP") : "";
     $("trashBtn").setAttribute("aria-label", n ? `最近削除した項目、${n} 件` : "最近削除した項目");
   }
-  function restoreFromTrash(key) {
-    const t = deleted.get(key), st = t && ALL_STORES.find((x) => x.name === t.store);
-    if (!st || !t.data || !fits(st, t.data)) { flash("この記録は戻せませんでした。"); return; }
-    // a day written again since (日記, 体重): the two change places, the one there now going to 最近削除した項目, so neither
-    // is lost (the user's call); another deleted one of the same day stays there, apart
-    const back = JSON.parse(JSON.stringify(t.data)), now = st.get(back.id);
-    deleted.items = deleted.items.filter((x) => x !== t);
-    if (now) keepInTrash(st, [now]); else setAside(st, back.id);
-    st.items = now ? st.items.map((x) => (x.id === back.id ? back : x)) : [...st.items, back];
+  function restoreFromTrash(key) { restoreManyFromTrash([key]); }
+  // 戻す for one or a group: each as it was, its id too. A day written again since (日記, 体重): the two change places, the
+  // one there now going to 最近削除した項目, so neither is lost (the user's call); another deleted one of the same day stays
+  // there, apart
+  function restoreManyFromTrash(keys) {
+    const touched = new Set();
+    let n = 0, swapped = 0, kind = "";
+    for (const key of keys) {
+      const t = deleted.get(key), st = t && ALL_STORES.find((x) => x.name === t.store);
+      if (!st || !t.data || !fits(st, t.data)) continue;
+      const back = JSON.parse(JSON.stringify(t.data)), now = st.get(back.id);
+      deleted.items = deleted.items.filter((x) => x !== t);
+      if (now) { keepInTrash(st, [now]); swapped++; } else setAside(st, back.id);
+      st.items = now ? st.items.map((x) => (x.id === back.id ? back : x)) : [...st.items, back];
+      touched.add(st); n++; kind = STORE_NAMES[st.name];
+    }
+    if (!n) { flash(keys.length > 1 ? "戻せる記録はありませんでした。" : "この記録は戻せませんでした。"); return; }
     deleted.saveLocal();
-    act(() => { st.saveLocal(); renderAll(); });
-    flash(now ? `${STORE_NAMES[st.name]}を戻しました。いまあったほうは「最近削除した項目」に移しました` : `${STORE_NAMES[st.name]}を戻しました`);
+    act(() => { for (const st of touched) st.saveLocal(); renderAll(); });
+    flash((n > 1 ? `${n.toLocaleString("ja-JP")} 件を戻しました` : `${kind}を戻しました`) + (swapped ? "。いまあったほうは「最近削除した項目」に移しました" : ""));
   }
   // 完全に削除: what deleted records held goes from 最近削除した項目 and from the copies kept on this device too (a file
   // written out before still has it); their ids stay remembered, so nothing older brings them back
@@ -6875,7 +6990,23 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     scrubCopies(ts.map((t) => t.id), exact);
     flash(ts.length > 1 ? `${ts.length.toLocaleString("ja-JP")} 件を完全に削除しました` : "完全に削除しました");
   }
-  armLink($("trashPurgeAll"), "すべて完全に削除", "もう一度押すと、すべて完全に削除します", () => purgeTrash(trashShown().map((t) => t.id)));
+  // a step that can't be taken back, asked first in an action sheet that says what it does (the user's call: two presses
+  // of すべて完全に削除 lost all of it for good, from the copies too)
+  let confirmGo = null;
+  function askFirst(msg, yes, go) {
+    $("confirmMsg").textContent = msg; $("confirmYes").textContent = yes; confirmGo = go;
+    $("confirmAsk").showModal(); $("confirmNo").focus();
+  }
+  $("confirmYes").addEventListener("click", () => { const go = confirmGo; $("confirmAsk").close(); go?.(); });
+  $("confirmNo").addEventListener("click", () => $("confirmAsk").close());
+  $("confirmAsk").addEventListener("click", (ev) => { if (ev.target === $("confirmAsk")) $("confirmAsk").close(); }); // around the buttons
+  $("confirmAsk").addEventListener("close", () => { confirmGo = null; });
+  $("trashPurgeAll").addEventListener("click", () => {
+    const ts = trashShown();
+    if (!ts.length) return;
+    const n = ts.length.toLocaleString("ja-JP");
+    askFirst(`${trashOf === "todos" ? "最近削除したToDo" : "最近削除した項目"}の ${n} 件を${ts.length > 1 ? "、すべて" : ""}完全に削除しますか？端末の中のコピーからも消えるので、もう戻せません。`, `${n} 件を完全に削除`, () => purgeTrash(ts.map((t) => t.id)));
+  });
   // those records out of every copy, as records and as what deleted ones held (in turn after a copy being made)
   function scrubCopies(keys, exact = []) {
     const gone = new Set(keys), same = new Map();
@@ -6884,7 +7015,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     return inQueue(async () => {
       if (!canStoreLocal || !window.indexedDB) return;
       try {
-        for (const day of await copyDays()) {
+        for (const day of await copyKeys()) {
           const c = await readCopy(day);
           if (!c?.data) continue;
           let changed = false;
@@ -6913,10 +7044,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // ---------- 書きかけ ----------
   // what was being typed into an add form and not yet added is kept as the app goes away, and put back when it opens
   // again: after the reload a new day brings, or when the phone has closed the app meanwhile (日記 saves itself). Kept
-  // for two days; a form added or emptied lets go of it. The new plan, ToDo and goal forms are in the sheet: one open as
-  // the app went away opens again. So does an entry or a plan being changed (EDIT_FORMS), kept only while its sheet is
-  // open, and with which one it was
-  const DRAFT_KEY = LS_PREFIX + "draft", DRAFT_DAYS = 2;
+  // for a month (the user's call: one older than two days went without a word); a form added or emptied lets go of it.
+  // The new plan, ToDo and goal forms are in the sheet: one open as the app went away opens again. So does an entry or a
+  // plan being changed (EDIT_FORMS), kept only while its sheet is open, and with which one it was. Only typing from the
+  // last two days opens a sheet or a page again; older typing fills its form quietly and says so once (since: when the
+  // typing last changed, told: said so)
+  const DRAFT_KEY = LS_PREFIX + "draft", DRAFT_DAYS = 30, DRAFT_FRESH = 2;
+  const DRAFT_NAMES = { meal: "食事", workout: "運動", study: "勉強", routine: "ルーティーン", money: "家計簿", plan: "予定", todo: "ToDo", goal: "目標" };
   const DRAFT_FORMS = { mealForm: "meal", workoutForm: "workout", studyForm: "study", rtForm: "routine", exForm: "money", planForm: "plan", todoForm: "todo", goalForm: "goal" };
   const DRAFT_SHEETS = { plan: openNewPlan, todo: openNewTodo, goal: openNewGoal };
   const EDIT_FORMS = { evEdit: "edit", recForm: "rec" };
@@ -6942,7 +7076,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (mode === "rec" && recEdit) { const f = draftOf($("recForm")); if (f) edit = { form: "recForm", kind: recEdit.kind, id: recEdit.id, fields: f }; }
     const open = DRAFT_SHEETS[mode] ? mode : null;
     try {
-      if (Object.keys(forms).length || edit) localStorage.setItem(DRAFT_KEY, JSON.stringify({ at: Date.now(), tab, open, forms, edit }));
+      let prev = null;
+      try { prev = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch {}
+      const same = !!prev && JSON.stringify(prev.forms || {}) === JSON.stringify(forms); // the same typing: its age goes on
+      const since = same ? num(prev.since || prev.at) : Date.now(), told = same && !!prev.told;
+      if (Object.keys(forms).length || edit) localStorage.setItem(DRAFT_KEY, JSON.stringify({ at: Date.now(), since, told, tab, open, forms, edit }));
       else localStorage.removeItem(DRAFT_KEY);
     } catch {}
   }
@@ -6984,10 +7122,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function restoreDraft(atHome) {
     let d = null;
     try { d = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch {}
-    if (!d || !(d.forms || d.edit) || !(Date.now() - num(d.at) < DRAFT_DAYS * 864e5)) return;
+    const since = num(d?.since || d?.at), fresh = Date.now() - since < DRAFT_FRESH * 864e5;
+    if (!d || !(d.forms || d.edit) || !(Date.now() - since < DRAFT_DAYS * 864e5)) return;
     const ids = Object.keys(d.forms || {}).filter((id) => DRAFT_FORMS[id] && $(id));
     const edited = !!d.edit && reopenEdit(d.edit);
     if (!ids.length && !edited) return;
+    // older typing, its forms filled in where they are (a sheet's form shows as it opens), said once
+    if (!fresh && !edited) {
+      for (const id of ids) fillForm($(id), d.forms[id]);
+      if (d.told) return;
+      flash(`${Math.floor((Date.now() - since) / 864e5)} 日前の書きかけ（${ids.map((id) => DRAFT_NAMES[DRAFT_FORMS[id]]).join("・")}）が、入力欄に残っています。`);
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, told: true })); } catch {}
+      return;
+    }
     const sheetForm = !edited && d.open && ids.find((id) => DRAFT_FORMS[id] === d.open);
     if (sheetForm) DRAFT_SHEETS[d.open](false);
     else if (atHome && !edited) {
