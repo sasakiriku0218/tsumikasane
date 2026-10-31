@@ -336,7 +336,12 @@ form.add > .full, form.add > .actions { grid-column: 1 / -1; }
 /* a date with its 期限なしにする under it, so the date keeps its width (the user's call: it was cut short beside it) */
 .ffield.below { flex-wrap: wrap; }
 .ffield.below > input[type="date"] { flex: 0 0 10em; }
-.ffield.below > .link-btn { flex-basis: 100%; text-align: left; }
+.ffield.below > .link-btn { position: relative; flex-basis: 100%; min-height: 32px; text-align: left; }
+.ffield.below > .link-btn::after { content: ""; position: absolute; inset: -6px 0; }  /* a 44px reach, as the days above */
+/* きょう・あした・来週 under a ToDo's 期限, a tap putting that day in (the user's call), on a line of their own */
+.quick-days { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.quick-days button { position: relative; min-height: 32px; padding: 0 12px; background: var(--fill); border: 0; border-radius: 999px; color: var(--fg); font-size: var(--t-sub); line-height: 1.2; cursor: pointer; }
+.quick-days button::after { content: ""; position: absolute; inset: -6px 0; }  /* a 44px reach */
 /* a note under a field, in the fields' column (a goal's 期限 and how far off it is) */
 .field-note { grid-column: -2 / -1; margin-top: -6px; }
 .field-note:empty { display: none; }
@@ -450,6 +455,12 @@ ul.list > li > .check, ul.list > li > .del { z-index: 1; }
 li.done .check circle { fill: var(--f-todo); stroke: var(--f-todo); }
 li.done .check path { fill: #ffffff; }
 li.done .text { color: var(--muted); text-decoration: line-through; }
+/* a ToDo just added, lit for a moment in the list as the sheet goes down (spotTodos), and scrolled into sight clear of
+   the bars over the list and the message above them */
+#todoList > li { scroll-margin: calc(44px + env(safe-area-inset-top, 0px) + 8px) 0 calc(var(--tabbar) + max(12px, env(safe-area-inset-bottom, 0px)) + var(--space-1) + var(--pagebar) + 64px); }
+#todoList > li.spot { animation: td-spot 2.4s ease-out; }
+@keyframes td-spot { 0%, 45% { background-color: color-mix(in srgb, var(--c-todo) 16%, transparent); } 100% { background-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { #todoList > li.spot { animation: none; background-color: color-mix(in srgb, var(--c-todo) 16%, transparent); } }
 /* ルーティーン: a done item fills its check in the record's colour; no strike-through, it's a habit kept, not a task gone */
 #rtList li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
 /* ルーティーン on きょう: the day's items, each a row that checks or unchecks it right there (the user's call). The rows sit
@@ -1564,12 +1575,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       <div class="card mp-grid" id="mpGrid" role="group" aria-labelledby="mpYear"></div>
       <div class="card"><button type="button" class="link-btn sheet-row" id="mpToday">今月に戻る</button></div>
     </div>
-    <!-- a new ToDo, from the ＋ beside ToDo's title: キャンセル and 追加 on the bar, as for a new plan -->
+    <!-- a new ToDo, from the ＋ beside ToDo's title: キャンセル and 追加 on the bar, as for a new plan. Its 期限 has きょう・
+         あした・来週 under it, a repeat once it is set, and a memo (the user's call) -->
     <div class="sheet-view" id="todoView" hidden>
       <form class="add" id="todoForm" autocomplete="off">
         <textarea id="todoText" class="full grow" rows="1" placeholder="やること" aria-label="やること" maxlength="200" required></textarea>
         <label class="flabel" for="todoDue">期限 <span class="opt">任意</span></label>
-        <div class="ffield below"><input type="date" id="todoDue"><button type="button" class="link-btn" id="todoDueClear" hidden>期限なしにする</button></div>
+        <div class="ffield below"><input type="date" id="todoDue"><span class="quick-days" id="todoQuick" role="group" aria-label="期限をすぐ選ぶ"></span><button type="button" class="link-btn" id="todoDueClear" hidden>期限なしにする</button></div>
+        <div class="form-rows" id="todoRepeatRow" hidden>
+          <label class="flabel" for="todoRepeat">繰り返し</label>
+          <div class="ffield"><select id="todoRepeat"></select></div>
+        </div>
+        <textarea id="todoMemo" class="full grow memo" rows="1" placeholder="メモ" aria-label="メモ" maxlength="1000"></textarea>
       </form>
     </div>
     <!-- an entry of ToDo, 食事, 運動, 勉強 or 家計簿, from its row on that page (the user's call: what was put in can be put
@@ -1967,16 +1984,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
 
   // two-step delete: first press arms it, second press within 3 s deletes. List rows have no room for a label, so the ×
-  // carries the name 削除 and a 44px target (DADS's exception for icon-only controls); armed, it spells the action out
-  function delButton(onConfirm, label = "削除") {
+  // carries the name 削除 and a 44px target (DADS's exception for icon-only controls), with the entry's name where given
+  // (「…」を削除), so VoiceOver says which; armed, it spells the action out
+  function delButton(onConfirm, label = "削除", name = "") {
     const b = el("button", { type: "button", class: "del" });
-    const idle = () => { b.classList.remove("armed"); b.setAttribute("aria-label", label); b.replaceChildren(icon("close", 24)); };
+    const named = (s) => (name ? `「${name}」を${s}` : s);
+    const idle = () => { b.classList.remove("armed"); b.setAttribute("aria-label", named(label)); b.replaceChildren(icon("close", 24)); };
     idle();
     let t = null;
     b.addEventListener("click", (ev) => {
       ev.stopPropagation();
       if (b.classList.contains("armed")) { clearTimeout(t); idle(); onConfirm(); return; }
-      b.classList.add("armed"); b.removeAttribute("aria-label"); b.textContent = label + "する";
+      b.classList.add("armed"); b.textContent = label + "する";
+      if (name) b.setAttribute("aria-label", named(label + "する")); else b.removeAttribute("aria-label");
       t = setTimeout(idle, 3000);
     });
     return b;
@@ -2111,13 +2131,28 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a new ToDo is made in the sheet the ＋ beside the title opens (openNewTodo); 追加 there stays grey until it has its text
   const syncTodoSave = () => { $("todoSave").disabled = !$("todoText").value.trim(); };
   $("todoText").addEventListener("input", syncTodoSave);
-  function clearTodoForm() { $("todoForm").reset(); $("todoDueClear").hidden = true; syncTodoSave(); growField($("todoText")); }
-  // a day once picked is hard to empty again on iPhone, so 期限なしにする does it, as in the edit form
-  for (const type of ["input", "change"]) $("todoDue").addEventListener(type, () => { $("todoDueClear").hidden = !$("todoDue").value; });
-  $("todoDueClear").addEventListener("click", (ev) => {
-    $("todoDue").value = ""; $("todoDueClear").hidden = true;
-    if (ev.detail === 0) $("todoDue").focus(); // pressed from the keyboard: keep focus in the form
-  });
+  // a ToDo's 期限, here and in its edit form: きょう, あした and 来週 (a week on) under the date put that day in at a tap
+  // (the user's call), and 期限なしにする empties it again, a day once picked being hard to empty on iPhone. The 繰り返し
+  // row shows once there is a 期限, its words following the day (毎週（土曜日）). Gives back what puts the rows right
+  function wireTodoDue(due, quick, clear, repeatRow, repeat) {
+    const sync = () => {
+      const none = !due.value;
+      clear.hidden = none; repeatRow.hidden = none; repeat.disabled = none;
+      for (const o of repeat.options) o.textContent = repeatName(o.value, due.value, true);
+    };
+    for (const type of ["input", "change"]) due.addEventListener(type, sync);
+    const put = (day) => { due.value = day; due.dispatchEvent(new Event("change", { bubbles: true })); };
+    quick.append(...[["きょう", 0], ["あした", 1], ["来週", 7]].map(([name, n]) =>
+      el("button", { type: "button", "aria-label": `${name}、${fmtShort(addDays(todayKey, n))}`, onclick: () => put(addDays(todayKey, n)) }, name)));
+    clear.addEventListener("click", (ev) => {
+      put("");
+      if (ev.detail === 0) due.focus(); // pressed from the keyboard: keep focus in the form
+    });
+    return sync;
+  }
+  const syncTodoDue = wireTodoDue($("todoDue"), $("todoQuick"), $("todoDueClear"), $("todoRepeatRow"), $("todoRepeat"));
+  $("todoMemo").addEventListener("input", () => growField($("todoMemo"))); // the memo grows too, keeping its line breaks
+  function clearTodoForm() { $("todoForm").reset(); syncTodoDue(); syncTodoSave(); growField($("todoText")); growField($("todoMemo")); }
   $("todoAdd").addEventListener("click", (ev) => openNewTodo(ev.detail === 0));
   $("todoForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -2125,9 +2160,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!text) return;
     // a new one isn't done, so with 完了 picked it would not show and seem not added: the list goes back to すべて
     if (todoFilter === "done") setTodoFilter("all");
-    const due = $("todoDue").value || "";
+    const due = $("todoDue").value || "", repeat = due && $("todoRepeat").value, memo = $("todoMemo").value.trim();
     act(async () => {
-      const id = await todos.add({ text, done: false, due, createdAt: Date.now() });
+      const id = await todos.add({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(memo ? { memo } : {}), createdAt: Date.now() });
+      todoNewIds.push(id); // lit in the list as the sheet goes down
       flash(`「${text}」を追加しました`, () => unmerge([[todos, [id]]]));
     });
     // the sheet stays, empty, with the typing ready for the next one (the user's call: it had to be opened again for each);
@@ -2151,22 +2187,25 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a 期限 by the days left, for ToDo and 目標 alike (the user's call: short, and the two written the same way): past it in
   // red, きょう and あした by name, later ones with the date too. The parts are kept whole, so a narrow row breaks the line
   // between them, not inside a word, and the ・ stays at the end of the first line (a line doesn't start with it)
-  function untilText(day) {
-    const n = daysUntil(day), date = fmtShort(day), part = (s) => el("span", { class: "phrase" }, s);
-    if (n < 0) return el("span", { class: "sub warn" }, part(`${-n} 日過ぎています・`), part(date));
-    if (n <= 1) return el("span", { class: "sub" }, part(n ? "あしたまで" : "きょうまで"));
-    return el("span", { class: "sub" }, part(`あと ${n} 日・`), part(date));
+  // with something after it (a ToDo's repeat), that comes last, after a ・ of its own
+  function untilText(day, tail = "") {
+    const n = daysUntil(day), part = (s) => el("span", { class: "phrase" }, s);
+    const parts = [...(n < 0 ? [`${-n} 日過ぎています`, fmtShort(day)] : n <= 1 ? [n ? "あしたまで" : "きょうまで"] : [`あと ${n} 日`, fmtShort(day)]), tail].filter(Boolean);
+    return el("span", { class: "sub" + (n < 0 ? " warn" : "") }, parts.map((s, i) => part(i < parts.length - 1 ? s + "・" : s)));
   }
-  // a done one keeps only its date, the days left meaning nothing now
+  // the day a ToDo was checked off (doneAt), for those done since it was kept
+  const doneDay = (t) => (num(t.doneAt) > 0 ? ymd(new Date(num(t.doneAt))) : "");
+  // a done one says the day it was done (the user's call), the days left meaning nothing now; one done before that was
+  // kept, its 期限. One that repeats says how after its 期限 (毎週, 毎月第2土曜)
   function dueText(t) {
-    if (!t.due) return null;
-    return t.done ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : untilText(t.due);
+    if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtShort(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : null;
+    return t.due ? untilText(t.due, t.repeat ? repeatName(t.repeat, t.due) : "") : null;
   }
   // the order to do them in, on this page and on きょう's tile (the user's call: the page as the tile has it): the 期限
   // soonest first, which puts those past it first and today's next, then those without one, each oldest first. Done
-  // ones go after the rest, as they were added
+  // ones go after the rest, the last done first (the user's call); those done before the day was kept, after them
   const todoOrder = (a, b) => Number(!!a.done) - Number(!!b.done)
-    || (a.done ? 0 : (a.due || "9999").localeCompare(b.due || "9999"))
+    || (a.done ? num(b.doneAt) - num(a.doneAt) : (a.due || "9999").localeCompare(b.due || "9999"))
     || num(a.createdAt) - num(b.createdAt);
   const todoSection = (t) => (t.done ? "完了" : !t.due ? "期限なし" : t.due < todayKey ? "期限切れ" : t.due === todayKey ? "きょう" : "これから");
   // a ToDo checked off stays where it was for a moment, done, then fades and goes down to 完了 (the user's call: a
@@ -2180,7 +2219,27 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     clearTimeout(todoSettling.get(t.id));
     todoSettling.delete(t.id);
     if (done) todoSettling.set(t.id, setTimeout(() => settleTodo(t.id), TODO_SETTLE));
-    act(() => todos.update(t.id, { done }));
+    act(() => setTodoDone(t, done));
+  }
+  // checked off, from the page, きょう's tile or its day: a ToDo keeps when (doneAt). One that repeats comes back as a new
+  // one at its next 期限 (the user's call), the done one keeping which (next) and handing it the repeat. Checked back on
+  // while that one is still to do, it takes the repeat back and the new one goes, so a mistaken tap leaves nothing behind
+  async function setTodoDone(t, done) {
+    if (done) {
+      const due = t.repeat && t.due ? nextDue(t) : null;
+      const next = due ? await todos.add({ text: t.text, done: false, due, repeat: t.repeat, ...(t.memo ? { memo: t.memo } : {}), createdAt: Date.now() }) : null;
+      await todos.update(t.id, { done: true, doneAt: Date.now(), ...(next ? { repeat: undefined, next } : {}) });
+      return;
+    }
+    const next = t.next ? todos.get(t.next) : null, back = next && !next.done;
+    if (back) unmerge([[todos, [next.id]]]);
+    await todos.update(t.id, { done: false, doneAt: undefined, next: undefined, ...(back ? { repeat: next.repeat } : {}) });
+  }
+  // a repeating ToDo's next 期限: the first turn of its repeat after both its 期限 and today, so one done late doesn't come
+  // back past it already. The turns are the calendar's (turnStarts), from its 期限; four years on finds a 29th of February
+  function nextDue(t) {
+    const after = t.due > todayKey ? t.due : todayKey;
+    return turnStarts({ date: t.due, repeat: t.repeat }, addDays(after, 1), addDays(after, 1500))[0] || null;
   }
   function settleTodo(id) {
     // its row on the page and on きょう's tile, whichever it was checked on
@@ -2198,6 +2257,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     act(() => todos.restore(todos.items.map((t) => (moved.has(t.id) ? { ...t, due: todayKey } : t))));
     flash(`期限切れのToDoを ${moved.size} 件、きょうに移しました`, () =>
       act(() => todos.restore(todos.items.map((t) => (moved.has(t.id) && t.due === todayKey ? { ...t, due: moved.get(t.id) } : t)))));
+  }
+  // the ToDos just added in the sheet, lit for a moment in the list it uncovers as it goes down, the first scrolled into
+  // sight (the user's call: a new one didn't stand out among the rest)
+  function spotTodos(ids) {
+    const rows = [...$("todoList").children].filter((li) => ids.includes(li.querySelector(".check")?.dataset.check));
+    if (tab !== "todo" || !rows.length) return;
+    rows[0].scrollIntoView({ block: "nearest", behavior: reduceMotion.matches ? "auto" : "smooth" });
+    for (const r of rows) r.classList.add("spot");
+    setTimeout(() => { for (const r of rows) r.classList.remove("spot"); }, 2400);
   }
   function renderTodos() {
     const items = [...todos.items].sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
@@ -2227,10 +2295,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
             el("button", { type: "button", class: "link-btn dayhead-btn", "aria-label": "期限切れのToDoをすべてきょうに移す", onclick: overdueToToday }, "きょうに移す"))
           : el("li", { class: "dayhead" }, el("span", {}, section), el("span", {}, `${counts.get(section)} 件`)));
       }
+      // its memo under the 期限, two lines at most; the check and × say which ToDo they are for, as on きょう's tile (the
+      // user's call: VoiceOver read every one as just 完了にする and 削除)
       list.append(el("li", { class: t.done ? "done" : "" },
-        el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => toggleTodo(t) }, checkMark()),
-        el("span", { class: "body" }, editLink("todo", t.id, t.text), dueText(t)),
-        delButton(() => removeWithUndo(todos, t.id))
+        el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
+        el("span", { class: "body" }, editLink("todo", t.id, t.text), dueText(t), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null),
+        delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
       ));
     }
     // the check keeps keyboard focus as the list is drawn again, and follows its ToDo down to 完了
@@ -3255,7 +3325,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const lastDate = {}, lastTime = {};
   const remember = (f) => { lastDate[f] = $(f + "Date").value; lastTime[f] = $(f + "Time").value; };
   function clearPlanForm() { $("planForm").reset(); syncPlanSave(); syncPlanRows("plan"); remember("plan"); }
-  for (const id of ["planRepeat", "edRepeat"]) setChildren($(id), REPEATS.map(([k, name]) => el("option", { value: k }, name)));
+  for (const id of ["planRepeat", "edRepeat", "todoRepeat"]) setChildren($(id), REPEATS.map(([k, name]) => el("option", { value: k }, name)));
   // a plan form's rows that come and go (f: "plan" for a new one, "ed" for a change): the end time once there is a start
   // time, the repeat's end once it repeats. No end may come before its start (min), so 追加 and 保存 wait until it's right
   function syncPlanRows(f) {
@@ -3450,6 +3520,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let monthPick = false, pickYear = 0; // the sheet holds the month picker, opened from the month's name; the year it shows
   let todoNew = false; // the sheet holds a new ToDo's form, opened from the ＋ beside ToDo's title
   let todoAdded = false; // a ToDo has been added from it since it opened, so its キャンセル reads 閉じる
+  let todoNewIds = []; // and which, to be lit in the list as the sheet goes down
   let recEdit = null, recReturnId = null; // the entry being changed in the sheet ({ kind, id }), and its row for focus after
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
   let chartFromDay = false; // the chart was opened from a day's list (its goal falls due that day), which 戻る goes back to
@@ -3486,7 +3557,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; todoAdded = false; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; todoAdded = false; todoNewIds = []; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   // a grey day of the month before or after opens its sheet too, without turning the month (the user's call)
@@ -3694,8 +3765,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function openNewTodo(byKey) {
     if (sheetEl.open) return;
     resetSheet();
-    todoNew = true; syncSheetHead(); syncTodoSave();
+    todoNew = true; syncSheetHead(); syncTodoSave(); syncTodoDue();
     presentSheet(byKey, "todo", $("todoText"));
+    growField($("todoText")); growField($("todoMemo")); // what was kept from before, at its height now it shows
   }
   // a goal's chart: from its row in the list, at the goal's own eight; from 次にやること, at the level of its action (path)
   function openChart(id, byKey, path = [], spot = null) {
@@ -3746,6 +3818,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   function closeSheet(instant) {
     if (!sheetEl.open || sheetClosing) return;
     commitChartText(); saveGoalEdit(); // what was typed last is saved now, not when the close event comes (it can come late)
+    if (todoNewIds.length) spotTodos(todoNewIds); // the ToDos added from it, lit in the list it uncovers
     if (instant === true || reduceMotion.matches) { sheetEl.close(); handOverFlash(); return; }
     sheetClosing = true;
     handOverFlash();
@@ -4545,23 +4618,26 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     todo: {
       store: todos, title: "ToDoを編集", del: "このToDoを削除",
       fields: (t) => {
-        // a day once picked is hard to empty again on iPhone, so 期限なしにする does it, as 終日にする does for a plan's time
+        // its 期限 with きょう・あした・来週 and 期限なしにする under it, its repeat once it has one, and its memo, as the ＋
+        // sheet has them (wireTodoDue)
         const due = el("input", { type: "date", id: "reDue", value: t.due || "" });
-        const clear = el("button", { type: "button", class: "link-btn", hidden: !t.due, onclick: (ev) => {
-          due.value = ""; clear.hidden = true;
-          if (ev.detail === 0) due.focus(); // pressed from the keyboard: keep focus in the form
-        } }, "期限なしにする");
-        for (const type of ["input", "change"]) due.addEventListener(type, () => { clear.hidden = !due.value; });
+        const quick = el("span", { class: "quick-days", role: "group", "aria-label": "期限をすぐ選ぶ" });
+        const clear = el("button", { type: "button", class: "link-btn" }, "期限なしにする");
+        const repeat = el("select", { id: "reRepeat" }, REPEATS.map(([k]) => el("option", { value: k, selected: k === (t.repeat || "") }, k)));
+        const repeatRow = el("div", { class: "form-rows" }, recRow("繰り返し", repeat));
+        wireTodoDue(due, quick, clear, repeatRow, repeat)();
         // the text wraps onto as many lines as it needs, as in the ＋ sheet (the user's call), one line of text still: 改行 saves
         const text = el("textarea", { id: "reText", class: "full grow", rows: 1, placeholder: "やること", "aria-label": "やること", maxlength: 200, required: true }, t.text);
         text.addEventListener("input", () => { if (/[\r\n]/.test(text.value)) text.value = text.value.replace(/\s*[\r\n]+\s*/g, " "); growField(text); });
         text.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) { ev.preventDefault(); $("recSave").click(); } });
-        requestAnimationFrame(() => growField(text));
-        return [text, recRow("期限", due, { opt: true, after: clear, below: true })];
+        const memo = el("textarea", { id: "reMemo", class: "full grow memo", rows: 1, placeholder: "メモ", "aria-label": "メモ", maxlength: 1000 }, t.memo || "");
+        memo.addEventListener("input", () => growField(memo)); // keeping its line breaks
+        requestAnimationFrame(() => { growField(text); growField(memo); });
+        return [text, recRow("期限", due, { opt: true, after: [quick, clear], below: true }), repeatRow, memo];
       },
       read: () => {
-        const text = $("reText").value.trim();
-        return text ? { text, due: $("reDue").value || "" } : recBad("reText");
+        const text = $("reText").value.trim(), due = $("reDue").value || "", memo = $("reMemo").value.trim();
+        return text ? { text, due, repeat: (due && $("reRepeat").value) || undefined, memo: memo || undefined } : recBad("reText");
       },
     },
     meal: {
@@ -4868,7 +4944,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const t of evs) list.append(planRow(t, () => editEvent(t.e.id, t.start), "を編集"));
     for (const t of todosDue) {
       list.append(el("li", { class: t.done ? "done" : "" },
-        el("button", { type: "button", class: "check", "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => act(() => todos.update(t.id, { done: !t.done })) }, checkMark()),
+        el("button", { type: "button", class: "check", "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => act(() => setTodoDone(t, !t.done)) }, checkMark()),
         el("span", { class: "body" }, el("span", { class: "text" }, t.text), el("span", { class: "sub" }, "ToDo の期限"))
       ));
     }
@@ -5501,7 +5577,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (DATED.has(s.name) && !isDay(x.date)) return false;
     if (s === events) return typeof x.title === "string" && (!x.repeat || REPEATS.some(([k]) => k === x.repeat)) && (!x.endDate || isDay(x.endDate))
       && (!x.repeatUntil || isDay(x.repeatUntil)) && (!x.skip || Array.isArray(x.skip)) && isClock(x.time) && isClock(x.endTime);
-    if (s === todos) return typeof x.text === "string";
+    if (s === todos) return typeof x.text === "string" && (!x.repeat || REPEATS.some(([k]) => k === x.repeat));
     if (s === labels || s === subjects || s === routines) return typeof x.name === "string";
     if (s === deleted) return typeof x.store === "string" && typeof x.rid === "string" && x.id === `${x.store}/${x.rid}`;
     return true;
