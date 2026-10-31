@@ -2267,13 +2267,20 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     todoAdded = true; syncSheetHead();
     $("todoText").focus();
   });
-  // すべて・未完了・完了, in the page's own bar
+  // すべて・未完了・完了, in the page's own bar. すべて or 未完了 is kept on this device for when the app opens again (the
+  // user's call: it came back to すべて each time); 完了 is for looking back, so the app opens on the one picked before it
+  // rather than on the done ones alone
+  const TODO_FILTER_KEY = LS_PREFIX + "todoFilter";
+  const syncTodoFilters = () => $("todoFilters").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.filter === todoFilter)));
   function setTodoFilter(f) {
     todoFilter = f;
-    $("todoFilters").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.filter === f)));
+    if (f !== "done") try { localStorage.setItem(TODO_FILTER_KEY, f); } catch {}
+    syncTodoFilters();
     renderTodos();
   }
   $("todoFilters").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setTodoFilter(b.dataset.filter)));
+  try { if (localStorage.getItem(TODO_FILTER_KEY) === "active") todoFilter = "active"; } catch {}
+  syncTodoFilters();
   // all of them at once (one save, one redraw), with 元に戻す. It says how many (the user's call: under すべて only ten
   // rows show, a repeat's turns are one row, and it takes them all)
   const doneCount = () => todos.items.filter((x) => x.done).length;
