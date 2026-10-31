@@ -1247,6 +1247,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <ul class="list card" id="todoList"></ul>
         <!-- it acts on the list, so it sits right under it -->
         <div class="list-foot" id="todoFoot"><button type="button" class="link-btn danger" id="clearDone">完了したものを削除</button></div>
+        <!-- the ToDos deleted, kept 30 days in 最近削除した項目: a way there from here too (the user's call: it was only on 記録) -->
+        <ul class="list card" id="todoTrashCard" hidden><li class="btn-row"><button type="button" class="row-btn nav" id="todoTrash"><svg class="icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-trash"/></svg><span>最近削除したToDo</span><span class="row-count" id="todoTrashCount"></span><span class="chev"><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></span></button></li></ul>
       </section>
 
       <!-- 記録: これまでの積み重ね, everything recorded so far (the user's call: no weeks, months or years, and entries are made
@@ -1893,7 +1895,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a page a level down, under a tab, outside the menu: a record's entries under 記録
   const SUBPAGES = [{ key: "reclist", parent: "records" }, { key: "trash", parent: "records" }, { key: "copies", parent: "records" }];
   // the page a page sits under: きょう for the record pages, 記録 for a record's entries
-  const parentOf = (key) => (isRecord(key) ? "home" : SUBPAGES.find((p) => p.key === key)?.parent || null);
+  const parentOf = (key) => (isRecord(key) ? "home" : key === "trash" && trashOf === "todos" ? "todo" : SUBPAGES.find((p) => p.key === key)?.parent || null);
   const SLOTS = ["朝食", "昼食", "夕食", "間食"];
 
   let tab = "home";
@@ -1901,6 +1903,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let viewMonth = monthOf(todayKey);
   let todoFilter = "all";
   let todoQuery = ""; // the words ToDo's list is narrowed to, each of them in a ToDo's name or memo (none: all of it)
+  let trashOf = null; // 最近削除した項目 opened from ToDo's page shows its ToDos alone ("todos"), and goes back there; null: all, from 記録
   let calMonth = monthOf(todayKey), calDay = todayKey;
 
   // ---------- storage: this device's browser (localStorage) ----------
@@ -2560,6 +2563,14 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   // ToDo's tab says how many are 期限切れ or due きょう (the user's call: from another page they went unseen), done ones
   // not counted; read out with the tab's name
+  // the row to 最近削除したToDo at the page's foot, while there are some, with how many
+  function renderTodoTrashRow() {
+    const n = deleted.items.filter((t) => t.data && t.store === "todos").length;
+    $("todoTrashCard").hidden = !n;
+    $("todoTrashCount").textContent = n ? n.toLocaleString("ja-JP") : "";
+    $("todoTrash").setAttribute("aria-label", `最近削除したToDo、${n} 件`);
+  }
+  $("todoTrash").addEventListener("click", () => { trashOf = "todos"; renderTrash(); showTab("trash"); });
   function renderTodoBadge() {
     const n = todos.items.filter((t) => !t.done && t.due && t.due <= todayKey).length, mi = menuEl.querySelector('button[data-tab="todo"] .mi');
     if (!mi) return;
@@ -2570,7 +2581,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     mi.parentElement.append(el("span", { class: "sr-only badge-sr" }, `、期限切れときょう ${n} 件`));
   }
   function renderTodos() {
-    renderTodoBadge();
+    renderTodoBadge(); renderTodoTrashRow();
     const held = todoHeldBack();
     // with words to look for, only those holding all of them, every one of them (no ten-row cut in 完了), and no button
     // to delete all done, which would take more than are showing
@@ -6611,8 +6622,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       default: return x.title || x.name || x.text || "";
     }
   }
+  const trashShown = () => trashItems().filter((t) => !trashOf || t.store === trashOf);
   function renderTrash() {
-    const items = trashItems();
+    const items = trashShown(), what = trashOf === "todos" ? "最近削除したToDo" : "最近削除した項目";
+    $("sec-trash").querySelector("h2").textContent = what;
     $("trashNote").textContent = items.length ? `${items.length.toLocaleString("ja-JP")} 件・新しい順` : "";
     setChildren($("trashList"), items.length ? items.map((t) => {
       const ago = daysBetween(ymd(new Date(t.at)), todayKey), left = Math.max(1, TRASH_DAYS - ago), text = trashText(t);
@@ -6622,7 +6635,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           el("span", { class: "sub" }, keepUnits(`${STORE_NAMES[t.store] || ""}・${when}削除・あと ${left} 日`))),
         el("button", { type: "button", class: "link-btn", "aria-label": `「${text}」を戻す`, onclick: () => restoreFromTrash(t.id) }, "戻す"),
         delButton(() => purgeTrash([t.id]), "完全に削除"));
-    }) : el("li", { class: "empty" }, "最近削除した項目はありません。"));
+    }) : el("li", { class: "empty" }, `${what}はありません。`));
     $("trashFoot").hidden = !items.length;
   }
   function renderTrashRow() {
@@ -6647,7 +6660,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     scrubCopies(ts.map((t) => t.id));
     flash(ts.length > 1 ? `${ts.length.toLocaleString("ja-JP")} 件を完全に削除しました` : "完全に削除しました");
   }
-  armLink($("trashPurgeAll"), "すべて完全に削除", "もう一度押すと、すべて完全に削除します", () => purgeTrash(trashItems().map((t) => t.id)));
+  armLink($("trashPurgeAll"), "すべて完全に削除", "もう一度押すと、すべて完全に削除します", () => purgeTrash(trashShown().map((t) => t.id)));
   // those records out of every copy, as records and as what deleted ones held (in turn after a copy being made)
   function scrubCopies(keys) {
     const gone = new Set(keys);
@@ -6678,7 +6691,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }));
   }
   // drawn before the page slides in, so it arrives whole
-  $("trashBtn").addEventListener("click", () => { renderTrash(); showTab("trash"); });
+  $("trashBtn").addEventListener("click", () => { trashOf = null; renderTrash(); showTab("trash"); });
 
   // ---------- 書きかけ ----------
   // what was being typed into an add form and not yet added is kept as the app goes away, and put back when it opens
