@@ -2485,12 +2485,13 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("todoFoot").hidden = words.length > 0 || !todos.items.some((t) => t.done); // only while there is something done to clear
     if (!$("clearDone").classList.contains("armed")) $("clearDone").textContent = clearDoneLabel();
     const list = $("todoList");
-    const focusId = list.contains(document.activeElement) ? document.activeElement.dataset.check : null; // a check pressed from the keyboard
+    const focused = listFocus(list); // keyboard focus in the list, put back once it is drawn again (refocus)
     list.replaceChildren();
     if (!shown.length) {
-      list.append(el("li", { class: "empty" }, words.length ? `「${todoQuery.trim()}」に合うToDoはありません。` : items.length
+      list.append(el("li", { class: "empty", tabindex: -1 }, words.length ? `「${todoQuery.trim()}」に合うToDoはありません。` : items.length
         ? (todoFilter === "done" ? "完了したものはまだありません" : "すべて完了しました")
         : [el("span", { class: "phrase" }, "まだ何もありません。"), el("span", { class: "phrase" }, "右上の＋から追加できます。")]));
+      if (focused) list.lastChild.focus(); // the last one gone: what the list says now
       return;
     }
     // in sections, each under its name with its count (the user's call): 期限切れ, きょう, これから, 期限なし, then 完了, which
@@ -2541,8 +2542,30 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     }
     if (more.length) list.append(el("li", { class: "more-done" }, el("button", { type: "button", class: "link-btn", onclick: (ev) => showAllDone(ev.detail === 0) },
       `ほか ${sum(more, (t) => group.get(t).length)} 件を見る`)));
-    // the check keeps keyboard focus as the list is drawn again, and follows its ToDo down to 完了
-    if (focusId) list.querySelector(`[data-check="${focusId}"]`)?.focus();
+    if (focused) refocus(list, focused);
+  }
+  // keyboard focus stays in ToDo's list as it is drawn again (the user's call: after ×, この回を削除 or きょうに移す it was
+  // lost, and VoiceOver started over from the top). listFocus notes where it is: which ToDo (its check's id), which of the
+  // row's controls, and how many rows are above it; refocus puts it back. A check keeps it and follows its ToDo down to
+  // 完了; a control whose row is still in its place keeps it; otherwise it goes to the name of the row now in that
+  // place (the next one), or the last row
+  function listFocus(list) {
+    const a = document.activeElement, li = a && a !== list && list.contains(a) ? a.closest("li") : null;
+    if (!li) return null;
+    const lis = [...list.children];
+    return {
+      id: li.querySelector(".check")?.dataset.check,
+      sel: a.matches(".check") ? ".check" : a.matches(".del") ? ".del" : a.closest(".ev-memo") ? ".ev-memo a" : a.matches(".dayhead-btn") ? ".dayhead-btn" : li.matches(".more-done") ? ".more-done button" : "[data-edit]",
+      at: lis.slice(0, lis.indexOf(li)).filter((x) => x.querySelector(".check")).length,
+    };
+  }
+  function refocus(list, f) {
+    const rows = [...list.children].filter((x) => x.querySelector(".check"));
+    const same = f.id ? rows.find((x) => x.querySelector(".check").dataset.check === f.id) : null;
+    let to = null;
+    if (same && (f.sel === ".check" || rows.indexOf(same) === f.at)) to = same.querySelector(f.sel) || same.querySelector("[data-edit]");
+    else if (!f.id) to = list.querySelector(f.sel);
+    (to || rows[Math.min(f.at, rows.length - 1)]?.querySelector("[data-edit]"))?.focus();
   }
   $("todoSearch").addEventListener("input", (ev) => { todoQuery = ev.target.value; renderTodos(); });
   $("todoSearch").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing) ev.target.blur(); }); // 検索 puts the keyboard away
