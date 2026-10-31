@@ -499,6 +499,7 @@ li.done .text { color: var(--muted); }  /* done: grey, not struck through (the u
 /* 重要's mark after the name, on the page and on its day */
 .todo-flag { display: inline-block; margin-inline-start: 6px; color: var(--flag); vertical-align: -1px; }
 .todo-flag .icon { width: .9em; height: .9em; }  /* as large as the text it follows */
+.flag-tail { white-space: nowrap; }
 /* ルーティーン: a done item fills its check in the record's colour; no strike-through, it's a habit kept, not a task gone */
 #rtList li.done .check circle { fill: var(--f-routine); stroke: var(--f-routine); }
 /* ルーティーン on きょう: the day's items, each a row that checks or unchecks it right there (the user's call). The rows sit
@@ -2282,7 +2283,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a ToDo's name as a button, with 重要's mark after it while it is still to do, and said in its name (the user's call)
   function flagged(t, button) {
     if (!t.flag || t.done) return button;
-    button.append(el("span", { class: "todo-flag" }, icon("flag", 15)));
+    // the mark keeps to the name's last letter, so a narrow row never leaves it alone on a line (the user's call)
+    const chars = Array.from(button.textContent);
+    button.replaceChildren(chars.slice(0, -1).join(""), el("span", { class: "flag-tail" }, chars.slice(-1).join(""), el("span", { class: "todo-flag" }, icon("flag", 15))));
     button.setAttribute("aria-label", button.getAttribute("aria-label") + "（重要）");
     return button;
   }
