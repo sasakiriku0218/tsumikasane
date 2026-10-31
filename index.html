@@ -490,6 +490,10 @@ li.done .text { color: var(--muted); }  /* done: grey, not struck through (the u
 #todoList > li > .check { margin-block-start: calc((var(--t-body) * 1.41 - 24px) / 2); }
 #todoList > li > .del { margin-block: calc((var(--t-body) * 1.41 - 44px) / 2) 0; }
 #todoList > li > .del.armed { margin-block: calc((var(--t-body) * 1.41 - 32px) / 2) 0; }
+/* 完了's day at the end of the name's line, or beneath it at the right when the two don't fit (a long name, a narrow
+   screen); the check stays at the start either way */
+#todoList > li > .body:has(> .done-day) { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 12px; }
+.done-day { flex: none; margin-inline-start: auto; color: var(--muted); font-size: var(--t-sub); font-variant-numeric: tabular-nums; }
 /* 重要's mark after the name, on the page and on its day */
 .todo-flag { display: inline-block; margin-inline-start: 6px; color: var(--flag); vertical-align: -1px; }
 .todo-flag .icon { width: .9em; height: .9em; }  /* as large as the text it follows */
@@ -2375,13 +2379,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       }
       // its memo under the 期限, two lines at most; the check and × say which ToDo they are for, as on きょう's tile (the
       // user's call: VoiceOver read every one as just 完了にする and 削除). A repeat's row in 完了: its check takes the last
-      // turn back, and × deletes every turn it stands for
-      const turns = group.get(t) || [t], n = turns.length;
+      // turn back, and × deletes every turn it stands for. In 完了 a row is one line (the user's call: two each took half of
+      // すべて), the day it was done small at its end (きょう, きのう, 10/27（火）), a repeat's how many times before it
+      const turns = group.get(t) || [t], n = turns.length, filed = todoPlaced(t).done;
+      const when = doneDay(t) ? relLabel(doneDay(t)) || fmtShort(doneDay(t)) : t.due ? `期限 ${fmtShort(t.due)}` : "";
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
         el("span", { class: "body" }, flagged(t, editLink("todo", t.id, t.text)),
-          n > 1 ? el("span", { class: "sub" }, (doneDay(t) ? `${fmtShort(doneDay(t))}に完了・` : "") + `これまで ${n} 回`) : dueText(t),
-          t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null),
+          filed ? (when || n > 1 ? el("span", { class: "done-day" }, keepUnits([n > 1 ? `${n} 回` : "", when].filter(Boolean).join("・"))) : null)
+            : [dueText(t), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null]),
         n > 1 ? delButton(() => removeWithUndo(todos, turns.map((x) => x.id), `「${t.text}」の完了を ${n} 件削除しました`), "削除", `${t.text}（完了 ${n} 件）`)
           : delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
       ));
