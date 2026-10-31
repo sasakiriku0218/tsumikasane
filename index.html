@@ -1638,7 +1638,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         <textarea id="todoText" class="full grow" rows="1" placeholder="やること" aria-label="やること" maxlength="200" required></textarea>
         <label class="flabel" for="todoDue">期限 <span class="opt">任意</span></label>
         <div class="ffield below"><input type="date" id="todoDue"><span class="quick-days" id="todoQuick" role="group" aria-label="期限をすぐ選ぶ"></span><button type="button" class="link-btn" id="todoDueClear" hidden>期限なしにする</button></div>
-        <div class="form-rows" id="todoRepeatRow" hidden>
+        <div class="form-rows">
           <label class="flabel" for="todoRepeat">繰り返し</label>
           <div class="ffield"><select id="todoRepeat"></select></div>
         </div>
@@ -2210,18 +2210,22 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("todoText").addEventListener("input", syncTodoSave);
   // a ToDo's 期限, here and in its edit form: きょう, あした and 来週 (a week on) under the date put that day in at a tap
   // (the user's call), and 期限なしにする empties it again, a day once picked being hard to empty on iPhone. The 繰り返し
-  // row shows once there is a 期限, its words following the day (毎週（土曜日）), or the day its turns count from while the
-  // 期限 is the one きょうに移す gave it (base). Gives back what puts the rows right
-  function wireTodoDue(due, quick, clear, repeatRow, repeat, base = null) {
+  // row is there from the start (the user's call: it showed only once there was a 期限, so repeats went unfound); a repeat
+  // picked with no 期限 starts today, and a 期限 emptied takes the repeat with it, a repeat counting from its 期限. Its
+  // words follow the day (毎週（土曜日）), or the day its turns count from while the 期限 is the one きょうに移す gave it
+  // (base). Gives back what puts the rows right
+  function wireTodoDue(due, quick, clear, repeat, base = null) {
     const sync = () => {
       const none = !due.value, from = base && due.value === due.defaultValue ? base : due.value;
-      clear.hidden = none; repeatRow.hidden = none; repeat.disabled = none;
+      clear.hidden = none;
+      if (none && repeat.value) repeat.value = "";
       for (const o of repeat.options) o.textContent = repeatName(o.value, from, true);
       // the one of きょう・あした・来週 that is the 期限 shows it (the user's call: a tap changed only the date's digits)
       for (const b of quick.children) b.setAttribute("aria-pressed", String(due.value === b.dataset.day));
     };
     for (const type of ["input", "change"]) due.addEventListener(type, sync);
     const put = (day) => { due.value = day; due.dispatchEvent(new Event("change", { bubbles: true })); };
+    repeat.addEventListener("change", () => { if (repeat.value && !due.value) put(todayKey); });
     quick.append(...[["きょう", 0], ["あした", 1], ["来週", 7]].map(([name, n]) =>
       el("button", { type: "button", "data-day": addDays(todayKey, n), "aria-label": `${name}、${fmtShort(addDays(todayKey, n))}`, onclick: () => put(addDays(todayKey, n)) }, name)));
     clear.addEventListener("click", (ev) => {
@@ -2230,7 +2234,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     });
     return sync;
   }
-  const syncTodoDue = wireTodoDue($("todoDue"), $("todoQuick"), $("todoDueClear"), $("todoRepeatRow"), $("todoRepeat"));
+  const syncTodoDue = wireTodoDue($("todoDue"), $("todoQuick"), $("todoDueClear"), $("todoRepeat"));
   $("todoMemo").addEventListener("input", () => growField($("todoMemo"))); // the memo grows too, keeping its line breaks
   function clearTodoForm() { $("todoForm").reset(); syncTodoDue(); syncTodoSave(); growField($("todoText")); growField($("todoMemo")); }
   $("todoAdd").addEventListener("click", (ev) => openNewTodo(ev.detail === 0));
@@ -4828,7 +4832,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         const clear = el("button", { type: "button", class: "link-btn" }, "期限なしにする");
         const repeat = el("select", { id: "reRepeat" }, REPEATS.map(([k]) => el("option", { value: k, selected: k === (t.repeat || "") }, k)));
         const repeatRow = el("div", { class: "form-rows" }, recRow("繰り返し", repeat));
-        wireTodoDue(due, quick, clear, repeatRow, repeat, t.repeatFrom)();
+        wireTodoDue(due, quick, clear, repeat, t.repeatFrom)();
         // the text wraps onto as many lines as it needs, as in the ＋ sheet (the user's call), one line of text still: 改行 saves
         const text = el("textarea", { id: "reText", class: "full grow", rows: 1, placeholder: "やること", "aria-label": "やること", maxlength: 200, required: true }, t.text);
         text.addEventListener("input", () => { if (/[\r\n]/.test(text.value)) text.value = text.value.replace(/\s*[\r\n]+\s*/g, " "); growField(text); });
