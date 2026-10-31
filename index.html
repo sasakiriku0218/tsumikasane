@@ -333,18 +333,22 @@ form.add > .full, form.add > .actions { grid-column: 1 / -1; }
 .ffield > .seg { max-width: 22em; }
 .ffield input[type="number"] { flex: 0 1 7em; text-align: right; font-variant-numeric: tabular-nums; }
 .ffield input[type="date"], .ffield input[type="time"] { flex: 0 1 10em; }
+/* a date with its 期限なしにする under it, so the date keeps its width (the user's call: it was cut short beside it) */
+.ffield.below { flex-wrap: wrap; }
+.ffield.below > input[type="date"] { flex: 0 0 10em; }
+.ffield.below > .link-btn { flex-basis: 100%; text-align: left; }
 /* a note under a field, in the fields' column (a goal's 期限 and how far off it is) */
 .field-note { grid-column: -2 / -1; margin-top: -6px; }
 .field-note:empty { display: none; }
 .ffield > select { flex: 1 1 auto; min-width: 0; }
 form.add .actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
 form.add .actions .link-btn { margin-inline-end: auto; }
-/* a label beside a field that grows (達成基準) stays level with its first line */
-form.add > .flabel:has(+ .ffield > textarea.grow) { align-self: start; padding-top: 10px; }
+/* a label beside a field that grows (達成基準), or one with a button under it (期限), stays level with its first line */
+form.add > .flabel:has(+ .ffield > textarea.grow), form.add > .flabel:has(+ .ffield.below) { align-self: start; padding-top: 10px; }
 @container (max-width: 19.5em) {
   form.add { grid-template-columns: minmax(0, 1fr); row-gap: 6px; }
   form.add > .flabel { margin-top: 6px; }
-  form.add > .flabel:has(+ .ffield > textarea.grow) { padding-top: 0; }
+  form.add > .flabel:has(+ .ffield > textarea.grow), form.add > .flabel:has(+ .ffield.below) { padding-top: 0; }
 }
 form.add input, form.add select, textarea, .inline input, .datenav input[type="date"], .label-row input, .label-row select {
   min-height: 44px; min-width: 0; padding: 0 12px;
@@ -399,6 +403,9 @@ ul.list li.current .datecell { color: var(--fg); font-weight: 600; }
 ul.list li.dayhead { min-height: 0; padding: 14px var(--space-2) 4px; justify-content: space-between; font-size: var(--t-foot); line-height: 1.35; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 ul.list li.dayhead::before, ul.list li.dayhead + li::before { display: none; }
 ul.list li.dayhead.warn { color: var(--warn); }  /* ToDo's 期限切れ, red as the 期限 under it */
+/* 期限切れ's きょうに移す, at the end of its line, with a 44px reach */
+ul.list li.dayhead .dayhead-btn { position: relative; min-height: 0; padding: 0; font-size: inherit; font-weight: 600; }
+ul.list li.dayhead .dayhead-btn::after { content: ""; position: absolute; inset: -12px -10px; }
 .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .text { overflow-wrap: anywhere; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1560,9 +1567,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     <!-- a new ToDo, from the ＋ beside ToDo's title: キャンセル and 追加 on the bar, as for a new plan -->
     <div class="sheet-view" id="todoView" hidden>
       <form class="add" id="todoForm" autocomplete="off">
-        <input type="text" id="todoText" class="full" placeholder="やること" aria-label="やること" maxlength="200" required>
+        <textarea id="todoText" class="full grow" rows="1" placeholder="やること" aria-label="やること" maxlength="200" required></textarea>
         <label class="flabel" for="todoDue">期限 <span class="opt">任意</span></label>
-        <div class="ffield"><input type="date" id="todoDue"><button type="button" class="link-btn" id="todoDueClear" hidden>期限なしにする</button></div>
+        <div class="ffield below"><input type="date" id="todoDue"><button type="button" class="link-btn" id="todoDueClear" hidden>期限なしにする</button></div>
       </form>
     </div>
     <!-- an entry of ToDo, 食事, 運動, 勉強 or 家計簿, from its row on that page (the user's call: what was put in can be put
@@ -2104,7 +2111,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a new ToDo is made in the sheet the ＋ beside the title opens (openNewTodo); 追加 there stays grey until it has its text
   const syncTodoSave = () => { $("todoSave").disabled = !$("todoText").value.trim(); };
   $("todoText").addEventListener("input", syncTodoSave);
-  function clearTodoForm() { $("todoForm").reset(); $("todoDueClear").hidden = true; syncTodoSave(); }
+  function clearTodoForm() { $("todoForm").reset(); $("todoDueClear").hidden = true; syncTodoSave(); growField($("todoText")); }
   // a day once picked is hard to empty again on iPhone, so 期限なしにする does it, as in the edit form
   for (const type of ["input", "change"]) $("todoDue").addEventListener(type, () => { $("todoDueClear").hidden = !$("todoDue").value; });
   $("todoDueClear").addEventListener("click", (ev) => {
@@ -2118,9 +2125,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!text) return;
     // a new one isn't done, so with 完了 picked it would not show and seem not added: the list goes back to すべて
     if (todoFilter === "done") setTodoFilter("all");
-    act(() => todos.add({ text, done: false, due: $("todoDue").value || "", createdAt: Date.now() }));
+    const due = $("todoDue").value || "";
+    act(async () => {
+      const id = await todos.add({ text, done: false, due, createdAt: Date.now() });
+      flash(`「${text}」を追加しました`, () => unmerge([[todos, [id]]]));
+    });
+    // the sheet stays, empty, with the typing ready for the next one (the user's call: it had to be opened again for each);
+    // the bar's キャンセル becomes 閉じる
     clearTodoForm();
-    closeSheet(); // the new ToDo shows in the list as the sheet goes down
+    todoAdded = true; syncSheetHead();
+    $("todoText").focus();
   });
   // すべて・未完了・完了, in the page's own bar
   function setTodoFilter(f) {
@@ -2176,6 +2190,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const row of rows) row.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" });
     setTimeout(move, 200); // a timer, not the animation's promise, which waits while the page isn't drawn
   }
+  // 期限切れ, all moved to きょう at once (the user's call: each had to be opened and its day picked again); 元に戻す puts
+  // back the days they had, on the ones still due today
+  function overdueToToday() {
+    const moved = new Map(todos.items.filter((t) => !t.done && t.due && t.due < todayKey).map((t) => [t.id, t.due]));
+    if (!moved.size) return;
+    act(() => todos.restore(todos.items.map((t) => (moved.has(t.id) ? { ...t, due: todayKey } : t))));
+    flash(`期限切れのToDoを ${moved.size} 件、きょうに移しました`, () =>
+      act(() => todos.restore(todos.items.map((t) => (moved.has(t.id) && t.due === todayKey ? { ...t, due: moved.get(t.id) } : t)))));
+  }
   function renderTodos() {
     const items = [...todos.items].sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? todoPlaced(t).done : !todoPlaced(t).done));
@@ -2199,7 +2222,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const t of shown) {
       if (todoFilter !== "done" && todoSection(todoPlaced(t)) !== section) {
         section = todoSection(todoPlaced(t));
-        list.append(el("li", { class: "dayhead" + (section === "期限切れ" ? " warn" : "") }, el("span", {}, section), el("span", {}, `${counts.get(section)} 件`)));
+        list.append(section === "期限切れ"
+          ? el("li", { class: "dayhead warn" }, el("span", {}, `${section} ${counts.get(section)} 件`),
+            el("button", { type: "button", class: "link-btn dayhead-btn", "aria-label": "期限切れのToDoをすべてきょうに移す", onclick: overdueToToday }, "きょうに移す"))
+          : el("li", { class: "dayhead" }, el("span", {}, section), el("span", {}, `${counts.get(section)} 件`)));
       }
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": t.done ? "未完了に戻す" : "完了にする", onclick: () => toggleTodo(t) }, checkMark()),
@@ -3423,6 +3449,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let findPages = 1; // how many three months これからの予定 shows (もっと見る adds three more)
   let monthPick = false, pickYear = 0; // the sheet holds the month picker, opened from the month's name; the year it shows
   let todoNew = false; // the sheet holds a new ToDo's form, opened from the ＋ beside ToDo's title
+  let todoAdded = false; // a ToDo has been added from it since it opened, so its キャンセル reads 閉じる
   let recEdit = null, recReturnId = null; // the entry being changed in the sheet ({ kind, id }), and its row for focus after
   let mandalaGoal = null, mPath = [], chartReturnId = null; // the goal whose chart is open, the cells walked into, its row
   let chartFromDay = false; // the chart was opened from a day's list (its goal falls due that day), which 戻る goes back to
@@ -3446,7 +3473,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("sheetDone").hidden = changing || adding; $("sheetSave").hidden = mode !== "edit"; $("recSave").hidden = mode !== "rec";
     $("goalSave").hidden = mode !== "goal"; $("planSave").hidden = mode !== "plan"; $("todoSave").hidden = mode !== "todo";
     $("sheetCancel").hidden = !(changing || adding || (mode === "chart" && (mPath.length || chartFromDay)) || (mode === "settings" && settingsFrom === "day") || (mode === "day" && dayFromFind));
-    $("sheetCancel").textContent = changing || adding ? "キャンセル" : "戻る";
+    $("sheetCancel").textContent = mode === "todo" && todoAdded ? "閉じる" : changing || adding ? "キャンセル" : "戻る";
     const rel = mode === "day" ? relLabel(calDay) : "";
     $("sheetTitle").textContent = mode === "find" ? "予定" : mode === "month" ? "月を選ぶ" : mode === "goal" ? "新しい目標" : mode === "plan" ? (planCopy ? "予定を複製" : "新しい予定") : mode === "todo" ? "新しいToDo" : mode === "chart" ? chartTitle()
       : mode === "settings" ? "設定" : mode === "rec" ? REC_EDIT[recEdit.kind].title : mode === "edit" ? "予定を編集" : (rel ? rel + "・" : "") + fmtMDW(calDay) + (holidayName(calDay) ? "・" + holidayName(calDay) : "");
@@ -3459,7 +3486,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; todoAdded = false; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   // a grey day of the month before or after opens its sheet too, without turning the month (the user's call)
@@ -3757,7 +3784,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   $("sheetCancel").addEventListener("click", () => {
     const mode = sheetMode();
     if (mode === "goal") { clearGoalForm(); closeSheet(); } else if (mode === "plan") { clearPlanForm(); if (planFromDay) backToDay(); else closeSheet(); }
-    else if (mode === "todo") { clearTodoForm(); closeSheet(); }
+    else if (mode === "todo") { if (!todoAdded) clearTodoForm(); closeSheet(); } // 閉じる keeps what was typed, as a pull down does
     else if (mode === "rec") closeSheet(); else if (mode === "chart") chartBack(); else if (mode === "day" && dayFromFind) backToFind(); else showDayView();
   });
   $("calSettings").addEventListener("click", (ev) => openSettings(ev.detail === 0));
@@ -4033,9 +4060,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (g.done) set(false); else set(true, { undo: () => set(false) });
   });
   $("mEdit").addEventListener("submit", (ev) => { ev.preventDefault(); saveGoalEdit(); });
-  // a goal's name and 達成基準, here and in the ＋ sheet, wrap onto as many lines as they need (the user's call: long ones
-  // were cut off in their one line), the fields growing with them. Each stays one line of text: 改行 moves on to the next
-  // empty field (or adds the goal once all are filled in) in the ＋ sheet, and here ends the typing
+  // a goal's name and 達成基準, here and in the ＋ sheet, and a new ToDo's text wrap onto as many lines as they need (the
+  // user's call: long ones were cut off in their one line), the fields growing with them. Each stays one line of text:
+  // 改行 adds the ToDo; for a goal it moves on to the next empty field (or adds the goal once all are filled in) in the ＋
+  // sheet, and under the chart ends the typing
   function growField(ta) {
     const key = `${ta.value}\n${ta.clientWidth}`;
     if (ta.dataset.fit === key) return; // as it was: measured again only when the name or the width changes
@@ -4053,7 +4081,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     ta.addEventListener("keydown", (ev) => {
       if (ev.key !== "Enter" || ev.isComposing || ev.keyCode === 229) return;
       ev.preventDefault();
-      if (ta.form?.id !== "goalForm") { saveGoalEdit(); ta.blur(); }
+      if (ta.form?.id === "todoForm") { if (!$("todoSave").disabled) $("todoSave").click(); }
+      else if (ta.form?.id !== "goalForm") { saveGoalEdit(); ta.blur(); }
       else if (!$("goalSave").disabled) $("goalSave").click();
       else $(goalFields.find((id) => !$(id).value.trim()))?.focus();
     });
@@ -4493,9 +4522,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   // the form's rows as the add forms have them: the label beside its field (任意 when it may stay empty), then the unit
   // or a button that goes with the field
-  function recRow(label, field, { opt = false, unit = null, after = null } = {}) {
+  function recRow(label, field, { opt = false, unit = null, after = null, below = false } = {}) {
     return [el("label", { class: "flabel", for: field.id }, label, opt ? " " : null, opt ? el("span", { class: "opt" }, "任意") : null),
-      el("div", { class: "ffield" }, field, unit ? el("span", { class: "unit" }, unit) : null, after)];
+      el("div", { class: "ffield" + (below ? " below" : "") }, field, unit ? el("span", { class: "unit" }, unit) : null, after)];
   }
   // one of a few, as a segmented control (区分, 支出・収入)
   function recSeg(name, label, options, current, onPick) {
@@ -4523,10 +4552,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           if (ev.detail === 0) due.focus(); // pressed from the keyboard: keep focus in the form
         } }, "期限なしにする");
         for (const type of ["input", "change"]) due.addEventListener(type, () => { clear.hidden = !due.value; });
-        return [
-          el("input", { type: "text", id: "reText", class: "full", value: t.text, placeholder: "やること", "aria-label": "やること", maxlength: 200, required: true }),
-          recRow("期限", due, { opt: true, after: clear }),
-        ];
+        // the text wraps onto as many lines as it needs, as in the ＋ sheet (the user's call), one line of text still: 改行 saves
+        const text = el("textarea", { id: "reText", class: "full grow", rows: 1, placeholder: "やること", "aria-label": "やること", maxlength: 200, required: true }, t.text);
+        text.addEventListener("input", () => { if (/[\r\n]/.test(text.value)) text.value = text.value.replace(/\s*[\r\n]+\s*/g, " "); growField(text); });
+        text.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) { ev.preventDefault(); $("recSave").click(); } });
+        requestAnimationFrame(() => growField(text));
+        return [text, recRow("期限", due, { opt: true, after: clear, below: true })];
       },
       read: () => {
         const text = $("reText").value.trim();
