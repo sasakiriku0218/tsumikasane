@@ -2225,7 +2225,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const none = !due.value, from = base && due.value === due.defaultValue ? base : due.value;
       clear.hidden = none;
       if (none && repeat.value) repeat.value = "";
-      for (const o of repeat.options) o.textContent = repeatName(o.value, from, true);
+      for (const o of repeat.options) o.textContent = repeatName(o.value, from, true, true);
       // the one of きょう・あした・来週 that is the 期限 shows it (the user's call: a tap changed only the date's digits)
       for (const b of quick.children) b.setAttribute("aria-pressed", String(due.value === b.dataset.day));
     };
@@ -2326,7 +2326,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // heading (inToday) one due today says only its repeat: きょうまで would just say the heading again (the user's call)
   function dueText(t, inToday = false) {
     if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtShort(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtShort(t.due)}`) : null;
-    const rep = t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, repeatBase(t))) : null;
+    const rep = t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, repeatBase(t), false, true)) : null;
     if (inToday && t.due === todayKey) return rep && el("span", { class: "sub due" }, el("span", { class: "due-parts" }, rep));
     return t.due ? untilText(t.due, rep) : null;
   }
@@ -2374,7 +2374,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   async function setTodoDone(t, done) {
     if (done) {
       const due = t.repeat && t.due ? nextDue(t) : null;
-      const next = due ? await todos.add({ text: t.text, done: false, due, repeat: t.repeat, ...(t.memo ? { memo: t.memo } : {}), ...(t.flag ? { flag: true } : {}), createdAt: Date.now() }) : null;
+      const from = due && turnBase(t, due);
+      const next = due ? await todos.add({ text: t.text, done: false, due, repeat: t.repeat, ...(from ? { repeatFrom: from } : {}), ...(t.memo ? { memo: t.memo } : {}), ...(t.flag ? { flag: true } : {}), createdAt: Date.now() }) : null;
       await todos.update(t.id, { done: true, doneAt: Date.now(), ...(next ? { repeat: undefined, next } : {}) });
       // and says when that is (the user's call: it just went, its next turn far down the list), with 元に戻す
       if (next) flash(`「${t.text}」の次は ${fmtShort(due)}です`, () => { const x = todos.get(t.id); if (x?.done) toggleTodo(x); });
@@ -2391,16 +2392,25 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const next = nextDue(t);
     if (!next) return;
     const was = { due: t.due, repeatFrom: t.repeatFrom };
-    act(() => todos.update(t.id, { due: next, repeatFrom: undefined }));
+    act(() => todos.update(t.id, { due: next, repeatFrom: turnBase(t, next) }));
     flash(`「${t.text}」のこの回を削除しました。次は ${fmtShort(next)}です`, () => act(() => todos.update(t.id, was)));
   }
   // a repeating ToDo's next 期限: the first turn of its repeat after both its 期限 and today, so one done late doesn't come
   // back past it already. The turns are the calendar's (turnStarts), from its 期限, or from the day it had before
-  // きょうに移す moved it (repeatBase); four years on finds a 29th of February
+  // きょうに移す moved it (repeatBase), except that a month without its day has the month's last instead of none (toEnd)
   const repeatBase = (t) => t.repeatFrom || t.due;
   function nextDue(t) {
     const after = t.due > todayKey ? t.due : todayKey;
-    return turnStarts({ date: repeatBase(t), repeat: t.repeat }, addDays(after, 1), addDays(after, 1500))[0] || null;
+    return turnStarts({ date: repeatBase(t), repeat: t.repeat, toEnd: true }, addDays(after, 1), addDays(after, 1500))[0] || null;
+  }
+  // the day the turns count from goes on with a turn that can't stand for it: one on the month's last day for the 31st
+  // (11/30), the last Saturday for a fifth (11/28) or the 28th of February for the 29th, which the turns after would
+  // otherwise count from (the 30th, the fourth Saturday) and drift. Nothing when the turn's own day will do
+  function turnBase(t, due) {
+    const base = repeatBase(t);
+    const same = t.repeat === "monthly" ? base.slice(8) === due.slice(8) : t.repeat === "yearly" ? base.slice(5) === due.slice(5)
+      : t.repeat === "monthlyNth" ? nthOf(base) === nthOf(due) : true;
+    return same ? undefined : base;
   }
   function settleTodos() {
     // their rows on the page and on きょう's tile, wherever they were checked
@@ -3353,13 +3363,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const REPEATS = [["", "しない"], ["daily", "毎日"], ["weekdays", "平日"], ["weekly", "毎週"], ["biweekly", "隔週"], ["monthly", "毎月"], ["monthlyNth", "毎月"], ["yearly", "毎年"]];
   const nthOf = (d) => Math.ceil(Number(d.slice(8, 10)) / 7); // which of its weekday in the month a day is: 2 for the second Monday
   // a repeat in words: short in the lists (毎週, 毎月第2月曜), and in the forms' menus with the day the plan's date gives it
-  // (毎週（月曜日）, 毎月（第2月曜日）, 毎年（11月9日）)
-  function repeatName(r, date, long) {
+  // (毎週（月曜日）, 毎月（第2月曜日）, 毎年（11月9日）). A ToDo's (todo) 31st is 月末 and its fifth weekday 最終, which
+  // is what its turns are (turnStarts' toEnd)
+  function repeatName(r, date, long, todo = false) {
     const dt = date ? parseYmd(date) : null, wd = dt ? WD[dt.getDay()] : "";
     if (!dt) return (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
-    if (!long) return r === "monthlyNth" ? `毎月第${nthOf(date)}${wd}曜` : (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
-    return { "": "しない", daily: "毎日", weekdays: "平日（月〜金）", weekly: `毎週（${wd}曜日）`, biweekly: `隔週（${wd}曜日）`, monthly: `毎月（${dt.getDate()}日）`,
-      monthlyNth: `毎月（第${nthOf(date)}${wd}曜日）`, yearly: `毎年（${dt.getMonth() + 1}月${dt.getDate()}日）` }[r] || "しない";
+    const nth = todo && nthOf(date) === 5 ? "最終" : `第${nthOf(date)}`;
+    if (!long) return r === "monthlyNth" ? `毎月${nth}${wd}曜` : (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
+    return { "": "しない", daily: "毎日", weekdays: "平日（月〜金）", weekly: `毎週（${wd}曜日）`, biweekly: `隔週（${wd}曜日）`,
+      monthly: todo && dt.getDate() === 31 ? "毎月（月末）" : `毎月（${dt.getDate()}日）`,
+      monthlyNth: `毎月（${nth}${wd}曜日）`, yearly: `毎年（${dt.getMonth() + 1}月${dt.getDate()}日）` }[r] || "しない";
   }
   const extraDays = (e) => (e.endDate && e.endDate > e.date ? daysBetween(e.date, e.endDate) : 0);
   // the first days of e's turns that reach into from … to
@@ -3378,21 +3391,26 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       // Monday to Friday
       for (let d = lo > e.date ? lo : e.date; d <= last; d = addDays(d, 1)) { const wd = parseYmd(d).getDay(); if (wd > 0 && wd < 6) take(d); }
     } else if (e.repeat === "monthlyNth") {
-      // the same weekday of the same week each month (the second Monday); a month without a fifth one is passed over
+      // the same weekday of the same week each month (the second Monday); a month without a fifth one is passed over, as the
+      // iPhone's カレンダー has it, or for a ToDo (toEnd) takes the last one of the month
       const [y0, m0] = e.date.split("-").map(Number), n = nthOf(e.date), wd = parseYmd(e.date).getDay(), [ly, lm] = lo.split("-").map(Number);
       for (let k = Math.max(0, (ly - y0) * 12 + lm - m0 - 1); ; k++) {
         const y = y0 + Math.floor((m0 - 1 + k) / 12), m = ((m0 - 1 + k) % 12) + 1, ym = `${y}-${pad(m)}`;
         if (ym + "-01" > last) break;
         const day = 1 + ((wd - new Date(y, m - 1, 1).getDay() + 7) % 7) + 7 * (n - 1);
         if (day <= daysInMonth(ym)) take(`${ym}-${pad(day)}`);
+        else if (e.toEnd) take(`${ym}-${pad(day - 7)}`);
       }
     } else {
-      // the same date each month or year; a month without it (the 31st, the 29th of February) is passed over
+      // the same date each month or year; a month without it (the 31st, the 29th of February) is passed over, as the iPhone's
+      // カレンダー has it, or for a ToDo (toEnd) has the month's last day: a ToDo for the 31st is one every month (the
+      // user's call: 月末の支払い, done on 10/31, came back on 12/31)
       const [y0, m0, d0] = e.date.split("-").map(Number), every = e.repeat === "yearly" ? 12 : 1, [ly, lm] = lo.split("-").map(Number);
       for (let k = Math.max(0, (Math.floor(((ly - y0) * 12 + lm - m0) / every) - 1) * every); ; k += every) {
         const ym = `${y0 + Math.floor((m0 - 1 + k) / 12)}-${pad(((m0 - 1 + k) % 12) + 1)}`;
         if (ym + "-01" > last) break;
         if (d0 <= daysInMonth(ym)) take(`${ym}-${pad(d0)}`);
+        else if (e.toEnd) take(`${ym}-${pad(daysInMonth(ym))}`);
       }
     }
     return out;
