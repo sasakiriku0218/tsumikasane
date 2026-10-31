@@ -2351,12 +2351,21 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // is the order todoOrder already gives. With only 完了 showing, its name would just say the bar's choice again
     const counts = new Map();
     for (const t of shown) counts.set(todoSection(todoPlaced(t)), (counts.get(todoSection(todoPlaced(t))) || 0) + 1);
-    // under すべて, 完了 shows the last ten done (the user's call: a repeat leaves one more there each time it is done) and
-    // its count; the rest are a press away, under 完了
-    const more = todoFilter === "all" ? shown.filter((t) => todoPlaced(t).done).slice(TODO_DONE_SHOWN) : [], cut = new Set(more);
+    // the turns of one repeat, done, are one row in 完了 (the user's call: each turn done left a row more there): the last
+    // done stands for them all and says how many. They are the done ones joined by next, as far as the one now to do
+    const byId = new Map(todos.items.map((t) => [t.id, t]));
+    const seriesOf = (t) => { let k = t; for (let i = 0; k.next && i < 10000; i++) { const n = byId.get(k.next); if (!n) return k.next; k = n; } return k.id; };
+    const rowFor = new Map(), group = new Map(); // a repeat → the row standing for it; that row → the ToDos it stands for
+    for (const t of shown) {
+      if (!todoPlaced(t).done) continue;
+      const k = seriesOf(t), row = rowFor.get(k);
+      if (row) group.get(row).push(t); else { rowFor.set(k, t); group.set(t, [t]); }
+    }
+    // under すべて, 完了 shows the last ten done (the user's call) and its count; the rest are a press away, under 完了
+    const more = todoFilter === "all" ? [...group.keys()].slice(TODO_DONE_SHOWN) : [], cut = new Set(more);
     let section = null;
     for (const t of shown) {
-      if (cut.has(t)) continue;
+      if (cut.has(t) || (todoPlaced(t).done && !group.has(t))) continue;
       if (todoFilter !== "done" && todoSection(todoPlaced(t)) !== section) {
         section = todoSection(todoPlaced(t));
         list.append(section === "期限切れ"
@@ -2365,14 +2374,20 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           : el("li", { class: "dayhead" }, el("span", {}, section), el("span", {}, `${counts.get(section)} 件`)));
       }
       // its memo under the 期限, two lines at most; the check and × say which ToDo they are for, as on きょう's tile (the
-      // user's call: VoiceOver read every one as just 完了にする and 削除)
+      // user's call: VoiceOver read every one as just 完了にする and 削除). A repeat's row in 完了: its check takes the last
+      // turn back, and × deletes every turn it stands for
+      const turns = group.get(t) || [t], n = turns.length;
       list.append(el("li", { class: t.done ? "done" : "" },
         el("button", { type: "button", class: "check", "data-check": t.id, "aria-label": `「${t.text}」を${t.done ? "未完了に戻す" : "完了にする"}`, onclick: () => toggleTodo(t) }, checkMark()),
-        el("span", { class: "body" }, flagged(t, editLink("todo", t.id, t.text)), dueText(t), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null),
-        delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
+        el("span", { class: "body" }, flagged(t, editLink("todo", t.id, t.text)),
+          n > 1 ? el("span", { class: "sub" }, (doneDay(t) ? `${fmtShort(doneDay(t))}に完了・` : "") + `これまで ${n} 回`) : dueText(t),
+          t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null),
+        n > 1 ? delButton(() => removeWithUndo(todos, turns.map((x) => x.id), `「${t.text}」の完了を ${n} 件削除しました`), "削除", `${t.text}（完了 ${n} 件）`)
+          : delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
       ));
     }
-    if (more.length) list.append(el("li", { class: "more-done" }, el("button", { type: "button", class: "link-btn", onclick: (ev) => showAllDone(ev.detail === 0) }, `ほか ${more.length} 件を見る`)));
+    if (more.length) list.append(el("li", { class: "more-done" }, el("button", { type: "button", class: "link-btn", onclick: (ev) => showAllDone(ev.detail === 0) },
+      `ほか ${sum(more, (t) => group.get(t).length)} 件を見る`)));
     // the check keeps keyboard focus as the list is drawn again, and follows its ToDo down to 完了
     if (focusId) list.querySelector(`[data-check="${focusId}"]`)?.focus();
   }
