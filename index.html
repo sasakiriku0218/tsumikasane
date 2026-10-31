@@ -899,6 +899,7 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .32); animation: sheet-fade .
 .mp-grid button.now { color: var(--accent); font-weight: 700; }
 .mp-grid button[aria-current="true"] { background: var(--accent-fill); color: var(--accent-ink); font-weight: 600; }
 .sheet-del, .sheet-row { display: block; width: 100%; min-height: 50px; padding: 0 var(--space-2); text-align: center; }
+.sheet-del:not([hidden]) + .sheet-del { border-top: .5px solid var(--separator); }  /* two in one card */
 .row-btn > .chip { min-width: 4.6em; text-align: center; }  /* the times line up in a column */
 /* 終日にする stays whole beside the time; the time field gives up the room */
 .ffield > .link-btn { flex: none; white-space: nowrap; }
@@ -1642,7 +1643,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
          right): its add form's fields with its values (the script fills them), キャンセル and 保存 on the bar, as for a plan -->
     <div class="sheet-view" id="recView" hidden>
       <form class="add" id="recForm" autocomplete="off"></form>
-      <div class="card"><button type="button" class="link-btn danger sheet-del" id="recDelete">この記録を削除</button></div>
+      <div class="card">
+        <!-- a repeating ToDo still to do: this turn alone (it goes on to its next), as well as the ToDo with its repeat -->
+        <button type="button" class="link-btn danger sheet-del" id="recSkip" hidden>この回を削除（次の回は残す）</button>
+        <button type="button" class="link-btn danger sheet-del" id="recDelete">この記録を削除</button>
+      </div>
     </div>
     <!-- a new goal, from the ＋ on 目標: キャンセル and 追加 on the bar, as iOS sheets for a new item have -->
     <div class="sheet-view" id="goalView" hidden>
@@ -2045,7 +2050,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // two-step delete: first press arms it, second press within 3 s deletes. List rows have no room for a label, so the ×
   // carries the name 削除 and a 44px target (DADS's exception for icon-only controls), with the entry's name where given
   // (「…」を削除), so VoiceOver says which; armed, it spells the action out
-  function delButton(onConfirm, label = "削除", name = "") {
+  function delButton(onConfirm, label = "削除", name = "", armedText = label + "する") {
     const b = el("button", { type: "button", class: "del" });
     const named = (s) => (name ? `「${name}」を${s}` : s);
     const idle = () => { b.classList.remove("armed"); b.setAttribute("aria-label", named(label)); b.replaceChildren(icon("close", 24)); };
@@ -2054,7 +2059,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     b.addEventListener("click", (ev) => {
       ev.stopPropagation();
       if (b.classList.contains("armed")) { clearTimeout(t); idle(); onConfirm(); return; }
-      b.classList.add("armed"); b.textContent = label + "する";
+      b.classList.add("armed"); b.textContent = armedText;
       if (name) b.setAttribute("aria-label", named(label + "する")); else b.removeAttribute("aria-label");
       t = setTimeout(idle, 3000);
     });
@@ -2319,6 +2324,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (back) unmerge([[todos, [next.id]]]);
     await todos.update(t.id, { done: false, doneAt: undefined, next: undefined, ...(back ? { repeat: next.repeat } : {}) });
   }
+  // a repeating ToDo's turn deleted alone (× on its row, or この回を削除 in its sheet): it goes on to its next turn, as if
+  // this one were done but with nothing kept as done (the user's call: × on 毎週's ゴミ出し took the repeat with it);
+  // 元に戻す puts its day back
+  function skipTurn(t) {
+    const next = nextDue(t);
+    if (!next) return;
+    const was = { due: t.due, repeatFrom: t.repeatFrom };
+    act(() => todos.update(t.id, { due: next, repeatFrom: undefined }));
+    flash(`「${t.text}」のこの回を削除しました。次は ${fmtShort(next)}です`, () => act(() => todos.update(t.id, was)));
+  }
   // a repeating ToDo's next 期限: the first turn of its repeat after both its 期限 and today, so one done late doesn't come
   // back past it already. The turns are the calendar's (turnStarts), from its 期限, or from the day it had before
   // きょうに移す moved it (repeatBase); four years on finds a 29th of February
@@ -2408,6 +2423,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           filed ? (when || n > 1 ? el("span", { class: "done-day" }, keepUnits([n > 1 ? `${n} 回` : "", when].filter(Boolean).join("・"))) : null)
             : [dueText(t, section === "きょう"), t.memo ? el("span", { class: "sub ev-memo clamp" }, t.memo) : null]),
         n > 1 ? delButton(() => removeWithUndo(todos, turns.map((x) => x.id), `「${t.text}」の完了を ${n} 件削除しました`), "削除", `${t.text}（完了 ${n} 件）`)
+          : t.repeat && t.due && !t.done ? delButton(() => skipTurn(t), "削除", `${t.text}（この回）`, "この回を削除")
           : delButton(() => removeWithUndo(todos, t.id), "削除", t.text)
       ));
     }
@@ -4733,7 +4749,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // can): the fields of its add form holding its values, 保存 on the bar, and a delete that asks for a second press. An
   // entry's day can change too (a ToDo's 期限); one moved to another day says where it went
   const recDelete = $("recDelete");
-  let recDelTimer = null, reSubject = "", reDone = null;
+  let recDelTimer = null, recSkipTimer = null, reSubject = "", reDone = null;
   // the entry's text as a button that opens it; .row-link stretches its hit area over the row
   function editLink(kind, id, text, name = text) {
     return el("button", { type: "button", class: "text row-link", "data-edit": id, "aria-label": `「${name}」を編集`, onclick: (ev) => openRecEdit(kind, id, ev.detail === 0) }, text);
@@ -4761,7 +4777,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // An emptied optional field is saved as undefined, which drops it from the entry
   const REC_EDIT = {
     todo: {
-      store: todos, title: "ToDoを編集", del: "このToDoを削除",
+      store: todos, title: "ToDoを編集", del: (t) => (t?.repeat && !t.done ? "繰り返しごと削除" : "このToDoを削除"),
       fields: (t) => {
         // its 期限 with きょう・あした・来週 and 期限なしにする under it, its repeat once it has one, and its memo, as the ＋
         // sheet has them (wireTodoDue)
@@ -4957,10 +4973,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     // 元に戻す for the seconds the message shows: the entry back as it was before 保存
     flash(moved ? `${fmtMDW(patch.date)}に移しました` : "保存しました", () => act(async () => { await st.set(before.id, before); flash("元に戻しました"); }));
   });
+  const recSkip = $("recSkip");
   function disarmRecDelete() {
-    clearTimeout(recDelTimer);
-    recDelete.classList.remove("armed");
-    recDelete.textContent = (recEdit && REC_EDIT[recEdit.kind].del) || "この記録を削除";
+    clearTimeout(recDelTimer); clearTimeout(recSkipTimer);
+    recDelete.classList.remove("armed"); recSkip.classList.remove("armed");
+    const spec = recEdit && REC_EDIT[recEdit.kind], x = spec?.store.get(recEdit.id);
+    recDelete.textContent = (typeof spec?.del === "function" ? spec.del(x) : spec?.del) || "この記録を削除";
+    // a repeating ToDo still to do has its turn alone to delete too (the user's call: its × took the repeat with it)
+    recSkip.textContent = "この回を削除（次の回は残す）";
+    recSkip.hidden = !(recEdit?.kind === "todo" && x?.repeat && x.due && !x.done);
   }
   recDelete.addEventListener("click", () => {
     if (!recDelete.classList.contains("armed")) {
@@ -4968,9 +4989,19 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       recDelTimer = setTimeout(disarmRecDelete, 4000);
       return;
     }
-    const { kind, id } = recEdit;
+    const { kind, id } = recEdit, x = REC_EDIT[kind].store.get(id);
     if (recFromDay) backFromRec(); else closeSheet();
-    removeWithUndo(REC_EDIT[kind].store, id);
+    removeWithUndo(REC_EDIT[kind].store, id, kind === "todo" && x?.repeat && !x.done ? `「${x.text}」を繰り返しごと削除しました` : undefined);
+  });
+  recSkip.addEventListener("click", () => {
+    if (!recSkip.classList.contains("armed")) {
+      recSkip.classList.add("armed"); recSkip.textContent = "もう一度押すと、この回を削除します";
+      recSkipTimer = setTimeout(disarmRecDelete, 4000);
+      return;
+    }
+    const t = todos.get(recEdit.id);
+    if (recFromDay) backFromRec(); else closeSheet();
+    if (t) skipTurn(t);
   });
   // Japan's national holidays (国民の祝日) by the rules in force since 2020: the fixed days, the Mondays (ハッピーマンデー),
   // the equinoxes (a formula good for 1980–2099), a day off after one on a Sunday (振替休日) and a day between two of them
