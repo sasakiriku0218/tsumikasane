@@ -2057,15 +2057,16 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     });
     return b;
   }
-  // same idea for a text link that needs a second press
+  // same idea for a text link that needs a second press; its words can be worked out each time (how many it deletes)
   function armLink(btn, label, armedLabel, onConfirm) {
     let t = null;
+    const say = (s) => (typeof s === "function" ? s() : s);
     btn.addEventListener("click", () => {
       if (btn.classList.contains("armed")) { clearTimeout(t); reset(); onConfirm(); return; }
-      btn.classList.add("armed"); btn.textContent = armedLabel;
+      btn.classList.add("armed"); btn.textContent = say(armedLabel);
       t = setTimeout(reset, 4000);
     });
-    function reset() { btn.classList.remove("armed"); btn.textContent = label; }
+    function reset() { btn.classList.remove("armed"); btn.textContent = say(label); }
   }
 
   // ---------- tabs (a sidebar on wide screens) ----------
@@ -2238,8 +2239,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     renderTodos();
   }
   $("todoFilters").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setTodoFilter(b.dataset.filter)));
-  // all of them at once (one save, one redraw), with 元に戻す
-  armLink($("clearDone"), "完了したものを削除", "もう一度押すと削除します", () => {
+  // all of them at once (one save, one redraw), with 元に戻す. It says how many (the user's call: under すべて only ten
+  // rows show, a repeat's turns are one row, and it takes them all)
+  const doneCount = () => todos.items.filter((x) => x.done).length;
+  const clearDoneLabel = () => `完了した ${doneCount()} 件を削除`;
+  armLink($("clearDone"), clearDoneLabel, () => `もう一度押すと ${doneCount()} 件を削除します`, () => {
     const done = todos.items.filter((x) => x.done);
     removeWithUndo(todos, done.map((x) => x.id), `完了したToDoを ${done.length} 件削除しました`);
   });
@@ -2348,6 +2352,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const items = [...todos.items].sort((a, b) => todoOrder(todoPlaced(a), todoPlaced(b)));
     const shown = items.filter((t) => todoFilter === "all" || (todoFilter === "done" ? todoPlaced(t).done : !todoPlaced(t).done));
     $("todoFoot").hidden = !items.some((t) => t.done); // only while there is something done to clear
+    if (!$("clearDone").classList.contains("armed")) $("clearDone").textContent = clearDoneLabel();
     const list = $("todoList");
     const focusId = list.contains(document.activeElement) ? document.activeElement.dataset.check : null; // a check pressed from the keyboard
     list.replaceChildren();
