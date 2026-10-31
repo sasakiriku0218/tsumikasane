@@ -333,6 +333,15 @@ section { display: flex; flex-direction: column; gap: var(--space-2); }
 section { container-type: inline-size; }
 form.add { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 12px; padding: 14px var(--space-2); background: var(--surface); border-radius: var(--radius); }
 form.add > .full, form.add > .actions { grid-column: 1 / -1; }
+/* the weekdays a weekly ToDo comes round on (dayPicker), under 繰り返し while it is 毎週: one or more, lit when picked */
+.week-days { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: -4px; }
+.week-days[hidden] { display: none; }
+.week-days label { position: relative; display: grid; cursor: pointer; }
+.week-days input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.week-days span { display: grid; place-items: center; min-height: 36px; border-radius: 999px; background: var(--fill); color: var(--fg); font-size: var(--t-sub); line-height: 1.2; }
+.week-days input:checked + span { background: var(--accent-fill); color: var(--accent-ink); font-weight: 600; }
+.week-days input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.week-days label::after { content: ""; position: absolute; inset: -4px 0; }  /* a 44px reach */
 /* under a new ToDo's name holding a list pasted in: each line is a ToDo of its own, or 1件にまとめる runs them into one */
 .lines-note { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-2); margin: -4px 0 0; font-size: var(--t-foot); line-height: 1.4; color: var(--muted); }
 .lines-note .link-btn { min-height: 44px; font-size: inherit; }
@@ -2282,18 +2291,46 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // picked with no 期限 starts today, and a 期限 emptied takes the repeat with it, a repeat counting from its 期限. Its
   // words follow the day (毎週（土曜日）), or the day its turns count from while the 期限 is the one きょうに移す gave it
   // (base). Gives back what puts the rows right
-  function wireTodoDue(due, quick, clear, repeat, base = null) {
+  function wireTodoDue(due, quick, clear, repeat, base = null, days = null) {
+    let lastWd = null; // the weekday the picked days last followed (dayPicker)
     const sync = () => {
       const none = !due.value, from = base && due.value === due.defaultValue ? base : due.value;
       clear.hidden = none;
       if (none && repeat.value) repeat.value = "";
-      for (const o of repeat.options) o.textContent = repeatName(o.value, from, true, true);
+      // 毎週's days: shown while it is 毎週, its turns' weekday picked to begin with, and following a changed 期限 while
+      // it is the only one picked; at least one stays picked
+      let picked = [];
+      if (days) {
+        const wd = from ? parseYmd(from).getDay() : null;
+        if (repeat.value === "weekly") {
+          picked = pickedDays(days);
+          if (!picked.length || (picked.length === 1 && picked[0] === lastWd && wd !== lastWd)) {
+            for (const x of days.querySelectorAll("input")) x.checked = Number(x.value) === wd;
+            picked = pickedDays(days);
+          }
+          const ws = weekStart();
+          for (const l of [...days.children].sort((a, b) => ((a.dataset.wd - ws + 7) % 7) - ((b.dataset.wd - ws + 7) % 7))) days.append(l);
+        }
+        lastWd = wd;
+        days.hidden = repeat.value !== "weekly";
+      }
+      for (const o of repeat.options) o.textContent = repeatName(o.value, from, true, true, o.value === "weekly" && from ? keptDays(picked, from) : null);
       // the one of きょう・あした・来週 that is the 期限 shows it (the user's call: a tap changed only the date's digits)
       for (const b of quick.children) b.setAttribute("aria-pressed", String(due.value === b.dataset.day));
     };
     for (const type of ["input", "change"]) due.addEventListener(type, sync);
     const put = (day) => { due.value = day; due.dispatchEvent(new Event("change", { bubbles: true })); };
-    repeat.addEventListener("change", () => { if (repeat.value && !due.value) put(todayKey); });
+    repeat.addEventListener("change", () => { if (repeat.value && !due.value) put(todayKey); else sync(); });
+    // a day picked or dropped: one at least stays, and a 期限 on a day no longer picked moves on to the next one that is,
+    // so the first turn is one of them (a 期限 set by hand after stays where it is put)
+    days?.addEventListener("change", (ev) => {
+      if (!pickedDays(days).length) ev.target.checked = true;
+      const ds = pickedDays(days);
+      if (due.value && !ds.includes(parseYmd(due.value).getDay())) {
+        for (let i = 1; i <= 7; i++) { const d = addDays(due.value, i); if (ds.includes(parseYmd(d).getDay())) { put(d); return; } }
+      }
+      sync();
+    });
     quick.append(...[["きょう", 0], ["あした", 1], ["来週", 7]].map(([name, n]) =>
       el("button", { type: "button", "data-day": addDays(todayKey, n), "aria-label": `${name}、${fmtDay(addDays(todayKey, n))}`, onclick: () => put(addDays(todayKey, n)) }, name)));
     clear.addEventListener("click", (ev) => {
@@ -2302,7 +2339,18 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     });
     return sync;
   }
-  const syncTodoDue = wireTodoDue($("todoDue"), $("todoQuick"), $("todoDueClear"), $("todoRepeat"));
+  // the weekdays a weekly ToDo comes round on, as many as it likes (the user's call: ゴミ出し on 月 and 木 took two
+  // ToDos): a checkbox a day under 繰り返し while it is 毎週, in the calendar's week order. They are kept as repeatDays
+  // only when other than the weekday its turns count from (keptDays), so a plain 毎週 stays as it was
+  function dayPicker(id) {
+    return el("div", { class: "full week-days", id, role: "group", "aria-label": "繰り返す曜日", hidden: true },
+      WD.map((w, d) => el("label", { "data-wd": d }, el("input", { type: "checkbox", id: `${id}${d}`, value: d, "aria-label": `${w}曜日` }), el("span", { "aria-hidden": "true" }, w))));
+  }
+  const pickedDays = (picker) => [...picker.querySelectorAll("input:checked")].map((x) => Number(x.value)).sort((a, b) => a - b);
+  const keptDays = (days, from) => (days.length && !(days.length === 1 && days[0] === parseYmd(from).getDay()) ? days : undefined);
+  const todoDaysEl = dayPicker("todoDays");
+  $("todoRepeat").closest(".form-rows").append(todoDaysEl);
+  const syncTodoDue = wireTodoDue($("todoDue"), $("todoQuick"), $("todoDueClear"), $("todoRepeat"), null, todoDaysEl);
   $("todoMemo").addEventListener("input", () => growField($("todoMemo"))); // the memo grows too, keeping its line breaks
   function clearTodoForm() { $("todoForm").reset(); syncTodoDue(); syncTodoSave(); growField($("todoText")); growField($("todoMemo")); }
   $("todoAdd").addEventListener("click", (ev) => openNewTodo(ev.detail === 0));
@@ -2315,8 +2363,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (todoFilter === "done") setTodoFilter("all");
     if (todoQuery) { todoQuery = ""; $("todoSearch").value = ""; } // nor would it if it lacked the words looked for
     const due = $("todoDue").value || "", repeat = due && $("todoRepeat").value, memo = $("todoMemo").value.trim(), flag = $("todoFlag").checked;
+    const repeatDays = repeat === "weekly" ? keptDays(pickedDays(todoDaysEl), due) : undefined;
     act(async () => {
-      const now = Date.now(), ids = await todos.addMany(lines.map((text, i) => ({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(memo ? { memo } : {}), ...(flag ? { flag: true } : {}), createdAt: now + i })));
+      const now = Date.now(), ids = await todos.addMany(lines.map((text, i) => ({ text, done: false, due, ...(repeat ? { repeat } : {}), ...(repeatDays ? { repeatDays } : {}), ...(memo ? { memo } : {}), ...(flag ? { flag: true } : {}), createdAt: now + i })));
       todoNewIds.push(...ids); // lit in the list as the sheet goes down
       flash(ids.length > 1 ? `ToDoを ${ids.length} 件追加しました` : `「${lines[0]}」を追加しました`, () => unmerge([[todos, ids]]));
     });
@@ -2388,7 +2437,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // heading (inToday) one due today says only its repeat: きょうまで would just say the heading again (the user's call)
   function dueText(t, inToday = false) {
     if (t.done) return doneDay(t) ? el("span", { class: "sub" }, `${fmtDay(doneDay(t))}に完了`) : t.due ? el("span", { class: "sub" }, `期限 ${fmtDay(t.due)}`) : null;
-    const rep = t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, repeatBase(t), false, true)) : null;
+    const rep = t.repeat ? el("span", { class: "due-rep" }, icon("repeat", 14), repeatName(t.repeat, repeatBase(t), false, true, t.repeatDays)) : null;
     if (inToday && t.due === todayKey) return rep && el("span", { class: "sub due" }, el("span", { class: "due-parts" }, rep));
     return t.due ? untilText(t.due, rep) : null;
   }
@@ -2420,7 +2469,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const todoSettling = new Set(); // the ToDos checked off, waiting in their places
   let todoSettleTimer = null;
   // where the list puts it, and how it looks there: as it was before the check
-  const todoPlaced = (t) => (todoSettling.has(t.id) ? { ...t, done: false, repeat: t.repeat || todos.get(t.next)?.repeat } : t);
+  const todoPlaced = (t) => (todoSettling.has(t.id) ? { ...t, done: false, repeat: t.repeat || todos.get(t.next)?.repeat, repeatDays: t.repeatDays || todos.get(t.next)?.repeatDays } : t);
   const todoHeldBack = () => new Set([...todoSettling].map((id) => todos.get(id)?.next).filter(Boolean)); // their next turns
   function toggleTodo(t) {
     const done = !t.done;
@@ -2437,15 +2486,15 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (done) {
       const due = t.repeat && t.due ? nextDue(t) : null;
       const from = due && turnBase(t, due);
-      const next = due ? await todos.add({ text: t.text, done: false, due, repeat: t.repeat, ...(from ? { repeatFrom: from } : {}), ...(t.memo ? { memo: t.memo } : {}), ...(t.flag ? { flag: true } : {}), createdAt: Date.now() }) : null;
-      await todos.update(t.id, { done: true, doneAt: Date.now(), ...(next ? { repeat: undefined, next } : {}) });
+      const next = due ? await todos.add({ text: t.text, done: false, due, repeat: t.repeat, ...(t.repeatDays ? { repeatDays: t.repeatDays } : {}), ...(from ? { repeatFrom: from } : {}), ...(t.memo ? { memo: t.memo } : {}), ...(t.flag ? { flag: true } : {}), createdAt: Date.now() }) : null;
+      await todos.update(t.id, { done: true, doneAt: Date.now(), ...(next ? { repeat: undefined, repeatDays: undefined, next } : {}) });
       // and says when that is (the user's call: it just went, its next turn far down the list), with 元に戻す
       if (next) flash(`「${t.text}」の次は ${fmtDay(due)}です`, () => { const x = todos.get(t.id); if (x?.done) toggleTodo(x); });
       return;
     }
     const next = t.next ? todos.get(t.next) : null, back = next && !next.done;
     if (back) unmerge([[todos, [next.id]]]);
-    await todos.update(t.id, { done: false, doneAt: undefined, next: undefined, ...(back ? { repeat: next.repeat } : {}) });
+    await todos.update(t.id, { done: false, doneAt: undefined, next: undefined, ...(back ? { repeat: next.repeat, repeatDays: next.repeatDays } : {}) });
   }
   // a repeating ToDo's turn deleted alone (× on its row, or この回を削除 in its sheet): it goes on to its next turn, as if
   // this one were done but with nothing kept as done (the user's call: × on 毎週's ゴミ出し took the repeat with it);
@@ -2463,6 +2512,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   const repeatBase = (t) => t.repeatFrom || t.due;
   function nextDue(t) {
     const after = t.due > todayKey ? t.due : todayKey;
+    if (t.repeat === "weekly" && t.repeatDays?.length) { // the next of its own weekdays (月・木)
+      for (let i = 1; i <= 7; i++) { const d = addDays(after, i); if (t.repeatDays.includes(parseYmd(d).getDay())) return d; }
+    }
     return turnStarts({ date: repeatBase(t), repeat: t.repeat, toEnd: true }, addDays(after, 1), addDays(after, 1500))[0] || null;
   }
   // the day the turns count from goes on with a turn that can't stand for it: one on the month's last day for the 31st
@@ -3567,10 +3619,12 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // a repeat in words: short in the lists (毎週, 毎月第2月曜), and in the forms' menus with the day the plan's date gives it
   // (毎週（月曜日）, 毎月（第2月曜日）, 毎年（11月9日）). A ToDo's (todo) 31st is 月末 and its fifth weekday 最終, which
   // is what its turns are (turnStarts' toEnd)
-  function repeatName(r, date, long, todo = false) {
+  function repeatName(r, date, long, todo = false, days = null) {
     const dt = date ? parseYmd(date) : null, wd = dt ? WD[dt.getDay()] : "";
     if (!dt) return (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
     const nth = todo && nthOf(date) === 5 ? "最終" : `第${nthOf(date)}`;
+    // a weekly ToDo's own days (repeatDays), in the calendar's week order: 毎週月・木, 毎週（月・木曜日）
+    if (r === "weekly" && days?.length) { const ws = weekStart(), ds = [...days].sort((a, b) => ((a - ws + 7) % 7) - ((b - ws + 7) % 7)).map((d) => WD[d]).join("・"); return long ? `毎週（${ds}曜日）` : `毎週${ds}`; }
     if (!long) return r === "monthlyNth" ? `毎月${nth}${wd}曜` : (REPEATS.find(([k]) => k === r) || REPEATS[0])[1];
     return { "": "しない", daily: "毎日", weekdays: "平日（月〜金）", weekly: `毎週（${wd}曜日）`, biweekly: `隔週（${wd}曜日）`,
       monthly: todo && dt.getDate() === 31 ? "毎月（月末）" : `毎月（${dt.getDate()}日）`,
@@ -5100,8 +5154,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         const quick = el("span", { class: "quick-days", role: "group", "aria-label": "期限をすぐ選ぶ" });
         const clear = el("button", { type: "button", class: "link-btn" }, "期限なしにする");
         const repeat = el("select", { id: "reRepeat" }, REPEATS.map(([k]) => el("option", { value: k, selected: k === (t.repeat || "") }, k)));
-        const repeatRow = el("div", { class: "form-rows" }, recRow("繰り返し", repeat));
-        wireTodoDue(due, quick, clear, repeat, t.repeatFrom)();
+        const days = dayPicker("reDays");
+        for (const x of days.querySelectorAll("input")) x.checked = (t.repeatDays || []).includes(Number(x.value));
+        const repeatRow = el("div", { class: "form-rows" }, recRow("繰り返し", repeat), days);
+        wireTodoDue(due, quick, clear, repeat, t.repeatFrom, days)();
         // the text wraps onto as many lines as it needs, as in the ＋ sheet (the user's call), one line of text still: 改行 saves
         const text = el("textarea", { id: "reText", class: "full grow", rows: 1, placeholder: "やること", "aria-label": "やること", maxlength: 200, required: true }, t.text);
         text.addEventListener("input", () => { if (/[\r\n]/.test(text.value)) text.value = text.value.replace(/\s*[\r\n]+\s*/g, " "); growField(text); });
@@ -5131,7 +5187,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       read: (t) => {
         const text = $("reText").value.trim(), due = $("reDue").value || "", memo = $("reMemo").value.trim();
         const repeat = $("reRepeat") ? (due && $("reRepeat").value) || undefined : t.repeat;
-        return text ? { text, due, repeat, repeatFrom: repeat && due === t.due ? t.repeatFrom : undefined, memo: memo || undefined,
+        const repeatFrom = repeat && due === t.due ? t.repeatFrom : undefined;
+        const repeatDays = $("reDays") ? (repeat === "weekly" ? keptDays(pickedDays($("reDays")), repeatFrom || due) : undefined) : t.repeatDays;
+        return text ? { text, due, repeat, repeatFrom, repeatDays, memo: memo || undefined,
           flag: $("reFlag") ? $("reFlag").checked || undefined : t.flag } : recBad("reText");
       },
     },
