@@ -573,6 +573,19 @@ li.done .text { color: var(--muted); text-decoration: line-through; }
 .m-tools, .m-text { -webkit-user-select: none; user-select: none; }
 .mandala.swapping .m-tools { pointer-events: none; }
 .m-cell.picked { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* the cell an action of 次にやること is in, lit for a moment as its chart opens (the user's call: it didn't stand out) */
+.m-cell.spot { animation: m-spot 1.8s ease-out; }
+@keyframes m-spot { 0%, 55% { box-shadow: inset 0 0 0 3px var(--accent); } 100% { box-shadow: inset 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .m-cell.spot { animation: none; box-shadow: inset 0 0 0 3px var(--accent); } }
+/* the day a cell was checked, between its check and its › */
+.m-date { font-size: var(--t-foot); color: var(--muted); font-variant-numeric: tabular-nums; }
+.m-cell.done .m-date { color: var(--fg); }
+/* 長押し's menu, under the cell held down: swap it, or put its action into ルーティーン */
+#mandalaView { position: relative; }
+.m-menu { position: absolute; z-index: 5; min-width: 220px; padding: 4px 0; border-radius: 14px; background: var(--surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .2), 0 0 0 .5px var(--separator); }
+.m-menu button { display: block; width: 100%; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.m-menu button + button { border-top: .5px solid var(--separator); }
+.m-menu button:disabled { color: var(--muted); cursor: default; }
 /* an empty cell: a faint ＋ in its middle, gone while it is being written in; taps go through it to the cell */
 .m-cell[data-k] { position: relative; cursor: text; }
 .m-plus { position: absolute; inset: 0; display: none; place-items: center; color: var(--muted); opacity: .6; pointer-events: none; }
@@ -1591,6 +1604,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       </div>
       <div class="mandala" id="mGrid"></div>
       <p class="group-foot" id="mHint"></p>
+      <!-- 全体 as a picture, to keep or show (the user's call) -->
+      <div class="card" id="mImageCard" hidden><button type="button" class="link-btn sheet-del" id="mImage">画像で保存</button></div>
+      <div class="m-menu" id="mMenu" role="menu" hidden></div>
       <div class="sheet-view" id="mRoot">
         <!-- the goal itself, changed in place (the user's call: goals can be put right after they're made) -->
         <!-- 達成 by hand, for a goal whose 達成基準 is met with cells still left (the user's call), and undoing it -->
@@ -1604,6 +1620,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
           <label class="flabel" for="mDeadline">期限</label>
           <div class="ffield"><input type="date" id="mDeadline" required></div>
           <span class="sub field-note" id="mDeadlineNote"></span>
+          <!-- a memo of the user's own, as long as wanted (the user's call: nowhere to write why, or what was noticed) -->
+          <label class="flabel" for="mMemo">メモ</label>
+          <div class="ffield"><textarea id="mMemo" class="grow memo" rows="1" maxlength="2000"></textarea></div>
         </form>
         <p class="group-foot">書きかえると、そのまま保存されます。</p>
         <h3 class="group-head" id="mSplitLabel">分割の回数</h3>
@@ -2984,7 +3003,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const tick = () => { nextHeld.set(g.id, { path: leaf.path, name, where, index, until: Date.now() + NEXT_HOLD }); checkLeaf(g.id, leaf.path); setTimeout(renderGoals, NEXT_HOLD + 50); };
       rows.push(el("li", { class: held ? "held" : null },
         el("button", { type: "button", class: "check", disabled: !!held, "aria-label": held ? `「${name}」を達成にしました` : `「${name}」を達成にする`, onclick: tick }, checkMark()),
-        el("button", { type: "button", class: "goal-next-open", "aria-label": `「${name}」をチャートで開く`, onclick: (ev) => openChart(g.id, ev.detail === 0, leaf.path.slice(0, -1)) },
+        el("button", { type: "button", class: "goal-next-open", "aria-label": `「${name}」をチャートで開く`, onclick: (ev) => openChart(g.id, ev.detail === 0, leaf.path.slice(0, -1), leaf.path[leaf.path.length - 1]) },
           el("span", { class: "body" }, el("span", { class: "text" }, name), el("span", { class: "sub" }, where.map((t, i) => (i < where.length - 1 ? clip(t, 10) : t)).join(" › "))),
           el("span", { class: "chev" }, icon("next", 16)))));
     }
@@ -3000,11 +3019,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!g) return;
     const chart = editChart(g), cell = slotsAt(chart, at)[k];
     if (!cell?.t?.trim()) return;
-    cell.d = true;
+    cell.d = true; cell.at = Date.now();
     saveChart(g, chart, { said: `「${oneLine(cell.t)}」を達成にしました`, undo: () => {
       nextHeld.delete(id);
       const x = goals.get(id), ch = x && editChart(x), c = ch && slotsAt(ch, at)[k];
-      if (c) { delete c.d; saveChart(x, ch); }
+      if (c) { delete c.d; delete c.at; saveChart(x, ch); }
     } });
   }
 
@@ -3410,6 +3429,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   let mOverview = false; // the chart shows 全体, the whole of it at a glance, rather than the eight to write in
   let mWholeFrom = []; // the levels whose 全体 the cells walked into were opened from, so 戻る back to them shows 全体 again
   let mSwap = null, holdTimer = null, holdFrom = null, swallowClick = false; // a cell picked up by 長押し, to swap with the next
+  let menuFor = null; // the cell 長押し's menu is open for
   let chartDraft = null, composing = false, mDelTimer = null; // a cell's text not saved yet; a kana conversion under way
   let mEditGoal = null; // the goal whose name, 達成基準 and 期限 the fields under its chart were filled from
   // what the sheet holds, one view at a time: a new goal, a goal's chart, the settings, a new plan, an entry of a record
@@ -3439,7 +3459,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null;
+    editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; recEdit = null; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
   // a grey day of the month before or after opens its sheet too, without turning the month (the user's call)
@@ -3651,12 +3671,20 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     presentSheet(byKey, "todo", $("todoText"));
   }
   // a goal's chart: from its row in the list, at the goal's own eight; from 次にやること, at the level of its action (path)
-  function openChart(id, byKey, path = []) {
+  function openChart(id, byKey, path = [], spot = null) {
     if (sheetEl.open || !goals.get(id)) return;
     resetSheet();
     mandalaGoal = chartReturnId = id; mPath = path;
     buildChart(); syncSheetHead();
     presentSheet(byKey, "chart");
+    if (spot !== null) spotCell(spot);
+  }
+  // the cell of the action opened from 次にやること, lit for a moment (the user's call: it didn't stand out)
+  function spotCell(k) {
+    const box = mGrid.querySelector(`.m-cell[data-k="${k}"]`);
+    if (!box) return;
+    box.classList.add("spot");
+    setTimeout(() => box.classList.remove("spot"), 1800);
   }
   // straight after 追加: the new goal's chart takes the place of the form in the open sheet
   function showNewChart(id) {
@@ -3713,7 +3741,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // out of it, otherwise out of the sheet
   sheetEl.addEventListener("cancel", (ev) => {
     ev.preventDefault();
-    if (mSwap !== null) { endSwap(); return; } // a cell picked up is put down first
+    if (menuFor !== null) { closeMenu(); return; } // a menu open goes first, then a cell picked up
+    if (mSwap !== null) { endSwap(); return; }
     if (mandalaGoal && (mPath.length || chartFromDay)) chartBack(); else if (editingId || settingsFrom === "day") showDayView(); else if (planFromDay) backToDay(); else if (dayFromFind) backToFind(); else closeSheet();
   });
   // a tap on the dimmed page above the sheet puts it away
@@ -3763,7 +3792,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // the nine cells for the level walked into; paintChart fills them, and redraws them in place after each change so a
   // cell being typed in keeps its text, caret and keyboard
   function buildChart() {
-    mSwap = null; mGrid.classList.remove("swapping");
+    mSwap = null; mGrid.classList.remove("swapping"); closeMenu();
     mGrid.classList.toggle("whole", mOverview);
     if (mOverview) { paintChart(); return; } // 全体 is drawn whole each time (paintWhole)
     const word = CELL_WORDS[mPath.length];
@@ -3792,6 +3821,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const canWhole = left >= 2;
     if (mOverview && !canWhole) { mOverview = false; buildChart(); return; } // 分割 went down to 1回
     $("mView").hidden = !canWhole;
+    $("mImageCard").hidden = !mOverview || !canWhole;
     for (const b of $("mView").querySelectorAll("button")) b.setAttribute("aria-pressed", String((b.dataset.view === "whole") === mOverview));
     const name = oneLine(node.t);
     if (mOverview) paintWhole(g, node, left);
@@ -3801,7 +3831,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       const mid = mGrid.querySelector(".m-center"), kids = kidsOf(node, left), midDone = mPath.length ? cellDone(node, left) : !!g.done;
       mid.classList.toggle("done", midDone);
       mid.querySelector(".m-title").textContent = name;
-      mid.querySelector(".m-pct").textContent = !kids.length ? "" : midDone && !mPath.length ? "達成" : `${Math.floor(cellProgress(node, left) * 100)}%`;
+      // with nothing around it, the middle's own check, and the day it was given (the goal's doneAt)
+      const midAt = mPath.length ? node.at : g.doneAt;
+      mid.querySelector(".m-pct").textContent = !kids.length ? (midDone && midAt ? `${fmtMD(ymd(new Date(midAt)))} 達成` : "") : midDone && !mPath.length ? "達成" : `${Math.floor(cellProgress(node, left) * 100)}%`;
       setChildren(mid.querySelector(".m-tools"), kids.length ? null : chartCheck(name, midDone, toggleMiddle));
       for (const box of mGrid.querySelectorAll(".m-cell[data-k]")) {
         const k = Number(box.dataset.k), cell = node.c?.[k] || null, text = cell?.t || "", filled = !!text.trim(), cname = oneLine(text);
@@ -3812,6 +3844,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
         box.classList.toggle("done", done);
         setChildren(box.querySelector(".m-tools"),
           !filled ? null : inner.length ? el("span", { class: "m-count" }, `${inner.filter((x) => cellDone(x, left - 2)).length}/${inner.length}`) : chartCheck(cname, done, () => toggleCell(k)),
+          // the day it was checked (the user's call: when each was done was kept nowhere); none for one checked before
+          filled && !inner.length && done && cell.at ? el("span", { class: "m-date" }, fmtMD(ymd(new Date(cell.at)))) : null,
           filled && left > 1 ? el("button", { type: "button", class: "m-open", "data-role": "open", "aria-label": inner.length ? `「${cname}」の中を開く` : `「${cname}」を8つに分ける`, onclick: () => openCell(k) }, icon("next", 16)) : null);
       }
       fitCells();
@@ -3824,17 +3858,17 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const above = mPath.map((_, i) => oneLine(nodeAt(g, mPath.slice(0, i))?.t));
     trail.textContent = above.map((t, i) => (i < above.length - 1 ? clip(t, 10) : t)).join(" › ");
     $("mHint").textContent = mSwap !== null ? "入れ替える先のマスを押してください。同じマスを押すとやめます。" : mOverview
-      ? `チャート全体です。まわりのかたまりを押すと、その${CELL_WORDS[mPath.length]}の8マスに入って書けます。＋のかたまりからは、新しい${CELL_WORDS[mPath.length]}を書けます。`
+      ? `かたまりを押すと、その${CELL_WORDS[mPath.length]}の8マスを開きます。＋からは新しい${CELL_WORDS[mPath.length]}を書けます。`
       : left > 1
-        ? "まわりの8マスに書き出します。› でそのマスをさらに8つに分けられ、中が全部達成になるとそのマスも達成になります。長押しで、ほかのマスと入れ替えられます。"
-        : "まわりの8マスに書き出して、できたら ○ をタップして達成にします。長押しで、ほかのマスと入れ替えられます。";
+        ? "› で8つに分けられます。長押しで入れ替えなどができます。"
+        : "○ で達成にします。長押しで入れ替えなどができます。";
     $("mRoot").hidden = !!mPath.length;
     if (!mPath.length) {
       // a field being typed in keeps its text when the same goal is drawn again, but another goal always fills it: focus
       // can stay in a field of a sheet that has closed until the browser next draws
       for (const [id, key] of GOAL_EDIT) if (mEditGoal !== g.id || document.activeElement !== $(id)) $(id).value = goalField(g, key);
       mEditGoal = g.id;
-      growField($("mTitle")); growField($("mCriterion"));
+      for (const id of ["mTitle", "mCriterion", "mMemo"]) growField($(id));
       // 達成にする while not achieved; 達成を取り消す when achieved by hand or by the middle's own check; nothing when the
       // cells achieved it (one is unchecked to undo it)
       const hasEls = kidsOf(nodeAt(g, []), depth).length > 0;
@@ -3894,6 +3928,64 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   // and again when the cells change size: the sheet opening, the phone turned
   new ResizeObserver(() => { if (mandalaGoal && !mOverview) fitCells(); }).observe(mGrid);
+  // 全体 as a picture (the user's call: a mandala chart is printed or shown to others): the name over the nine blocks of
+  // nine, done cells tinted, in the light colours whatever the screen's. A phone saves it through the share sheet (写真 or
+  // ファイル), as the records' backup is; elsewhere it is downloaded
+  async function saveChartImage() {
+    const g = goals.get(mandalaGoal), node = g && nodeAt(g, mPath);
+    if (!g || !node) return;
+    const left = goalDepth(g) - mPath.length, font = getComputedStyle(document.body).fontFamily;
+    const CELL = 112, GAP = 4, BGAP = 12, PAD = 28, HEAD = 70, SCALE = 2, block = CELL * 3 + GAP * 2, size = block * 3 + BGAP * 2;
+    const W = size + PAD * 2, H = size + PAD * 2 + HEAD;
+    const canvas = document.createElement("canvas");
+    canvas.width = W * SCALE; canvas.height = H * SCALE;
+    const x = canvas.getContext("2d");
+    x.scale(SCALE, SCALE);
+    // the mint of 目標, mixed with white as the tints on the screen are
+    const tint = (a) => `rgb(${[0, 133, 117].map((v) => Math.round(v * a + 255 * (1 - a))).join(",")})`;
+    const lines = (text, width, max) => {
+      const out = [""];
+      for (const ch of text) {
+        const cur = out[out.length - 1];
+        if (x.measureText(cur + ch).width <= width || !cur || "、。，．」』）！？ー".includes(ch)) out[out.length - 1] = cur + ch; else out.push(ch);
+      }
+      if (out.length > max) { out.length = max; out[max - 1] = out[max - 1].slice(0, -1) + "…"; }
+      return out;
+    };
+    x.fillStyle = "#f2f2f7"; x.fillRect(0, 0, W, H);
+    x.fillStyle = "#000000"; x.font = `700 26px ${font}`; x.textBaseline = "middle"; x.textAlign = "left";
+    x.fillText(lines(oneLine(node.t), size, 1)[0], PAD, PAD + 22);
+    x.textAlign = "center";
+    for (let bi = 0; bi < 9; bi++) {
+      const k = GRID_ORDER[bi], centre = k < 0, bc = centre ? node : node.c?.[k] || null, named = !!oneLine(bc?.t), l = centre ? left : left - 1;
+      const bx = PAD + (bi % 3) * (block + BGAP), by = PAD + HEAD + Math.floor(bi / 3) * (block + BGAP);
+      for (let mi = 0; mi < 9; mi++) {
+        const j = GRID_ORDER[mi], mid = j < 0, cell = mid ? bc : named ? bc.c?.[j] || null : null, text = named ? oneLine(cell?.t) : "";
+        const done = mid && centre && !mPath.length ? !!g.done : !!(text && cellDone(cell, mid ? l : l - 1));
+        const cx = bx + (mi % 3) * (CELL + GAP), cy = by + Math.floor(mi / 3) * (CELL + GAP);
+        x.fillStyle = mid ? tint(done ? 0.4 : 0.26) : done ? tint(0.16) : "#ffffff";
+        x.beginPath(); if (x.roundRect) x.roundRect(cx, cy, CELL, CELL, 10); else x.rect(cx, cy, CELL, CELL); x.fill();
+        if (!text) continue;
+        x.fillStyle = "#000000"; x.font = `${mid ? 700 : 400} 16px ${font}`;
+        const ls = lines(text, CELL - 14, 5), lh = 20, top = cy + CELL / 2 - ((ls.length - 1) * lh) / 2;
+        ls.forEach((s, i) => x.fillText(s, cx + CELL / 2, top + i * lh));
+      }
+    }
+    const name = `tsumikasane-mandala-${todayKey}.png`;
+    const blob = await new Promise((done) => canvas.toBlob(done, "image/png"));
+    if (!blob) { flash("画像にできませんでした。"); return; }
+    const file = new File([blob], name, { type: "image/png" });
+    if (matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: oneLine(node.t) }); }
+      catch (e) { if (e.name !== "AbortError") flash("保存できませんでした。もう一度お試しください。"); }
+      return;
+    }
+    const a = el("a", { href: URL.createObjectURL(blob), download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    flash(`「${name}」を保存しました。`);
+  }
+  $("mImage").addEventListener("click", saveChartImage);
   // 8マス or 全体, from the switch over the chart
   $("mView").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
     const whole = b.dataset.view === "whole";
@@ -3904,7 +3996,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }));
   // the goal's own name, 達成基準 and 期限, changed in place under its first chart. All three were needed to make the goal,
   // so a field left empty takes its old value back
-  const GOAL_EDIT = [["mTitle", "title"], ["mCriterion", "criterion"], ["mDeadline", "deadline"]];
+  const GOAL_EDIT = [["mTitle", "title"], ["mCriterion", "criterion"], ["mDeadline", "deadline"], ["mMemo", "memo"]];
   const goalField = (g, key) => (key === "criterion" ? criterionText(g) : g[key] || "");
   function saveGoalEdit() {
     const g = goals.get(mandalaGoal);
@@ -3912,9 +4004,9 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     const patch = {};
     for (const [id, key] of GOAL_EDIT) {
       const v = $(id).value.trim(), was = goalField(g, key);
-      if (!v) $(id).value = was; else if (v !== was) patch[key] = v;
+      if (!v && key !== "memo") $(id).value = was; else if (v !== was) patch[key] = v; // the memo alone may be emptied
     }
-    growField($("mTitle")); growField($("mCriterion")); // an emptied field has its old text back
+    for (const id of ["mTitle", "mCriterion", "mMemo"]) growField($(id)); // an emptied field has its old text back
     if (!Object.keys(patch).length) return;
     act(() => goals.update(g.id, patch));
     syncSheetHead(); // the bar's title is the goal's name
@@ -3952,7 +4044,8 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     ta.style.height = ta.scrollHeight + 2 + "px"; // and its border, top and bottom
     ta.dataset.fit = key;
   }
-  for (const ta of document.querySelectorAll("textarea.grow")) {
+  $("mMemo").addEventListener("input", () => growField($("mMemo"))); // the memo grows too, but keeps its line breaks
+  for (const ta of document.querySelectorAll("textarea.grow:not(.memo)")) {
     ta.addEventListener("input", () => {
       if (/[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/\s*[\r\n]+\s*/g, " "); // pasted in on several lines
       growField(ta);
@@ -3990,7 +4083,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   }
   // the checks of the cells with written ones inside them (`left`: the levels that may open below these cells)
   function dropOwnChecks(slots, left) {
-    for (const cell of slots) if (kidsOf(cell, left).length) { delete cell.d; dropOwnChecks(cell.c, left - 1); }
+    for (const cell of slots) if (kidsOf(cell, left).length) { delete cell.d; delete cell.at; dropOwnChecks(cell.c, left - 1); }
   }
   // 分割 going down: the cells that become the last level (`levels` down, 1 for the eight around the goal) keep the 達成
   // they showed from what is inside them (`extra` levels of it) as their own check, so the change alone neither achieves
@@ -3999,7 +4092,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     for (const cell of slots) {
       if (!cell?.t?.trim()) continue;
       if (levels > 1) { if (Array.isArray(cell.c)) keepDone(cell.c, levels - 1, extra); }
-      else if (kidsOf(cell, extra).length) { if (cellDone(cell, extra)) cell.d = true; else delete cell.d; }
+      else if (kidsOf(cell, extra).length) { delete cell.at; if (cellDone(cell, extra)) cell.d = true; else delete cell.d; }
     }
   }
   function setCellText(k, text) {
@@ -4030,7 +4123,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     commitChartText();
     const g = goals.get(mandalaGoal), chart = g && editChart(g), cell = chart && slotsAt(chart, mPath)[k];
     if (!cell) return;
-    if (cell.d) delete cell.d; else cell.d = true;
+    if (cell.d) { delete cell.d; delete cell.at; } else { cell.d = true; cell.at = Date.now(); }
     saveChart(g, chart);
   }
   function toggleMiddle() {
@@ -4039,7 +4132,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!g) return;
     if (!mPath.length) { saveChart(g, editChart(g), { selfDone: !g.done }); return; }
     const chart = editChart(g), cell = slotsAt(chart, mPath.slice(0, -1))[mPath[mPath.length - 1]];
-    if (cell.d) delete cell.d; else cell.d = true;
+    if (cell.d) { delete cell.d; delete cell.at; } else { cell.d = true; cell.at = Date.now(); }
     saveChart(g, chart);
   }
   // into a cell (its eight around it) and back out
@@ -4121,6 +4214,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
   // eight, puts it down
   mGrid.addEventListener("click", (ev) => {
     if (swallowClick) { swallowClick = false; return; } // the end of the 長押し that picked a cell up
+    if (menuFor !== null) { closeMenu(); return; } // a tap off the menu puts it away
     const box = ev.target.closest(".m-cell[data-k]");
     if (mSwap !== null) {
       const k = box ? Number(box.dataset.k) : null;
@@ -4161,13 +4255,45 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (!box || mOverview || mSwap !== null || ev.button !== 0 || ev.target.closest("button") || box.contains(document.activeElement)) return;
     clearTimeout(holdTimer);
     holdFrom = { x: ev.clientX, y: ev.clientY };
-    holdTimer = setTimeout(() => { holdTimer = null; swallowClick = true; pickCell(Number(box.dataset.k)); }, 500);
+    holdTimer = setTimeout(() => { holdTimer = null; swallowClick = true; cellMenu(Number(box.dataset.k)); }, 500);
   });
   mGrid.addEventListener("pointermove", (ev) => {
     if (holdTimer && Math.hypot(ev.clientX - holdFrom.x, ev.clientY - holdFrom.y) > 10) { clearTimeout(holdTimer); holdTimer = null; }
   });
   for (const type of ["pointerup", "pointercancel", "pointerleave"]) mGrid.addEventListener(type, () => { clearTimeout(holdTimer); holdTimer = null; });
   mGrid.addEventListener("contextmenu", (ev) => { if (ev.target.closest(".m-cell[data-k]")) ev.preventDefault(); });
+  // 長押し on a written cell opens its menu (the user's call: an action done every day had no way into ルーティーン): swap it
+  // with another cell, or put it into ルーティーン. An empty one has only its place to give, so it is picked up at once
+  function cellMenu(k) {
+    const g = goals.get(mandalaGoal), name = oneLine(g && nodeAt(g, mPath)?.c?.[k]?.t);
+    if (!name) { pickCell(k); return; }
+    const inRoutine = routines.items.some((r) => oneLine(r.name) === name), menu = $("mMenu");
+    menu.replaceChildren(
+      el("button", { type: "button", role: "menuitem", onclick: () => { closeMenu(); pickCell(k); } }, "ほかのマスと入れ替える"),
+      el("button", { type: "button", role: "menuitem", disabled: inRoutine, onclick: () => { closeMenu(); addToRoutine(name); } }, inRoutine ? "ルーティーンに入っています" : "ルーティーンに入れる"));
+    const box = mGrid.querySelector(`.m-cell[data-k="${k}"]`), b = box.getBoundingClientRect(), v = $("mandalaView").getBoundingClientRect();
+    menu.hidden = false;
+    menu.style.left = Math.max(8, Math.min(b.left - v.left, v.width - menu.offsetWidth - 8)) + "px";
+    menu.style.top = b.bottom - v.top + 6 + "px";
+    box.classList.add("picked");
+    menuFor = k;
+    navigator.vibrate?.(15);
+  }
+  function closeMenu() {
+    if (menuFor === null) return;
+    $("mMenu").hidden = true;
+    mGrid.querySelector(`.m-cell[data-k="${menuFor}"]`)?.classList.remove("picked");
+    menuFor = null;
+  }
+  // a press anywhere else in the sheet puts the menu away
+  sheetEl.addEventListener("pointerdown", (ev) => { if (menuFor !== null && !ev.target.closest("#mMenu") && !ev.target.closest("#mGrid")) closeMenu(); });
+  // an action into ルーティーン, checked there every day from now on; 元に戻す takes it out again
+  function addToRoutine(name) {
+    act(async () => {
+      const id = await routines.add({ name, createdAt: Date.now() });
+      flash(`「${name}」をルーティーンに入れました`, () => unmerge([[routines, [id]]]));
+    });
+  }
   function pickCell(k) {
     commitChartText();
     mSwap = k;
