@@ -2253,9 +2253,11 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
       flash(`「${text}」を追加しました`, () => unmerge([[todos, [id]]]));
     });
     // the sheet stays, empty, with the typing ready for the next one (the user's call: it had to be opened again for each);
-    // the bar's キャンセル becomes 閉じる
+    // the bar's キャンセル becomes 閉じる. The next one keeps this one's 期限 (the user's call: several for one day were each
+    // given it again), or begun from a day with none, that day; its repeat, 重要 and memo are its own, so they go
     clearTodoForm();
-    if (todoFromDay) { $("todoDue").value = calDay; syncTodoDue(); } // begun from a day: the next one is for that day too
+    const next = due || (todoFromDay ? calDay : "");
+    if (next) { $("todoDue").value = next; syncTodoDue(); }
     todoAdded = true; syncSheetHead();
     $("todoText").focus();
   });
@@ -3737,7 +3739,7 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     if (tileDrag) endTileDrag({ type: "pointercancel" }); // a tile's row let go of, should the sheet go mid-drag
     sheetEl.style.transform = "";
     commitChartText(); // a cell's unsaved text goes in before the chart lets go
-    dropDayTodo();
+    dropKeptDue();
     editingId = null; settingsFrom = null; goalNew = false; planNew = false; planFromDay = false; planCopy = false; monthPick = false; findOpen = false; dayFromFind = false; todoNew = false; todoAdded = false; todoNewIds = []; todoFromDay = false; recEdit = null; recFromDay = false; mandalaGoal = null; mPath = []; mEditGoal = null; chartFromDay = false; mOverview = false; mWholeFrom = []; mSwap = null; menuFor = null; $("mMenu").hidden = true;
     disarmDelete(); disarmGoalDelete(); disarmRecDelete(); syncSheetHead();
   }
@@ -3778,10 +3780,10 @@ html[data-nav="pop"]::view-transition-old(root) { animation-name: nav-out-to-rig
     $("todoText").focus();
     growField($("todoText")); growField($("todoMemo"));
   }
-  function backFromTodo() { dropDayTodo(); todoNew = false; todoFromDay = false; todoAdded = false; todoNewIds = []; showDayView(); }
-  // leaving a new ToDo begun from a day: the day's 期限 put in for it goes too, unless something typed goes with it, so
-  // ToDo's own ＋ doesn't open on that day later
-  function dropDayTodo() { if (todoFromDay && !$("todoText").value.trim()) clearTodoForm(); }
+  function backFromTodo() { dropKeptDue(); todoNew = false; todoFromDay = false; todoAdded = false; todoNewIds = []; showDayView(); }
+  // leaving a new ToDo begun from a day, or after one was added: the 期限 put in for it (the day's, or the last one's) goes
+  // too, unless something typed goes with it, so ToDo's own ＋ doesn't open on that day later
+  function dropKeptDue() { if ((todoFromDay || todoAdded) && !$("todoText").value.trim()) clearTodoForm(); }
   // この予定を複製: the new plan's form in the same sheet holding this plan's name, days, times, label and memo, on this
   // turn's day, to set on another day (the user's call); a copy doesn't repeat. 追加 and キャンセル come back to the list
   function copyPlan() {
